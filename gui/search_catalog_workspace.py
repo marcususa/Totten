@@ -1,6 +1,5 @@
 import json
 import os
-import threading
 from pathlib import Path
 from tkinter import ttk
 import customtkinter as ctk
@@ -35,7 +34,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         self._configure_styles()
         self._build_ui()
-        self.load_catalog()
+
+        # Safely schedule the catalog loading on the main Tkinter thread
+        self.after(100, self.load_catalog)
 
     def _configure_styles(self):
         self.style = ttk.Style()
@@ -117,82 +118,69 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.table_frame.grid_columnconfigure(0, weight=1)
 
     def load_catalog(self):
-        def _load():
-            catalog_data = {}
-            if self.json_path.exists():
-                try:
-                    with open(self.json_path, "r", encoding="utf-8") as f:
-                        catalog_data = json.load(f)
-                except Exception as e:
-                    print(f"Error loading catalog json: {e}")
+        catalog_data = {}
+        if self.json_path.exists():
+            try:
+                with open(self.json_path, "r", encoding="utf-8") as f:
+                    catalog_data = json.load(f)
+            except Exception as e:
+                print(f"Error loading catalog json: {e}")
 
-            all_games = []
-            headers_set = set()
-            if self.pgn_path.exists():
-                try:
-                    with open(self.pgn_path, "r", encoding="utf-8", errors="ignore") as f:
-                        while True:
-                            headers = chess.pgn.read_headers(f)
-                            if headers is None:
-                                break
+        all_games = []
+        headers_set = set()
+        if self.pgn_path.exists():
+            try:
+                with open(self.pgn_path, "r", encoding="utf-8", errors="ignore") as f:
+                    while True:
+                        headers = chess.pgn.read_headers(f)
+                        if headers is None:
+                            break
 
-                            cleaned_headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in
-                                               headers.items()}
-                            headers_set.update(cleaned_headers.keys())
-                            all_games.append(cleaned_headers)
-                except Exception as e:
-                    print(f"Error loading catalog pgn: {e}")
+                        cleaned_headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in
+                                           headers.items()}
+                        headers_set.update(cleaned_headers.keys())
+                        all_games.append(cleaned_headers)
+            except Exception as e:
+                print(f"Error loading catalog pgn: {e}")
 
-            headers_set.update(STANDARD_TAG_BANK["common"])
-            headers_set.update(STANDARD_TAG_BANK["essential"])
+        headers_set.update(STANDARD_TAG_BANK["common"])
+        headers_set.update(STANDARD_TAG_BANK["essential"])
 
-            def _update_ui():
-                self.catalog = catalog_data
+        self.catalog = catalog_data
+        self.all_games_columns = list(headers_set)
 
-                self.all_games_columns = list(headers_set)
+        priority_order = [
+            "ECO", "Games", "Opening", "Variation",
+            "White", "Black",
+            "Event", "Site", "Date", "Round", "Result",
+            "WhiteElo", "BlackElo", "TimeControl", "Termination", "Annotator", "PlyCount"
+        ]
 
-                # Hierarchical Sorting Structure:
-                # 1. First layer core: ECO, Games, Opening, Variation
-                # 2. Players layer: White, Black
-                # 3. Context layer: Event, Site, Date, Round, Result
-                # 4. Extended Common/Other metadata tags alphabetically
-                priority_order = [
-                    "ECO", "Games", "Opening", "Variation",
-                    "White", "Black",
-                    "Event", "Site", "Date", "Round", "Result",
-                    "WhiteElo", "BlackElo", "TimeControl", "Termination", "Annotator", "PlyCount"
-                ]
+        ordered_cols = [c for c in priority_order if c in self.all_games_columns or c == "Games"]
 
-                ordered_cols = [c for c in priority_order if c in self.all_games_columns or c == "Games"]
+        for c in sorted(self.all_games_columns):
+            if c not in ordered_cols and c != "Games":
+                ordered_cols.append(c)
 
-                for c in sorted(self.all_games_columns):
-                    if c not in ordered_cols and c != "Games":
-                        ordered_cols.append(c)
+        self.all_games_columns = ordered_cols
 
-                self.all_games_columns = ordered_cols
+        self.all_games_data = []
+        for h in all_games:
+            row = []
+            for col in self.all_games_columns:
+                if col == "Games":
+                    row.append("1")
+                else:
+                    row.append(h.get(col, ""))
+            self.all_games_data.append(row)
 
-                self.all_games_data = []
-                for h in all_games:
-                    row = []
-                    for col in self.all_games_columns:
-                        if col == "Games":
-                            row.append("1")
-                        else:
-                            row.append(h.get(col, ""))
-                    self.all_games_data.append(row)
+        self.setup_treeview(self.all_games_columns)
+        for row in self.all_games_data:
+            self.tree.insert("", "end", values=row)
 
-                # Instantly display full hierarchical game catalog on silver platter
-                self.setup_treeview(self.all_games_columns)
-                for row in self.all_games_data:
-                    self.tree.insert("", "end", values=row)
-
-                self.lbl_tag_count.configure(text=f"Loaded Tags: {len(self.all_games_columns)}")
-                set_status_message(
-                    f"Catalog loaded instantly with full hierarchical dataset ({len(self.all_games_data):,} games).")
-
-            self.after(0, _update_ui)
-
-        threading.Thread(target=_load, daemon=True).start()
+        self.lbl_tag_count.configure(text=f"Loaded Tags: {len(self.all_games_columns)}")
+        set_status_message(
+            f"Catalog loaded instantly with full hierarchical dataset ({len(self.all_games_data):,} games).")
 
     def refresh_tree(self):
         for item in self.tree.get_children():
