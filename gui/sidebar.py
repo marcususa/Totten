@@ -1,174 +1,136 @@
-import gui.app_state as state
+# gui/sidebar.py
+
 import customtkinter as ctk
-from tkinter import ttk
-left_frame = None
-sidebar = None
+import gui.app_state as state
 
-pgn_node = None
-pgn_games_node = None
-mixed_collections_node = None
-catalog_node = None
-notes_node = None
 
-sidebar_visible = True
+class Sidebar(ctk.CTkFrame):
+    def __init__(self, parent, on_navigate_callback):
+        super().__init__(parent, width=150, corner_radius=0, fg_color="#172134")
+        self.on_navigate = on_navigate_callback
 
-from gui.events import on_tree_select
+        # Prevent inner widgets from forcing the frame past 150px width
+        self.pack_propagate(False)
+
+        # --- STATUS DISPLAY (Anchored at the bottom) ---
+        self.status_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.status_container.pack(side="bottom", fill="x", padx=10, pady=(5, 10))
+
+        self.lbl_status = ctk.CTkLabel(
+            self.status_container,
+            text="Ready",
+            anchor="sw",
+            justify="left",
+            wraplength=130,  # Wrapped to fit comfortably inside 150px
+            font=ctk.CTkFont(size=11),
+            text_color=("gray40", "gray60")
+        )
+        self.lbl_status.pack(side="bottom", fill="x", anchor="sw")
+
+        # Save reference to app_state for global updates
+        state.status = self.lbl_status
+
+        # --- NAVIGATION TREE / BUTTONS (Packed from top) ---
+
+        # 1. PGN Games
+        self.btn_pgn_games = ctk.CTkButton(
+            self,
+            text="PGN Games",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("pgn_games")
+        )
+        self.btn_pgn_games.pack(fill="x", padx=5, pady=(15, 2))
+
+        # 1a. Games Data
+        self.btn_games_data = ctk.CTkButton(
+            self,
+            text="  ↳ Games Data\n    Analysis",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray25", "gray75"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("pgn_games")
+        )
+        self.btn_games_data.pack(fill="x", padx=5, pady=(0, 5))
+
+        # 2. Catalog
+        self.btn_catalog = ctk.CTkButton(
+            self,
+            text="Catalog",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("catalog")
+        )
+        self.btn_catalog.pack(fill="x", padx=5, pady=5)
+
+        # 3. Mixed Collections
+        self.lbl_mixed = ctk.CTkLabel(
+            self,
+            text="Mixed Collections",
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray30", "gray70")
+        )
+        self.lbl_mixed.pack(fill="x", padx=8, pady=5)
+
+        # 4. Notes
+        self.btn_notes = ctk.CTkButton(
+            self,
+            text="Notes",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("notes")
+        )
+        self.btn_notes.pack(fill="x", padx=5, pady=5)
+
+
+# --- TOP LEVEL FUNCTIONS ---
+
+def create_sidebar(app, on_navigate_callback=None):
+    """Factory function to initialize and return the Sidebar frame."""
+    if on_navigate_callback is None:
+        from gui.workspace import show_workspace
+        on_navigate_callback = show_workspace
+
+    sidebar = Sidebar(app, on_navigate_callback)
+    state.left_frame = sidebar
+    state.sidebar_visible = True
+
+    if hasattr(app, "grid_columnconfigure"):
+        app.grid_columnconfigure(0, minsize=150, weight=0)
+
+    return sidebar
+
 
 def toggle_sidebar():
+    """Toggles the visibility of the sidebar frame and keeps column 0 locked at 150px."""
+    sidebar = getattr(state, "left_frame", None)
 
-    global sidebar_visible
+    if sidebar is None:
+        print("Notice: Sidebar frame reference (state.left_frame) not found.")
+        return
 
-    if sidebar_visible:
-        left_frame.grid_remove()
-        sidebar_app.grid_columnconfigure(0, minsize=0)
+    app = sidebar.master
+
+    if getattr(state, "sidebar_visible", True):
+        sidebar.grid_remove()
+        if hasattr(app, "grid_columnconfigure"):
+            app.grid_columnconfigure(0, minsize=0, weight=0)
+        state.sidebar_visible = False
     else:
-        left_frame.grid()
-        left_frame.configure(width=250)
-        sidebar_app.grid_columnconfigure(0, minsize=250)
+        # Lock frame size and column to 150px
+        sidebar.configure(width=150)
+        sidebar.pack_propagate(False)
 
-    sidebar_visible = not sidebar_visible
+        if hasattr(app, "grid_columnconfigure"):
+            app.grid_columnconfigure(0, minsize=150, weight=0)
 
-
-
-def create_sidebar(app):
-
-    global sidebar_app
-    sidebar_app = app
-
-    global left_frame
-    global sidebar
-
-    global pgn_node
-    global pgn_games_node
-    global mixed_collections_node
-    global catalog_node
-    global notes_node
-
-    # ----------------------------
-    # Sidebar Frame
-    # ----------------------------
-
-    left_frame = ctk.CTkFrame(
-        app,
-        width=250,
-        fg_color="#374154"
-    )
-
-    left_frame.grid(
-        row=1,
-        column=0,
-        sticky="nsew",
-        padx=0,
-        pady=0
-    )
-
-    app.grid_columnconfigure(0, weight=0)
-    app.grid_columnconfigure(1, weight=1)
-
-    left_frame.grid_propagate(False)
-
-
-
-    # ----------------------------
-    # Tree Style
-    # ----------------------------
-
-    style = ttk.Style()
-    style.theme_use("default")
-
-    style.configure(
-        "Treeview",
-        background="#273144",
-        fieldbackground="#273144",
-        foreground="#eeeeee",
-        relief="flat",
-        borderwidth=0,
-        rowheight=24
-    )
-
-    style.configure(
-        "Treeview.Heading",
-        relief="solid",
-        borderwidth=0,
-        padding="2",
-        background="#1f6aa5",
-        foreground="#eeeeee"
-    )
-
-
-    style.map(
-        "Treeview",
-        background=[("selected", "#346934")],
-        foreground=[("selected", "#dddddd")]
-    )
-
-
-    # ----------------------------
-    # Sidebar Tree
-    # ----------------------------
-
-    sidebar = ttk.Treeview(
-        left_frame,
-        style="Treeview",
-        show="tree"
-    )
-    sidebar.bind("<<TreeviewSelect>>", on_tree_select)
-
-    sidebar.pack(
-        fill="both",
-        expand=True,
-        padx=(0,4),
-        pady=(0,4)
-    )
-
-    sidebar.bind("<<TreeviewSelect>>", on_tree_select)
-
-    # ----------------------------
-    # Root Items
-    # ----------------------------
-
-    pgn_node = sidebar.insert(
-        "",
-        "end",
-        text="PGN Collection",
-        open=True
-    )
-
-    pgn_games_node = sidebar.insert(
-        "",
-        "end",
-        text="PGN Games",
-        open=True
-    )
-
-    mixed_collections_node = sidebar.insert(
-        "",
-        "end",
-        text="Mixed Collections",
-        open=True
-    )
-
-    catalog_node = sidebar.insert(
-        "",
-        "end",
-        text="Catalog",
-        open=True
-    )
-
-    notes_node = sidebar.insert(
-        "",
-        "end",
-        text="Notes",
-        open=True
-    )
-
-    # Export to app_state
-
-    state.left_frame = left_frame
-    state.sidebar = sidebar
-
-    state.pgn_node = pgn_node
-    state.pgn_games_node = pgn_games_node
-    state.mixed_collections_node = mixed_collections_node
-    state.catalog_node = catalog_node
-    state.notes_node = notes_node
+        sidebar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        state.sidebar_visible = True
