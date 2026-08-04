@@ -1,209 +1,108 @@
-import os
 import json
-import chess.pgn
-import gui.app_state as state
 from pathlib import Path
-
-def catalog_pgns(add_catalog_button, import_button, catalog_button, imported_files, status, workspace):
-    add_catalog_button.configure(text="Add to Catalog")
-    add_catalog_button.configure(state="disabled")
-    import_button.configure(state="normal")
-    catalog_button.configure(state="normal")
-    selected_games = set()
-
-    if not imported_files:
-        status.configure(
-            text="No PGNs imported to catalog."
-        )
-        return
-
-    print("Game Data selections:")
-    for name, var in state.game_data_vars.items():
-        print(name, var.get())
-
-    print("Other Data selections:")
-    for name, var in state.other_data_vars.items():
-        print(name, var.get())
-
-    add_catalog_button.configure(text="Please Wait...")
-    workspace.update()
-
-    new_files = []
-
-    total_games = 0
-
-    if os.path.exists("personal_catalog.json"):
-        with open("personal_catalog.json", "r", encoding="utf-8") as f:
-            catalog = json.load(f)
-
-        cataloged_files = catalog.get("cataloged_files", [])
-    else:
-        catalog = {
-            "cataloged_files": [],
-            "A": {},
-            "B": {},
-            "C": {},
-            "D": {},
-            "E": {}
-        }
-
-        cataloged_files = []
-
-    for filename in imported_files:
-
-        short_name = Path(filename).name
-
-        if filename in cataloged_files:
-            continue
-
-        with open(filename, encoding="utf-8") as pgn:
-            filtered_games = []
-            while True:
-
-                game = chess.pgn.read_game(pgn)
-
-                if game is None:
-                    break
-                rating_setting = state.rating_filter.get()
-
-                white_elo = game.headers.get("WhiteElo", "")
-                black_elo = game.headers.get("BlackElo", "")
-
-                if rating_setting != "All":
-
-                    minimum_rating = int(rating_setting.replace("+", ""))
-
-                    white_rating = int(white_elo) if white_elo.isdigit() else 0
-                    black_rating = int(black_elo) if black_elo.isdigit() else 0
-
-                    if white_rating < minimum_rating and black_rating < minimum_rating:
-                        continue
+import chess.pgn
 
 
-                total_games += 1
+def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="personal_catalog.pgn",
+                 tag_mappings=None):
+    """
+    Parses a PGN file, updates the opening frequencies in the catalog JSON,
+    and accumulates all parsed games into personal_catalog.pgn with clean movetext formatting.
+    """
+    pgn_file = Path(pgn_path)
+    cat_file = Path(catalog_path)
+    pgn_out = Path(pgn_out_path)
+    tag_mappings = tag_mappings or {}
 
-                eco = game.headers.get("ECO", "").strip()
-                opening = game.headers.get("Opening", "").strip()
-                variation = game.headers.get("Variation", "").strip()
+    # Load existing catalog data if the json already exists
+    existing_files = []
+    catalog = {}
+    if cat_file.exists():
+        try:
+            with open(cat_file, "r", encoding="utf-8") as f:
+                old_data = json.load(f)
+                if isinstance(old_data, dict):
+                    catalog = old_data
+                    if "cataloged_files" in catalog:
+                        existing_files = catalog["cataloged_files"]
+        except Exception:
+            pass
 
-                if eco and opening:
+    file_str = str(pgn_file.resolve())
+    if file_str not in existing_files:
+        existing_files.append(file_str)
 
-                    game_info = {
-                        "ECO": eco,
-                        "Opening": opening,
-                        "Variation": variation,
-                        "White": game.headers.get("White", "White"),
-                        "Black": game.headers.get("Black", "Black")
-                    }
+    catalog["cataloged_files"] = existing_files
 
-                    if state.game_data_vars["Event"].get():
-                        game_info["Event"] = game.headers.get("Event", "")
+    if not pgn_file.exists():
+        return 0
 
-                    if state.game_data_vars["Round"].get():
-                        game_info["Round"] = game.headers.get("Round", "")
+    game_count = 0
 
-                    if state.game_data_vars["Result"].get():
-                        game_info["Result"] = game.headers.get("Result", "")
+    # Open the cumulative PGN output file in append mode to preserve previously added games
+    with open(pgn_file, "r", encoding="utf-8", errors="ignore") as f, \
+            open(pgn_out, "a", encoding="utf-8") as out_f:
 
+        while True:
+            game = chess.pgn.read_game(f)
+            if game is None:
+                break
 
-# for the unknowns, code below
+            game_count += 1
 
-                    for tag, var in state.other_data_vars.items():
-                        print(tag, game.headers.get(tag))
-                        if var.get():
-                            value = game.headers.get(tag, "").strip()
-                            if value:
-                                game_info[tag] = value
+            # Export game cleanly: columns=None removes hard line wraps in movetext
+            # to prevent ugly gaps and spacing artifacts downstream.
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
+            clean_game_str = game.accept(exporter)
 
-# for the unknowns, code above
+            # Write the clean game string to the persistent personal_catalog.pgn file
+            out_f.write(clean_game_str + "\n\n")
 
-                    depth_setting = state.depth_menu.get()
+            headers = dict(game.headers)
 
-                    if depth_setting != "All Moves":
+            for raw_tag, target_tag in tag_mappings.items():
+                if raw_tag in headers:
+                    val = headers.pop(raw_tag)
+                    if target_tag != "(Ignore)" and target_tag:
+                        headers[target_tag] = val
 
-                        max_plies = int(depth_setting.split()[0]) * 2
+            eco = str(headers.get("ECO", "UNKNOWN")).strip().upper() or "UNKNOWN"
+            opening = str(headers.get("Opening", "")).strip()
+            variation = str(headers.get("Variation", "")).strip()
 
-                        moves = []
-                        board = game.board()
+            if eco not in catalog:
+                catalog[eco] = {}
 
-                        for move in game.mainline_moves():
-                            if len(moves) >= max_plies:
-                                break
+            var_key = f"{opening} - {variation}".strip(" -")
+            if not var_key:
+                var_key = "General"
 
-                            moves.append(board.san(move))
-                            board.push(move)
+            if var_key in catalog[eco]:
+                if isinstance(catalog[eco][var_key], dict):
+                    catalog[eco][var_key]["frequency"] = catalog[eco][var_key].get("frequency", 0) + 1
+                else:
+                    catalog[eco][var_key] += 1
+            else:
+                catalog[eco][var_key] = {
+                    "eco": eco,
+                    "opening": opening,
+                    "variation": variation,
+                    "frequency": 1
+                }
 
-                        game_info["Moves"] = " ".join(moves)
+    sorted_catalog = {
+        "cataloged_files": sorted(list(set(catalog["cataloged_files"])))
+    }
 
-                    move_text = []
+    for eco in sorted(k for k in catalog.keys() if k != "cataloged_files"):
+        sorted_catalog[eco] = dict(sorted(
+            catalog[eco].items(),
+            key=lambda item: (item[1].get("opening", ""), item[1].get("variation", "")) if isinstance(item[1],
+                                                                                                      dict) else ("",
+                                                                                                                  "")
+        ))
 
-                    for i in range(0, len(moves), 2):
-                        move_number = (i // 2) + 1
+    with open(cat_file, "w", encoding="utf-8") as f:
+        json.dump(sorted_catalog, f, indent=4)
 
-                        if i + 1 < len(moves):
-                            move_text.append(f"{move_number}. {moves[i]} {moves[i + 1]}")
-                        else:
-                            move_text.append(f"{move_number}. {moves[i]}")
-
-                    game_info["Moves"] = " ".join(move_text)
-
-                    print(game_info)
-
-                    filtered_games.append(game_info)
-
-
-                    group = eco[0]
-
-                    if eco not in catalog[group]:
-                        catalog[group][eco] = {
-                            "opening": opening,
-                            "variation": variation,
-                            "frequency": 0
-                        }
-
-                    catalog[group][eco]["frequency"] += 1
-
-        state.pgn_games_lookup[short_name] = filtered_games
-
-        cataloged_files.append(filename)
-        new_files.append(filename)
-
-        games_file_node = state.sidebar.insert(
-            state.pgn_games_node,
-            "end",
-            text=short_name,
-            open=True
-        )
-
-        state.sidebar.insert(
-            games_file_node,
-            "end",
-            text="Game Data"
-        )
-
-        state.sidebar.delete(
-            state.pgn_item_lookup[filename]
-        )
-
-        del state.pgn_item_lookup[filename]
-        del state.pgn_lookup[short_name]
-
-    if not new_files:
-        add_catalog_button.configure(text="Add to Catalog")
-        status.configure(
-            text="PGNs already cataloged. Import new games to catalog more."
-        )
-        return
-
-    print(catalog)
-
-    catalog["cataloged_files"] = cataloged_files
-    with open("personal_catalog.json", "w", encoding="utf-8") as f:
-        json.dump(catalog, f, indent=4, sort_keys=True)
-
-    print("JSON written.")
-
-    status.configure(
-        text=f"Cataloged {total_games} game(s) from {len(new_files)} PGN(s)."
-    )
-    add_catalog_button.configure(text="Add to Catalog")
+    return game_count
