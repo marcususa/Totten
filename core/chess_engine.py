@@ -21,8 +21,9 @@ class ChessEngine:
             ]
         elif system == "Linux":
             possible_paths = [
-                base_dir / "stockfish-ubuntu-x86-64-bmi2",
-                base_dir / "stockfish",
+                base_dir / "stockfish",  # Generic fallback link/name
+                base_dir / "stockfish-ubuntu-x86-64",  # Generic/Baseline compatible
+                base_dir / "stockfish-ubuntu-x86-64-bmi2",  # Advanced (fails on old CPUs)
             ]
         else:
             possible_paths = [
