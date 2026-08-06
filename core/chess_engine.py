@@ -10,7 +10,6 @@ class ChessEngine:
     def __init__(self):
         base_dir = Path(__file__).parent.parent / "engines"
 
-        # Detect the current operating system to set the correct candidate binaries
         system = platform.system()
 
         if system == "Windows":
@@ -21,9 +20,9 @@ class ChessEngine:
             ]
         elif system == "Linux":
             possible_paths = [
-                base_dir / "stockfish",  # Generic fallback link/name
-                base_dir / "stockfish-ubuntu-x86-64",  # Generic/Baseline compatible
-                base_dir / "stockfish-ubuntu-x86-64-bmi2",  # Advanced (fails on old CPUs)
+                base_dir / "stockfish",
+                base_dir / "stockfish-ubuntu-x86-64",
+                base_dir / "stockfish-ubuntu-x86-64-bmi2",
             ]
         else:
             possible_paths = [
@@ -38,14 +37,9 @@ class ChessEngine:
                 break
 
         if not self.engine_path:
-            # Ultimate fallback if none of the specific candidates are found
             self.engine_path = possible_paths[0]
 
     def analyze_game(self, pgn_input, mode="review", game_index=0, callback=None):
-        """
-        Analyzes a game based on mode ('review', 'candidates', 'standard')
-        and streams results move-by-move via callback. Supports multi-game PGN files via game_index.
-        """
         game = None
         if isinstance(pgn_input, str):
             pgn_io = io.StringIO(pgn_input)
@@ -64,30 +58,31 @@ class ChessEngine:
             return
 
         board = game.board()
-        white_inacc = 0
-        black_inacc = 0
+        running_score = None
 
         try:
             with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
+                engine.configure({"Hash": 256, "Threads": 4})
+
                 for i, move in enumerate(game.mainline_moves()):
                     ply = i + 1
                     move_num = (i // 2) + 1
                     is_white = (i % 2 == 0)
 
-                    # Dynamic depth scaling: Depth 15 for moves 1-10, Depth 20 for move 11+
-                    current_depth = 15 if move_num <= 10 else 20
+                    current_depth = 14
 
-                    # 1. Evaluate position before move (passing 'game' flushes engine state automatically)
-                    info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
-                    score_obj = info_before[0]["score"].white()
-                    if score_obj.is_mate():
-                        score_before = 100.0 if score_obj.mate() > 0 else -100.0
+                    if running_score is None:
+                        info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
+                        score_obj_before = info_before[0]["score"].white()
+                        if score_obj_before.is_mate():
+                            score_before = 100.0 if score_obj_before.mate() > 0 else -100.0
+                        else:
+                            score_before = (score_obj_before.score() or 0) / 100.0
                     else:
-                        score_before = (score_obj.score() or 0) / 100.0
+                        score_before = running_score
 
                     played_san = board.san(move)
 
-                    # --- MODE 1: CANDIDATE MOVES (Engine 2) ---
                     candidates_data = []
                     recs = []
                     if mode == "candidates":
@@ -108,109 +103,83 @@ class ChessEngine:
                                     if cand != move:
                                         recs.append(cand_san)
 
-                    # --- MODE 2: STANDARD PV LINE (Engine 3) ---
                     pv_line = []
-                    if mode == "standard" and "pv" in info_before[0]:
-                        temp_b = board.copy()
-                        for pv_move in info_before[0]["pv"][:4]:
-                            pv_line.append(temp_b.san(pv_move))
-                            temp_b.push(pv_move)
+                    if mode == "standard":
+                        info_before_pv = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
+                        if "pv" in info_before_pv[0]:
+                            temp_b = board.copy()
+                            for pv_move in info_before_pv[0]["pv"][:4]:
+                                pv_line.append(temp_b.san(pv_move))
+                                temp_b.push(pv_move)
 
-                    # --- 2. MAKE MOVE & EVALUATE POST-MOVE POSITION ---
                     board.push(move)
                     info_after = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
 
-                    score_after_obj = info_after[0]["score"].white()
-                    if score_after_obj.is_mate():
-                        score_after = 100.0 if score_after_obj.mate() > 0 else -100.0
-                    else:
-                        score_after = (score_after_obj.score() or 0) / 100.0
+                    score_obj_after = info_after[0]["score"].white()
 
-                    # Calculate evaluation loss (centipawn drop)
-                    if is_white:
-                        eval_diff = max(0.0, score_before - score_after)
+                    if score_obj_after.is_mate():
+                        score_after = 100.0 if score_obj_after.mate() > 0 else -100.0
                     else:
-                        eval_diff = max(0.0, score_after - score_before)
+                        score_after = (score_obj_after.score() or 0) / 100.0
 
+                    running_score = score_after
+                    eval_diff = round(score_after - score_before, 2)
                     tag = "default"
 
-                    # --------------------------------------------------
-                    # ISOLATED MODE TAG LOGIC
-                    # --------------------------------------------------
-                    # --- CANDIDATES MODE (Engine 2) ---
                     if mode == "candidates":
-                        if eval_diff >= 2.30:
+                        cand_drop = max(0.0, (-eval_diff if is_white else eval_diff))
+                        if cand_drop >= 2.30:
                             tag = "red"
-                        elif eval_diff >= 1.00:
+                        elif cand_drop >= 1.00:
                             tag = "orange"
-                        elif eval_diff >= 0.30:
+                        elif cand_drop >= 0.30:
                             tag = "light_blue"
                         else:
                             tag = "default"
 
-                    # --- STANDARD MODE (Engine 3) ---
                     elif mode == "standard":
-                        cpl_loss = eval_diff * 100.0
+                        # Standard Platform CPL Logic (No Green, pure Lichess/Chess.com thresholds)
+                        cand_drop = max(0.0, (-eval_diff if is_white else eval_diff))
+                        cpl_loss = cand_drop * 100.0
 
-                        if score_before >= 10.0 or score_before <= -10.0:
-                            if cpl_loss >= 400.0:
+                        if cpl_loss >= 300.0:
+                            tag = "red"      # Blunder (>= 3.0 pawns)
+                        elif cpl_loss >= 100.0:
+                            tag = "orange"   # Mistake (>= 1.0 pawn)
+                        elif cpl_loss >= 50.0:
+                            tag = "light_blue" # Inaccuracy (>= 0.5 pawns)
+                        else:
+                            tag = "default"
+
+                    elif mode == "review":
+                        if is_white:
+                            if -0.29 <= eval_diff <= 0.29:
+                                tag = "default"
+                            elif -0.59 <= eval_diff <= -0.30:
+                                tag = "light_blue" if move_num >= 7 else "default"
+                            elif -0.99 <= eval_diff <= -0.60:
+                                tag = "green" if move_num >= 7 else "default"
+                            elif -2.30 <= eval_diff <= -1.00:
+                                tag = "orange"
+                            elif eval_diff < -2.30:
                                 tag = "red"
                             else:
                                 tag = "default"
                         else:
-                            if cpl_loss >= 300.0:
-                                tag = "red"        # Blunder
-                            elif cpl_loss >= 100.0:
-                                tag = "orange"     # Mistake
-                            elif cpl_loss >= 50.0:
-                                tag = "light_blue" # Inaccuracy
-                            else:
-                                tag = "default"    # Good / Best
+                            black_eval_gain = eval_diff
 
-                    # --- GAME REVIEW MODE (Engine 1) ---
-                    elif mode == "review":
-                        if eval_diff >= 2.30:
-                            tag = "red"
-                            if is_white:
-                                white_inacc = 0
-                            else:
-                                black_inacc = 0
-
-                        elif eval_diff >= 1.00:
-                            tag = "orange"
-                            if is_white:
-                                white_inacc = 0
-                            else:
-                                black_inacc = 0
-
-                        elif 0.30 <= eval_diff <= 0.90:
-                            if move_num <= 7:
+                            if -0.29 <= eval_diff <= 0.29:
                                 tag = "default"
+                            elif 0.30 <= black_eval_gain <= 0.59:
+                                tag = "light_blue" if move_num >= 7 else "default"
+                            elif 0.60 <= black_eval_gain <= 0.99:
+                                tag = "green" if move_num >= 7 else "default"
+                            elif 1.00 <= black_eval_gain <= 2.30:
+                                tag = "orange"
+                            elif black_eval_gain > 2.30:
+                                tag = "red"
                             else:
-                                if is_white:
-                                    if black_inacc > 0:
-                                        black_inacc -= 1
-                                        tag = "light_blue"
-                                    else:
-                                        white_inacc += 1
-                                        if white_inacc == 3:
-                                            tag = "green"
-                                            white_inacc = 0
-                                        else:
-                                            tag = "light_blue"
-                                else:
-                                    if white_inacc > 0:
-                                        white_inacc -= 1
-                                        tag = "light_blue"
-                                    else:
-                                        black_inacc += 1
-                                        if black_inacc == 3:
-                                            tag = "green"
-                                            black_inacc = 0
-                                        else:
-                                            tag = "light_blue"
-                        else:
-                            tag = "default"
+                                tag = "default"
 
                     result = {
                         "ply": ply,
@@ -234,7 +203,6 @@ class ChessEngine:
             print(f"[Engine Analysis Error]: {e}")
 
     def generate_review_pgn(self, move_results, max_width=80):
-        """Generates clean PGN string with numeric evaluations for copy/paste."""
         tokens = []
         for res in move_results:
             eval_str = f"{res['eval_after']:+.2f}"
