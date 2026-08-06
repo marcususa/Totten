@@ -27,6 +27,8 @@ class EngineAnalysisMixin:
             self.btn_standard.configure(fg_color="#2e4a8c")
             self.candidates_container.pack_forget()
             self.review_container.pack(fill="both", expand=True)
+            if self.active_game:
+                self.start_standard_analysis(self.active_game)
 
     def toggle_game(self, event):
         item = self.pgn_tree.identify_row(event.y)
@@ -54,53 +56,96 @@ class EngineAnalysisMixin:
         self.pgn_data_text.insert("end", pgn_text_export)
         self.pgn_data_text.configure(state="disabled")
 
-        self.analysis_rows = {}
-        self.moves_textbox.configure(state="normal")
-        self.moves_textbox.delete("1.0", "end")
-        self.moves_textbox.configure(state="disabled")
+        # Load plain game moves into analysis view immediately so navigation works
+        self._load_plain_game_moves(game)
 
         self.candidates_textbox.configure(state="normal")
         self.candidates_textbox.delete("1.0", "end")
         self.candidates_textbox.configure(state="disabled")
 
-        if self.active_engine_mode == "candidates":
-            self.start_candidates_analysis(game)
-        elif self.active_engine_mode == "review":
-            self.start_game_review(game)
+    def _load_plain_game_moves(self, game):
+        self.analysis_rows = {}
+        temp_board = game.board()
+
+        for i, move in enumerate(game.mainline_moves()):
+            ply = i + 1
+            move_num = (i // 2) + 1
+            is_white = (i % 2 == 0)
+            played_san = temp_board.san(move)
+            temp_board.push(move)
+
+            if move_num not in self.analysis_rows:
+                self.analysis_rows[move_num] = {
+                    "white": "", "black": "",
+                    "white_tag": "default", "black_tag": "default"
+                }
+
+            if is_white:
+                self.analysis_rows[move_num]["white"] = played_san
+            else:
+                self.analysis_rows[move_num]["black"] = played_san
+
+        self._sync_analysis_selection()
 
     def start_game_review(self, target_game):
+        self._run_analysis_worker(target_game, mode="review")
+
+    def start_standard_analysis(self, target_game):
+        self._run_analysis_worker(target_game, mode="standard")
+
+    def _run_analysis_worker(self, target_game, mode="review"):
         self.analysis_rows = {}
 
-        def run_analysis_thread(game_obj):
-            def stream_callback(res):
-                move_num = res['move_num']
-                is_white = res['is_white']
-                curr_eval = res['eval_after']
-                eval_str = f" {curr_eval:+.1f}" if abs(curr_eval) >= 1.5 else ""
-                recs = res.get('recs', [])
-                rec_str = " {" + ",".join(recs) + "}" if recs else ""
-                move_display = f"{res['played_san']}{eval_str}{rec_str}"
-                tag = res.get('tag', 'default')
+        # Cancel any previous running thread if it exists
+        if hasattr(self, '_current_analysis_worker') and self._current_analysis_worker:
+            self._current_analysis_worker.cancel = True
 
-                if move_num not in self.analysis_rows:
-                    self.analysis_rows[move_num] = {
-                        "white": "", "black": "",
-                        "white_tag": "default", "black_tag": "default"
-                    }
+        class WorkerThread(threading.Thread):
+            def __init__(self, game_obj, outer, analysis_mode):
+                super().__init__()
+                self.game_obj = game_obj
+                self.outer = outer
+                self.analysis_mode = analysis_mode
+                self.cancel = False
+                self.daemon = True
 
-                if is_white:
-                    self.analysis_rows[move_num]["white"] = move_display
-                    self.analysis_rows[move_num]["white_tag"] = tag
-                else:
-                    self.analysis_rows[move_num]["black"] = move_display
-                    self.analysis_rows[move_num]["black_tag"] = tag
+            def run(self):
+                def stream_callback(res):
+                    if self.cancel:
+                        return  # Stop processing if cancelled
 
-                self.after(0, self._sync_analysis_selection)
+                    move_num = res['move_num']
+                    is_white = res['is_white']
+                    curr_eval = res['eval_after']
 
-            engine_worker = ChessEngine()
-            engine_worker.analyze_game(game_obj, mode="standard", callback=stream_callback)
+                    # For standard mode, append PV line if available
+                    pv_line = res.get('pv_line', '')
+                    eval_str = f" {curr_eval:+.1f}" if abs(curr_eval) >= 1.5 else ""
+                    pv_str = f" [{pv_line}]" if pv_line and self.analysis_mode == "standard" else ""
 
-        threading.Thread(target=run_analysis_thread, args=(target_game,), daemon=True).start()
+                    move_display = f"{res['played_san']}{eval_str}{pv_str}"
+                    tag = res.get('tag', 'default')
+
+                    if move_num not in self.outer.analysis_rows:
+                        self.outer.analysis_rows[move_num] = {
+                            "white": "", "black": "",
+                            "white_tag": "default", "black_tag": "default"
+                        }
+
+                    if is_white:
+                        self.outer.analysis_rows[move_num]["white"] = move_display
+                        self.outer.analysis_rows[move_num]["white_tag"] = tag
+                    else:
+                        self.outer.analysis_rows[move_num]["black"] = move_display
+                        self.outer.analysis_rows[move_num]["black_tag"] = tag
+
+                    self.outer.after(0, self.outer._sync_analysis_selection)
+
+                engine_worker = ChessEngine()
+                engine_worker.analyze_game(self.game_obj, mode=self.analysis_mode, callback=stream_callback)
+
+        self._current_analysis_worker = WorkerThread(target_game, self, mode)
+        self._current_analysis_worker.start()
 
     def start_candidates_analysis(self, target_game):
         def run_candidates_thread(game_obj):
