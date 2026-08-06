@@ -9,10 +9,15 @@ def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="p
     Parses a PGN file, updates the opening frequencies in the catalog JSON,
     and accumulates all parsed games into personal_catalog.pgn with clean movetext formatting.
     """
-    pgn_file = Path(pgn_path)
-    cat_file = Path(catalog_path)
-    pgn_out = Path(pgn_out_path)
+    pgn_file = Path(pgn_path).resolve()
+    cat_file = Path(catalog_path).resolve()
+    pgn_out = Path(pgn_out_path).resolve()
     tag_mappings = tag_mappings or {}
+
+    # Prevent importing the catalog's own output file into itself
+    if pgn_file == pgn_out:
+        print("[Catalog Error]: Cannot import the catalog's output file into itself.")
+        return 0
 
     # Load existing catalog data if the json already exists
     existing_files = []
@@ -24,15 +29,19 @@ def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="p
                 if isinstance(old_data, dict):
                     catalog = old_data
                     if "cataloged_files" in catalog:
-                        existing_files = catalog["cataloged_files"]
+                        existing_files = [Path(p).resolve() for p in catalog["cataloged_files"]]
         except Exception:
             pass
 
-    file_str = str(pgn_file.resolve())
-    if file_str not in existing_files:
-        existing_files.append(file_str)
+    file_str = str(pgn_file)
 
-    catalog["cataloged_files"] = existing_files
+    # GUARD CLAUSE: Stop duplicates if file was already imported
+    if pgn_file in existing_files:
+        print(f"[Catalog Info]: File {pgn_file.name} has already been cataloged.")
+        return 0
+
+    existing_files.append(file_str)
+    catalog["cataloged_files"] = [str(p) for p in existing_files]
 
     if not pgn_file.exists():
         return 0
