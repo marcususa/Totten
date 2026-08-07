@@ -14,15 +14,11 @@ def handle_clear_catalog():
     3. Archives/rotates active 'personal_catalog.pgn' and resets active PGN workspaces.
     4. Clears treeview UI state to show 0 games.
     """
-    # 1. Clear backend catalog data
     clear_catalog()
-
-    # 2. Wipe memory tracking (imported_files list, PGN lookups, sidebar nodes)
     reset_importer_state()
 
-    # 3. Reset active PGN/game workspace instances using valid workspace keys
     if hasattr(state, "workspaces"):
-        for key in ["pgn_games", "import"]:
+        for key in ["pgn_games", "edit"]:
             if key in state.workspaces:
                 workspace_obj = state.workspaces[key]
                 if hasattr(workspace_obj, "clear_and_reset_catalog"):
@@ -32,7 +28,6 @@ def handle_clear_catalog():
                 elif hasattr(workspace_obj, "load_games"):
                     workspace_obj.load_games("personal_catalog.pgn")
 
-    # 4. Refresh Catalog/Search workspace view
     if hasattr(state, "workspaces"):
         for key in ["catalog", "search_catalog", "search"]:
             if key in state.workspaces:
@@ -44,29 +39,15 @@ def handle_clear_catalog():
 
 
 def handle_import_pgn():
-    """Opens the PGN import dialog first, updates app state, then refreshes and shows the workspace."""
-    from gui.workspace import show_workspace
-
-    # 1. Run file dialog to pick file and update state.current_filename
+    """Ingests PGN directly into catalog, then jumps straight to Search Catalog Workspace."""
     import_pgn()
-
-    # 2. Switch view to import workspace
-    show_workspace("import")
-
-    # 3. Trigger immediate refresh on the import workspace instance
-    if hasattr(state, "workspaces") and "import" in state.workspaces:
-        state.workspaces["import"].refresh_view()
+    show_catalog()
 
 
 def handle_import_fen():
-    """Opens the FEN import dialog first, updates app state, then refreshes and shows the workspace."""
-    from gui.workspace import show_workspace
-
+    """Ingests FEN directly, then jumps straight to Search Catalog Workspace."""
     import_fen()
-    show_workspace("import")
-
-    if hasattr(state, "workspaces") and "import" in state.workspaces:
-        state.workspaces["import"].refresh_view()
+    show_catalog()
 
 
 def show_catalog():
@@ -90,13 +71,32 @@ def show_catalog():
             workspace_obj.load_data()
 
 
-def show_analyze():
-    """Switches to the PGN Games Workspace (Games Data)."""
+def show_edit_workspace():
+    """Switches to the Edit Workspace for playlists, FEN overrides, and tag curation."""
     from gui.workspace import show_workspace
 
-    target_key = "pgn_games"
+    target_key = "edit"
     if hasattr(state, "workspaces"):
-        for key in ["pgn_games", "games", "analysis"]:
+        for key in ["edit", "edit_workspace"]:
+            if key in state.workspaces:
+                target_key = key
+                break
+
+    show_workspace(target_key)
+
+    if hasattr(state, "workspaces") and target_key in state.workspaces:
+        workspace_obj = state.workspaces[target_key]
+        if hasattr(workspace_obj, "refresh_view"):
+            workspace_obj.refresh_view()
+
+
+def show_analysis():
+    """Switches to the Analysis Workspace."""
+    from gui.workspace import show_workspace
+
+    target_key = "analysis"
+    if hasattr(state, "workspaces"):
+        for key in ["analysis", "pgn_games", "games"]:
             if key in state.workspaces:
                 target_key = key
                 break
@@ -111,6 +111,39 @@ def show_analyze():
             workspace_obj.load_games()
 
 
+def show_patterns():
+    """Switches to the Patterns Workspace."""
+    from gui.workspace import show_workspace
+    show_workspace("patterns")
+
+
+def show_mixed_collections():
+    """Switches to the Mixed Collections Workspace."""
+    from gui.workspace import show_workspace
+    show_workspace("mixed_collections")
+
+
+def show_calendar():
+    """Switches to the Calendar Workspace."""
+    from gui.workspace import show_workspace
+    show_workspace("calendar")
+
+
+def show_about_dialog():
+    """Displays application About information."""
+    top = tk.Toplevel()
+    top.title("About ChessMusic4")
+    top.geometry("320x200")
+    top.configure(bg="#172134")
+
+    lbl = tk.Label(top, text="ChessMusic4\n\nModular Chess Analysis, Catalog, & Audio Suite\nVersion 2026.8",
+                   bg="#172134", fg="#f8fafc", justify="center")
+    lbl.pack(expand=True, padx=20, pady=20)
+
+    btn = tk.Button(top, text="Close", command=top.destroy, bg="#334155", fg="#f8fafc", relief="flat")
+    btn.pack(pady=(0, 15))
+
+
 def create_menu(app):
     menu_bar = tk.Menu(app)
     app.config(menu=menu_bar)
@@ -121,15 +154,10 @@ def create_menu(app):
     file_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="File", menu=file_menu)
 
-    file_menu.add_command(label="Import PGN...", command=handle_import_pgn)
-    file_menu.add_command(label="Import FEN...", command=handle_import_fen)
+    file_menu.add_command(label="Import PGN", command=handle_import_pgn)
+    file_menu.add_command(label="Import FEN", command=handle_import_fen)
     file_menu.add_command(label="Export PGN")
-
-    file_menu.add_separator()
-    file_menu.add_command(label="Catalog", command=show_catalog)
     file_menu.add_command(label="Clear Catalog", command=handle_clear_catalog)
-
-    file_menu.add_separator()
     file_menu.add_command(label="Exit", command=app.quit)
 
     # ----------------------------
@@ -138,16 +166,18 @@ def create_menu(app):
     edit_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="Edit", menu=edit_menu)
 
+    edit_menu.add_command(label="PGN & Playlists", command=show_edit_workspace)
+
     # ----------------------------
     # View Menu
     # ----------------------------
     view_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="View", menu=view_menu)
 
-    view_menu.add_command(
-        label="Show / Hide Sidebar",
-        command=toggle_sidebar
-    )
+    view_menu.add_command(label="Catalog", command=show_catalog)
+    view_menu.add_command(label="Mixed Collections", command=show_mixed_collections)
+    view_menu.add_command(label="Calendar", command=show_calendar)
+    view_menu.add_command(label="Show / Hide Sidebar", command=toggle_sidebar)
 
     # ----------------------------
     # Tools Menu
@@ -155,17 +185,14 @@ def create_menu(app):
     tools_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="Tools", menu=tools_menu)
 
-    tools_menu.add_command(
-        label="Catalog",
-        command=show_catalog
-    )
-    tools_menu.add_command(
-        label="Analyze",
-        command=show_analyze
-    )
+    tools_menu.add_command(label="Analysis", command=show_analysis)
+    tools_menu.add_command(label="Patterns", command=show_patterns)
+    tools_menu.add_command(label="Engines", command=show_edit_workspace)
 
     # ----------------------------
     # Help Menu
     # ----------------------------
     help_menu = tk.Menu(menu_bar, tearoff=0)
     menu_bar.add_cascade(label="Help", menu=help_menu)
+
+    help_menu.add_command(label="About", command=show_about_dialog)

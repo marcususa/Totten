@@ -32,31 +32,7 @@ class Sidebar(ctk.CTkFrame):
 
         # --- NAVIGATION TREE / BUTTONS (Packed from top) ---
 
-        # 1. PGN Games
-        self.btn_pgn_games = ctk.CTkButton(
-            self,
-            text="PGN Games",
-            anchor="w",
-            fg_color="transparent",
-            text_color=("gray10", "gray90"),
-            hover_color=("gray70", "gray30"),
-            command=lambda: self.on_navigate("pgn_games")
-        )
-        self.btn_pgn_games.pack(fill="x", padx=5, pady=(15, 2))
-
-        # 1a. Games Data
-        self.btn_games_data = ctk.CTkButton(
-            self,
-            text="  ↳ Games Data\n    Analysis",
-            anchor="w",
-            fg_color="transparent",
-            text_color=("gray25", "gray75"),
-            hover_color=("gray70", "gray30"),
-            command=lambda: self.on_navigate("pgn_games")
-        )
-        self.btn_games_data.pack(fill="x", padx=5, pady=(0, 5))
-
-        # 2. Catalog
+        # 1. Catalog
         self.btn_catalog = ctk.CTkButton(
             self,
             text="Catalog",
@@ -66,29 +42,55 @@ class Sidebar(ctk.CTkFrame):
             hover_color=("gray70", "gray30"),
             command=lambda: self.on_navigate("catalog")
         )
-        self.btn_catalog.pack(fill="x", padx=5, pady=5)
+        self.btn_catalog.pack(fill="x", padx=5, pady=(15, 5))
 
-        # 3. Mixed Collections
-        self.lbl_mixed = ctk.CTkLabel(
+        # 2. Analysis
+        self.btn_analysis = ctk.CTkButton(
             self,
-            text="Mixed Collections",
-            anchor="w",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray30", "gray70")
-        )
-        self.lbl_mixed.pack(fill="x", padx=8, pady=5)
-
-        # 4. Notes
-        self.btn_notes = ctk.CTkButton(
-            self,
-            text="Notes",
+            text="Analysis",
             anchor="w",
             fg_color="transparent",
             text_color=("gray10", "gray90"),
             hover_color=("gray70", "gray30"),
-            command=lambda: self.on_navigate("notes")
+            command=lambda: self.on_navigate("analysis")
         )
-        self.btn_notes.pack(fill="x", padx=5, pady=5)
+        self.btn_analysis.pack(fill="x", padx=5, pady=5)
+
+        # 3. Patterns
+        self.btn_patterns = ctk.CTkButton(
+            self,
+            text="Patterns",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("patterns")
+        )
+        self.btn_patterns.pack(fill="x", padx=5, pady=5)
+
+        # 4. Mixed Collections
+        self.btn_mixed = ctk.CTkButton(
+            self,
+            text="Mixed Collections",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray30", "gray70"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("mixed_collections")
+        )
+        self.btn_mixed.pack(fill="x", padx=5, pady=5)
+
+        # 5. Calendar
+        self.btn_calendar = ctk.CTkButton(
+            self,
+            text="Calendar",
+            anchor="w",
+            fg_color="transparent",
+            text_color=("gray10", "gray90"),
+            hover_color=("gray70", "gray30"),
+            command=lambda: self.on_navigate("calendar")
+        )
+        self.btn_calendar.pack(fill="x", padx=5, pady=5)
 
 
 # --- TOP LEVEL FUNCTIONS ---

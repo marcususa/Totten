@@ -3,86 +3,110 @@
 import customtkinter as ctk
 import gui.app_state as state
 from gui.search_catalog_workspace import SearchCatalogWorkspace
-from gui.import_workspace import ImportWorkspace
+from gui.edit_workspace import EditWorkspace
+from gui.calendar_workspace import CalendarWorkspace
 
-# Import the 4 analysis mixin modules
+# Import your 4 modular analysis pieces
 from gui.layout_analysis import LayoutAnalysisMixin
 from gui.catalog_analysis import CatalogAnalysisMixin
-from gui.format_analysis import FormatAnalysisMixin
 from gui.engine_analysis import EngineAnalysisMixin
+from gui.format_analysis import FormatAnalysisMixin
 
 
-class PgnGamesWorkspace(
+class AnalysisWorkspace(
     ctk.CTkFrame,
     LayoutAnalysisMixin,
     CatalogAnalysisMixin,
-    FormatAnalysisMixin,
-    EngineAnalysisMixin
+    EngineAnalysisMixin,
+    FormatAnalysisMixin
 ):
-    def __init__(self, parent, filename=None):
-        super().__init__(parent, fg_color="#172134", corner_radius=0)
+    """Combined workspace class uniting the UI layout, catalog bindings, engine worker, and move formatting."""
+
+    def __init__(self, master, filename=None, app_state=None):
+        super().__init__(master, fg_color="#172134", corner_radius=0)
         self.filename = filename
-        
-        # 1. Build the UI layout from layout_analysis.py
+        self.app_state = app_state or state
+
+        # 1. Build the visual elements (board, textboxes, treeview, engine buttons 1, 2, 3)
         self.init_layout()
-        
-        # 2. Bind catalog events & load games from catalog_analysis.py
+
+        # 2. Hook up catalog bindings and load PGN games into the tree
         self.init_catalog_bindings()
 
 
-def create_notes_workspace(parent):
-    """Creates the Notes frame and loads notes.txt directly."""
-    frame = ctk.CTkFrame(parent, fg_color="#172134", corner_radius=0)
+class WorkspaceManager(ctk.CTkFrame):
+    """
+    Manages the active workspace container and switches between views
+    (Analysis, Catalog, Edit, Mixed Collections, Calendar).
+    """
 
-    notes_box = ctk.CTkTextbox(
-        frame,
-        fg_color="#0f172a",
-        text_color="#f8fafc",
-        font=("Arial", 12)
-    )
-    notes_box.pack(fill="both", expand=True, padx=10, pady=10)
+    def __init__(self, master, app_state=None):
+        super().__init__(master, fg_color="#172134", corner_radius=0)
+        self.app_state = app_state or state
 
-    try:
-        with open("notes.txt", "r") as f:
-            notes_box.insert("1.0", f.read())
-    except FileNotFoundError:
-        pass
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-    return frame
+        self.workspaces = {}
+        self.current_workspace_key = None
+
+        self._init_workspaces()
+
+    def _init_workspaces(self):
+        # 1. Analysis Workspace (Board, Catalog tree, Move textboxes, and 3 Engine modes)
+        analysis_ws = AnalysisWorkspace(self, app_state=self.app_state)
+        self.workspaces["analysis"] = analysis_ws
+        self.workspaces["pgn_games"] = analysis_ws  # Legacy alias fallback
+
+        # 2. Catalog
+        catalog_ws = SearchCatalogWorkspace(self, self.app_state)
+        self.workspaces["catalog"] = catalog_ws
+
+        # 3. Edit Workspace
+        edit_ws = EditWorkspace(self, self.app_state)
+        self.workspaces["edit"] = edit_ws
+
+        # 4. Mixed Collections (Placeholder)
+        mixed_ws = ctk.CTkFrame(self, fg_color="#172134")
+        ctk.CTkLabel(mixed_ws, text="Mixed Collections Workspace", font=("Arial", 16), text_color="#94a3b8").pack(
+            expand=True)
+        self.workspaces["mixed_collections"] = mixed_ws
+
+        # 5. Calendar & Historical Notes Workspace (Replacing old notes section)
+        calendar_ws = CalendarWorkspace(self, app_state=self.app_state)
+        self.workspaces["calendar"] = calendar_ws
+
+        # Grid all workspaces on top of each other; hide by default
+        for ws in self.workspaces.values():
+            ws.grid(row=0, column=0, sticky="nsew")
+            ws.grid_remove()
+
+    def show_workspace(self, key):
+        target_key = key.lower().strip()
+        if target_key not in self.workspaces:
+            target_key = "analysis"
+
+        workspace = self.workspaces[target_key]
+        workspace.tkraise()
+        workspace.grid()
+        self.current_workspace_key = target_key
+
+        if hasattr(workspace, "refresh_view"):
+            workspace.refresh_view()
 
 
-def create_workspace(app):
-    state.workspace = ctk.CTkFrame(
-        app,
-        fg_color="#172134",
-        corner_radius=0
-    )
+# Global hook references
+_workspace_manager_instance = None
 
-    # Register static workspace views
-    state.workspaces = {
-        "catalog": SearchCatalogWorkspace(state.workspace, state),
-        "pgn_games": PgnGamesWorkspace(state.workspace),
-        "notes": create_notes_workspace(state.workspace),
-        "import": ImportWorkspace(state.workspace, state),
-    }
 
-    # Default startup view
-    show_workspace("catalog")
-
-    return state.workspace
+def create_workspace(master, app_state=None):
+    global _workspace_manager_instance
+    _workspace_manager_instance = WorkspaceManager(master, app_state)
+    state.workspace = _workspace_manager_instance
+    state.workspaces = _workspace_manager_instance.workspaces
+    return _workspace_manager_instance
 
 
 def show_workspace(key):
-    """Switches the active frame displayed in the main workspace."""
-    # Hide all views first
-    for view in state.workspaces.values():
-        view.pack_forget()
-
-    # Show only the requested view
-    if key in state.workspaces:
-        if key == "import" and hasattr(state.workspaces[key], "refresh_view"):
-            state.workspaces[key].refresh_view()
-
-        state.workspaces[key].pack(fill="both", expand=True)
-    else:
-        print(f"Warning: Key '{key}' not found in state.workspaces!")
+    if _workspace_manager_instance:
+        _workspace_manager_instance.show_workspace(key)
