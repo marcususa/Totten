@@ -8,8 +8,6 @@ from gui.statusbar import set_status_message
 from core.constants import CONFIG_FILE
 from gui.chess_board import ChessBoardWidget
 
-
-
 # File 1 module titled "layout_analysis.py"
 
 class ToolTip:
@@ -73,8 +71,6 @@ class LayoutAnalysisMixin:
         # --- ROOT CONTAINER (Using Grid for precise column sizing) ---
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # ... (keep the rest of your layout code right below here)
 
         # Give the left column more proportional width (weight 3 vs 2)
         self.main_container.grid_columnconfigure(0, weight=3)
@@ -156,49 +152,50 @@ class LayoutAnalysisMixin:
         )
 
         style = ttk.Style()
-        style.theme_use("clam")
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
 
-        style.layout("Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+        style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+
+        #Code part 8/11/26 to match color assignments. Check later.
+
         style.configure(
-            "Treeview",
-            background="#1e293b",
+            "Borderless.Treeview",
+            background="#172134",
             foreground="#f8fafc",
-            fieldbackground="#1e293b",
+            fieldbackground="#172134",
             rowheight=22,
             font=("Arial", 10),
             borderwidth=0,
-            focuscolor="#1e293b"
+            relief="flat",
+            focuscolor="#172134"
         )
         style.map(
-            "Treeview",
+            "Borderless.Treeview",
             background=[("selected", "#2e4a8c")],
-            focuscolor=[('focus', '#1e293b')]
+            focuscolor=[('focus', '#172134')]
         )
         style.configure(
-            "Treeview.Heading",
+            "Borderless.Treeview.Heading",
             background="#0f172a",
-            foreground="#94a3b8",
+            foreground="#f8fafc",
             font=("Arial", 10, "bold"),
-            relief="solid",
-            borderwidth=1
-        )
-        style.map("Treeview.Heading", background=[('active', '#1e293b')])
-
-        style.configure(
-            "Vertical.TScrollbar",
-            background="#334155",
-            troughcolor="#0f172a",
-            bordercolor="#0f172a",
-            arrowcolor="#94a3b8",
-            relief="flat"
+            relief="flat",
+            borderwidth=0
         )
         style.map(
-            "Vertical.TScrollbar",
-            background=[('active', '#475569'), ('pressed', '#2e4a8c')]
+            "Borderless.Treeview.Heading",
+            background=[('active', '#0f172a'), ('selected', '#0f172a')],
+            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
         )
 
+
+
+        # Updated to padx=0, pady=0 for perfectly uniform border sizing
         self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
-        self.tree_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
         self.pgn_tree = ttk.Treeview(
             self.tree_frame,
@@ -206,7 +203,8 @@ class LayoutAnalysisMixin:
             show="headings",
             selectmode="browse",
             height=6,
-            takefocus=False
+            takefocus=False,
+            style="Borderless.Treeview"
         )
         self.pgn_tree.heading("no", text="No.")
         self.pgn_tree.heading("white", text="White Player", anchor="w")
@@ -225,8 +223,10 @@ class LayoutAnalysisMixin:
         )
         self.pgn_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
 
-        self.pgn_tree.pack(side="left", fill="both", expand=True, padx=(0, 0), pady=(0, 0))
-        self.pgn_scrollbar.pack(side="right", fill="y", padx=(0, 0), pady=(0, 0))
+        self.pgn_tree.update_idletasks()
+
+        self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        self.pgn_scrollbar.pack(side="right", fill="y", padx=0, pady=0)
 
         # =========================================================================
         # RIGHT SIDE: ANALYSIS, GAME DETAILS, & ENGINE CONTROLS
@@ -260,11 +260,10 @@ class LayoutAnalysisMixin:
             fg_color="#1e293b",
             text_color="#f8fafc",
             font=ctk.CTkFont(family="Arial", size=11),
-            wrap="word",  # <-- Changed from "none" to "word"
+            wrap="word",
             height=110
         )
         self.moves_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
-
 
         # Text color tags
         self.moves_textbox.tag_config("red", foreground="#FF4444")
