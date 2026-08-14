@@ -1,3 +1,4 @@
+# gui/search_catalog_workspace.py
 import json
 import os
 from pathlib import Path
@@ -78,6 +79,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             background=[("selected", "#172134")],
             focuscolor=[('focus', '#172134')]
         )
+
+        # Comprehensive state mapping to lock heading colors and prevent Windows hover/active tinting
         self.style.configure(
             "Borderless.Treeview.Heading",
             background="#344268",
@@ -88,8 +91,18 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         )
         self.style.map(
             "Borderless.Treeview.Heading",
-            background=[('active', '#344268'), ('selected', '#344268')],
-            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
+            background=[
+                ('active', '#344268'),
+                ('pressed', '#344268'),
+                ('selected', '#344268'),
+                ('!active', '#344268')
+            ],
+            foreground=[
+                ('active', '#f8fafc'),
+                ('pressed', '#f8fafc'),
+                ('selected', '#f8fafc'),
+                ('!active', '#f8fafc')
+            ]
         )
 
     def _build_ui(self):

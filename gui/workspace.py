@@ -1,3 +1,4 @@
+# gui/workspace.py
 import customtkinter as ctk
 from tkinter import ttk
 import gui.app_state as state
@@ -41,10 +42,10 @@ class AnalysisWorkspace(
         except Exception:
             pass
 
-        # Re-assert explicit styling to prevent theme resets on toggle
+        # Re-assert explicit styling with comprehensive state mapping to prevent Windows hover darkening
         style.configure(
             "Borderless.Treeview.Heading",
-            background="#0f172a",
+            background="#344268",
             foreground="#f8fafc",
             font=("Arial", 10, "bold"),
             relief="flat",
@@ -52,8 +53,18 @@ class AnalysisWorkspace(
         )
         style.map(
             "Borderless.Treeview.Heading",
-            background=[('active', '#0f172a'), ('selected', '#0f172a'), ('!active', '#0f172a')],
-            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc'), ('!active', '#f8fafc')]
+            background=[
+                ('active', '#344268'),
+                ('pressed', '#344268'),
+                ('selected', '#344268'),
+                ('!active', '#344268')
+            ],
+            foreground=[
+                ('active', '#f8fafc'),
+                ('pressed', '#f8fafc'),
+                ('selected', '#f8fafc'),
+                ('!active', '#f8fafc')
+            ]
         )
 
 
@@ -163,4 +174,3 @@ def show_analysis_workspace():
 
 # Register it automatically so app_state can reach it
 state.show_analysis_workspace = show_analysis_workspace
-
