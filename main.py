@@ -3,6 +3,7 @@ import os
 from tkinter import ttk
 import customtkinter as ctk
 import gui.app_state as state
+from gui.splash import StandaloneSplash
 
 # Imports for GUI components
 from gui.sidebar import create_sidebar
@@ -19,12 +20,16 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 app = ctk.CTk()
+app.withdraw()  # Hide main window temporarily to prevent raw layout flashing
 app.configure(fg_color="#172134")
 app.title("Totten")
 
 # Expanded size & minimum boundaries to fit sidebar + workspace + 200px buffer
 app.geometry("1000x800")
 app.minsize(1000, 800)
+
+# Pop up the loading splash screen
+splash = StandaloneSplash(title_text="Totten", message="Starting up...")
 
 # ----------------------------
 # TTK Global Styling Setup
@@ -38,6 +43,21 @@ elif "alt" in available_themes:
     style.theme_use("alt")
 
 BG_COLOR = "#172134"
+
+# Global fallback styles so any workspace using standard Treeview headings matches cleanly
+style.configure(
+    "Heading",
+    background="#344268",
+    foreground="#f8fafc",
+    font=("Arial", 10, "bold"),
+    relief="flat",
+    borderwidth=0,
+)
+style.map(
+    "Heading",
+    background=[('active', '#344268'), ('selected', '#344268')],
+    foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
+)
 
 # Set base colors to match the app background
 style.configure(
@@ -81,6 +101,16 @@ app.update()
 # ----------------------------
 state.left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 state.workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+# ----------------------------
+# Startup Complete - Reveal App
+# ----------------------------
+def reveal_main_app():
+    splash.close()
+    app.deiconify()  # Bring the fully rendered main window forward
+
+# Small delay to ensure everything settles before displaying
+app.after(600, reveal_main_app)
 
 # ----------------------------
 # Start App
