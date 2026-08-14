@@ -1,109 +1,34 @@
 import customtkinter as ctk
-from PIL import Image
+
+from layout_workspace import LayoutAnalysisMixin
+from catalog_analysis import CatalogAnalysisMixin
+from format_analysis import FormatAnalysisMixin
+from engine_analysis import EngineAnalysisMixin
+import app_state as state
 
 
-PIECE_PATH = "../assets/pieces/"
+class AnalysisWorkspace(
+    ctk.CTkFrame,
+    LayoutAnalysisMixin,
+    CatalogAnalysisMixin,
+    FormatAnalysisMixin,
+    EngineAnalysisMixin
+):
+    def __init__(self, master, filename=None, app_state=None):
+        super().__init__(master, fg_color="#172134", corner_radius=0)
+        self.app_state = app_state or state
+        self.filename = filename
 
+        # 1. Initialize UI layout and register the global cross-workspace callback
+        self.init_layout()
 
-def load_piece(filename):
-    from io import BytesIO
-    import cairosvg
+        # 2. Initialize catalog tree bindings and load games into the second workspace tree
+        self.init_catalog_bindings()
 
-    png_data = cairosvg.svg2png(
-        url=PIECE_PATH + filename,
-        output_width=70,
-        output_height=70
-    )
+        # 3. Check if a game was already selected in workspace 1 before loading this view
+        self.check_initial_state()
 
-    image = Image.open(BytesIO(png_data))
-
-    return ctk.CTkImage(
-        light_image=image,
-        dark_image=image,
-        size=(70, 70)
-    )
-
-
-def show_analysis_preview():
-
-    app = ctk.CTk()
-    app.configure(fg_color="#172134")
-
-    app.title("Chess Analysis Preview")
-    app.geometry("700x700")
-
-    title = ctk.CTkLabel(
-        app,
-        text="Analysis Workspace Preview",
-        font=("Arial", 24),
-        text_color="white"
-    )
-
-    title.pack(pady=20)
-
-    board_frame = ctk.CTkFrame(
-        app,
-        fg_color="#172134"
-    )
-
-    board_frame.pack()
-
-    pieces = [
-        ["br.svg", "bn.svg", "bb.svg", "bq.svg",
-         "bk.svg", "bb.svg", "bn.svg", "br.svg"],
-
-        ["bp.svg"] * 8,
-
-        [""] * 8,
-        [""] * 8,
-        [""] * 8,
-        [""] * 8,
-
-        ["wp.svg"] * 8,
-
-        ["wr.svg", "wn.svg", "wb.svg", "wq.svg",
-         "wk.svg", "wb.svg", "wn.svg", "wr.svg"]
-    ]
-
-
-    for row in range(8):
-        for col in range(8):
-
-            square_color = "#9f7939" if (row + col) % 2 else "#fbcba4"
-
-            square = ctk.CTkFrame(
-                board_frame,
-                width=70,
-                height=70,
-                fg_color=square_color,
-                corner_radius=0
-            )
-
-            square.grid(
-                row=row,
-                column=col,
-                padx=0,
-                pady=0
-            )
-
-            square.grid_propagate(False)
-
-            piece = pieces[row][col]
-
-            if piece:
-                img = load_piece(piece)
-
-                label = ctk.CTkLabel(
-                    square,
-                    text="",
-                    image=img
-                )
-
-                label.image = img
-                label.pack(expand=True)
-
-
-    app.mainloop()
-
-
-show_analysis_preview()
+    def check_initial_state(self):
+        """Checks if an active game was already selected in workspace 1 before loading."""
+        if hasattr(state, "active_analysis_game") and state.active_analysis_game:
+            self.load_game_from_state(state.active_analysis_game)

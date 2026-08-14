@@ -1,4 +1,5 @@
 import json
+import gui.app_state as state
 from pathlib import Path
 from tkinter import ttk
 import customtkinter as ctk
@@ -57,7 +58,57 @@ class LayoutAnalysisMixin:
     def __init__(self, parent, filename=None):
         pass
 
+    def load_game_from_state(self, game_node):
+        """Called automatically when a game is clicked in the Search Catalog Workspace."""
+        self.active_game = game_node
+        self.root_game_node = game_node
+        self.current_node = game_node
+
+        # 1. Update the main chessboard widget using its required FEN bridge
+        if hasattr(self, "board_widget") and self.board_widget:
+            fen_str = game_node.board().fen()
+            self.board_widget.set_position_fen(fen_str)
+
+        # 1b. If the board is currently popped out, update that window too!
+        if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
+            fen_str = game_node.board().fen()
+            self.popout_board.set_position_fen(fen_str)
+
+        # 2. Display the full .pgn of the selected game
+        if hasattr(self, "pgn_data_text") and self.pgn_data_text:
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
+            pgn_text_export = game_node.accept(exporter)
+
+            self.pgn_data_text.configure(state="normal")
+            self.pgn_data_text.delete("1.0", "end")
+            self.pgn_data_text.insert("end", pgn_text_export)
+            self.pgn_data_text.configure(state="disabled")
+
+        # 3. Ensure the tree view on the left reflects or highlights this game if loaded,
+        # or load/inject this single game context into the tree/preview lookup.
+        if hasattr(self, "pgn_tree") and hasattr(self, "preview_lookup"):
+            # Clear tree and insert the incoming single game so the tree view shows it
+            self.pgn_tree.delete(*self.pgn_tree.get_children())
+            self.preview_lookup.clear()
+
+            headers = game_node.headers
+            white = headers.get("White", "Unknown")
+            black = headers.get("Black", "Unknown")
+            result = headers.get("Result", "*")
+
+            item_id = self.pgn_tree.insert("", "end", values=(1, white, black, result))
+            self.preview_lookup[item_id] = game_node
+            self.pgn_tree.selection_set(item_id)
+
+        # 4. Load plain game moves into analysis view immediately so navigation & text window work
+        if hasattr(self, "_load_plain_game_moves"):
+            self._load_plain_game_moves(game_node)
+
+
     def init_layout(self):
+        # Register the callback right when the layout builds so it's 100% active
+        state.register_analysis_callback(self.load_game_from_state)
+
         self.preview_lookup = {}
         self.active_game = None
         self.active_engine_mode = "standard"
@@ -159,8 +210,6 @@ class LayoutAnalysisMixin:
 
         style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
 
-        #Code part 8/11/26 to match color assignments. Check later.
-
         style.configure(
             "Borderless.Treeview",
             background="#172134",
@@ -170,12 +219,11 @@ class LayoutAnalysisMixin:
             font=("Arial", 10),
             borderwidth=0,
             relief="flat",
-            focuscolor="#172134"
         )
         style.map(
             "Borderless.Treeview",
             background=[("selected", "#2e4a8c")],
-            focuscolor=[('focus', '#172134')]
+            foreground=[("selected", "#ffffff")]
         )
         style.configure(
             "Borderless.Treeview.Heading",
@@ -191,9 +239,6 @@ class LayoutAnalysisMixin:
             foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
         )
 
-
-
-        # Updated to padx=0, pady=0 for perfectly uniform border sizing
         self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
         self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
 

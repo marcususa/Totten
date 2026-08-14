@@ -151,5 +151,16 @@ def create_workspace(master, app_state=None):
 
 
 def show_workspace(key):
+    """Allows sidebar navigation and external modules to switch views."""
     if _workspace_manager_instance:
         _workspace_manager_instance.show_workspace(key)
+
+
+def show_analysis_workspace():
+    """Globally accessible function to programmatically switch to the Analysis workspace."""
+    if _workspace_manager_instance:
+        _workspace_manager_instance.show_workspace("analysis")
+
+# Register it automatically so app_state can reach it
+state.show_analysis_workspace = show_analysis_workspace
+

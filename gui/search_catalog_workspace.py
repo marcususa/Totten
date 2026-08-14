@@ -2,7 +2,9 @@ import json
 import os
 from pathlib import Path
 from tkinter import ttk, messagebox, filedialog
+from .splash import LoadingOverlay
 import threading
+import random
 import customtkinter as ctk
 import chess.pgn
 
@@ -43,6 +45,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         # Mapping to store exact game instances by Treeview item ID for click-to-analysis
         self.tree_item_game_map = {}
 
+        # Session-stable cache for randomized representative items
+        self.session_representative_cache = {}
+
         self._configure_styles()
         self._build_ui()
 
@@ -50,26 +55,41 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
     def _configure_styles(self):
         self.style = ttk.Style()
-        self.style.theme_use("default")
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+
+        self.style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+
         self.style.configure(
-            "Treeview",
-            background="#222e42",
-            fieldbackground="#222e42",
-            foreground="white",
+            "Borderless.Treeview",
+            background="#172134",
+            foreground="#f8fafc",
+            fieldbackground="#172134",
             rowheight=26,
+            font=("Arial", 10),
             borderwidth=0,
-        )
-        self.style.configure(
-            "Treeview.Heading",
-            background="#2a384f",
-            foreground="white",
-            borderwidth=0,
-            padding=(3, 4),
+            relief="flat",
+            focuscolor="#172134"
         )
         self.style.map(
-            "Treeview.Heading",
-            background=[("active", "#33445e"), ("!active", "#2a384f")],
-            foreground=[("active", "white"), ("!active", "white")],
+            "Borderless.Treeview",
+            background=[("selected", "#172134")],
+            focuscolor=[('focus', '#172134')]
+        )
+        self.style.configure(
+            "Borderless.Treeview.Heading",
+            background="#344268",
+            foreground="#f8fafc",
+            font=("Arial", 10, "bold"),
+            relief="flat",
+            borderwidth=0
+        )
+        self.style.map(
+            "Borderless.Treeview.Heading",
+            background=[('active', '#172134'), ('selected', '#172134')],
+            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
         )
 
     def _build_ui(self):
@@ -83,6 +103,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         # 1. Search/Workspace View
         self.search_view = ctk.CTkFrame(self.panel, fg_color="transparent")
+        self.search_view.grid(row=0, column=0, sticky="nsew")
         self.search_view.grid_rowconfigure(1, weight=1)
         self.search_view.grid_columnconfigure(0, weight=1)
 
@@ -134,8 +155,24 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.lbl_tag_count = ctk.CTkLabel(self.toolbar, text="", font=("Arial", 11), text_color="#94a3b8")
         self.lbl_tag_count.grid(row=0, column=2, sticky="e", padx=5)
 
-        self.table_frame = ctk.CTkFrame(self.search_view, fg_color="#172134")
-        self.table_frame.grid(row=1, column=0, sticky="nsew")
+        # Outer border wrapper frame (This exposes the border color clearly)
+        self.table_border_frame = ctk.CTkFrame(
+            self.search_view,
+            fg_color="#344268",  # <-- This acts as your border color
+            corner_radius=6
+        )
+        self.table_border_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        self.table_border_frame.grid_rowconfigure(0, weight=1)
+        self.table_border_frame.grid_columnconfigure(0, weight=1)
+
+        # Inner table frame that holds the actual treeview
+        self.table_frame = ctk.CTkFrame(
+            self.table_border_frame,
+            fg_color="#172134",
+            corner_radius=4
+        )
+        # padx/pady=2 here creates the exact visible border thickness outline!
+        self.table_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
@@ -192,7 +229,6 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         dialog.grab_set()
 
         dialog.configure(fg_color="#172134")
-
         dialog.grid_rowconfigure(0, weight=1)
         dialog.grid_columnconfigure(0, weight=1)
 
@@ -236,6 +272,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         if show_search:
             self.import_view.grid_remove()
             self.search_view.grid(row=0, column=0, sticky="nsew")
+            self._configure_styles()
+            if hasattr(self, "tree") and self.tree:
+                self.tree.configure(style="Borderless.Treeview")
         else:
             self.search_view.grid_remove()
             self.import_view.grid(row=0, column=0, sticky="nsew")
@@ -244,13 +283,20 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         for widget in self.table_frame.winfo_children():
             widget.destroy()
 
-        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
+        self._configure_styles()
 
-        self.tree.tag_configure("eco_a", background="#222e42", foreground="#e15a5a")
-        self.tree.tag_configure("eco_b", background="#222e42", foreground="#7da6f3")
-        self.tree.tag_configure("eco_c", background="#222e42", foreground="#86efac")
-        self.tree.tag_configure("eco_d", background="#222e42", foreground="#ed861b")
-        self.tree.tag_configure("eco_e", background="#222e42", foreground="#af7ce4")
+        self.tree = ttk.Treeview(
+            self.table_frame,
+            columns=columns,
+            show="headings",
+            style="Borderless.Treeview"
+        )
+
+        self.tree.tag_configure("eco_a", background="#222e42", foreground="#47c274", font=("Arial", 10, "bold"))
+        self.tree.tag_configure("eco_b", background="#222e42", foreground="#ed861b", font=("Arial", 10, "bold"))
+        self.tree.tag_configure("eco_c", background="#222e42", foreground="#dd3434", font=("Arial", 10, "bold"))
+        self.tree.tag_configure("eco_d", background="#222e42", foreground="#4682f3", font=("Arial", 10, "bold"))
+        self.tree.tag_configure("eco_e", background="#222e42", foreground="#a25aed", font=("Arial", 10, "bold"))
 
         self.tree.tag_configure("eco_default", background="#222e42", foreground="white")
         self.tree.tag_configure("eco_child", background="#222e42", foreground="#94a3b8")
@@ -266,7 +312,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             elif col in ("White", "Black", "Date", "Site", "Event", "WhiteElo", "BlackElo"):
                 self.tree.column(col, width=110, minwidth=80, anchor="w", stretch=False)
             elif col in ("Opening", "Variation"):
-                self.tree.column(col, width=180, minwidth=120, anchor="w", stretch=False)
+                self.tree.column(col, width=220, minwidth=140, anchor="w", stretch=False)
             else:
                 self.tree.column(col, width=95, minwidth=60, anchor="w", stretch=False)
 
@@ -278,13 +324,13 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
 
-        self.tree.bind("<Double-1>", self.on_game_double_click)
+        self.tree.bind("<<TreeviewSelect>>", self.on_game_single_click)
 
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
     def sort_by_column(self, col):
-        if col == "":
+        if col == "" or col == "Variation":
             return
         if self.sort_column == col:
             self.sort_reverse = not self.sort_reverse
@@ -293,23 +339,34 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             self.sort_reverse = False
         self.refresh_current_view()
 
-    def on_game_double_click(self, event):
-        selected_item = self.tree.focus()
-        if selected_item and selected_item in self.tree_item_game_map:
-            game_instance = self.tree_item_game_map[selected_item]
-            white = game_instance["headers"].get("White", "Unknown")
-            black = game_instance["headers"].get("Black", "Unknown")
-            event_name = game_instance["headers"].get("Event", "Analysis Game")
-
-            set_status_message(f"Opening analysis for: {white} vs {black} ({event_name})")
-
-            messagebox.showinfo("Navigation",
-                                f"Jumping to Analysis Workspace for:\n\n{white} vs {black}\nEvent: {event_name}")
-
-    def on_tree_select(self, event):
+    def on_game_single_click(self, event):
         selected_items = self.tree.selection()
         if selected_items:
-            self.tree.selection_remove(selected_items)
+            selected_item = selected_items[0]
+
+            is_group_header = self.tree.parent(selected_item) == ""
+
+            if is_group_header:
+                return
+
+            if selected_item in self.tree_item_game_map:
+                game_data = self.tree_item_game_map[selected_item]
+                game_obj = game_data.get("game_object")
+
+                if game_obj:
+                    headers = game_data.get("headers", {})
+                    white = headers.get("White", "Unknown")
+                    black = headers.get("Black", "Unknown")
+
+                    set_status_message(f"Loading analysis: {white} vs {black}")
+
+                    if hasattr(self.app_state, "set_active_analysis_game"):
+                        self.app_state.set_active_analysis_game(game_obj)
+                    elif hasattr(self.app_state, "load_analysis_game"):
+                        self.app_state.load_analysis_game(game_obj)
+
+                    if hasattr(self.app_state, "show_analysis_workspace") and self.app_state.show_analysis_workspace:
+                        self.app_state.show_analysis_workspace()
 
     def _get_eco_tag(self, eco_base):
         prefix = eco_base[0].upper() if eco_base else 'A'
@@ -321,28 +378,23 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.refresh_current_view()
 
     def refresh_current_view(self):
-        base_cols = ["ECO", "Games", "Opening"]
+        expanded_keys = set()
+        if hasattr(self, "tree") and self.tree.get_children():
+            for item_id in self.tree.get_children():
+                if self.tree.item(item_id, "open"):
+                    vals = self.tree.item(item_id, "values")
+                    if vals and len(vals) >= 4:
+                        expanded_keys.add((vals[0], vals[2], vals[3]))
 
-        if self.active_primary_tag == "Players":
-            dynamic_cols = ["White", "Black"]
-        elif self.active_primary_tag == "Elo":
-            dynamic_cols = ["WhiteElo", "BlackElo"]
-        elif self.active_primary_tag == "Event":
-            dynamic_cols = ["Event"]
-        elif self.active_extra_columns:
-            dynamic_cols = sorted(list(self.active_extra_columns))
-        else:
-            dynamic_cols = ["Variation"]
-
-        current_cols = base_cols + dynamic_cols
-        treeview_cols = current_cols + [""]
-
+        treeview_cols = ["ECO", "Games", "Opening", "Variation", ""]
         self.setup_treeview(treeview_cols)
         self.tree_item_game_map.clear()
 
+        active_display_tag = self.active_primary_tag or ("Custom Tags" if self.active_extra_columns else "Players")
+        self.tree.heading("Variation", text=active_display_tag)
+
         if self.sort_column:
             try:
-                col_idx = current_cols.index(self.sort_column)
                 if self.sort_column == "Games":
                     sorted_data = sorted(
                         self.aggregated_games_data,
@@ -354,9 +406,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                         self.aggregated_games_data,
                         key=lambda x: str(
                             x["eco"] if self.sort_column == "ECO" else
-                            x["opening"] if self.sort_column == "Opening" else
-                            x["variation"] if self.sort_column == "Variation" else
-                            x["instances"][0]["headers"].get(self.sort_column, "")
+                            x["opening"] if self.sort_column == "Opening" else ""
                         ),
                         reverse=self.sort_reverse
                     )
@@ -365,12 +415,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         else:
             sorted_data = sorted(
                 self.aggregated_games_data,
-                key=lambda x: (
-                    -x["count"],
-                    x["eco"],
-                    x["opening"],
-                    x["variation"]
-                )
+                key=lambda x: (-x["count"], x["eco"], x["opening"], x["variation"])
             )
 
         query = self.entry_filter.get().lower()
@@ -384,20 +429,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             count = item_data["count"]
             instances = item_data["instances"]
 
-            parent_row = []
-            for col in treeview_cols:
-                if col == "":
-                    parent_row.append("")
-                elif col == "ECO":
-                    parent_row.append(eco)
-                elif col == "Games":
-                    parent_row.append(str(count))
-                elif col == "Opening":
-                    parent_row.append(opening)
-                elif col == "Variation":
-                    parent_row.append(variation)
-                else:
-                    parent_row.append(instances[0]["headers"].get(col, "") if count == 1 else "")
+            group_key = (eco, opening, variation)
+            rep_instance = self.session_representative_cache.get(group_key, instances[0]) if instances else None
+
+            parent_row = [eco, str(count), opening, variation, ""]
 
             if not query or any(query in str(val).lower() for val in parent_row):
                 if eco_base != last_eco_base:
@@ -408,38 +443,47 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                     last_eco_base = eco_base
 
                 row_tag = self._get_eco_tag(eco_base)
+                is_previously_expanded = group_key in expanded_keys
 
-                if count > 1:
-                    parent_id = self.tree.insert("", "end", values=parent_row, tags=(row_tag,))
+                if count > 0:
+                    parent_id = self.tree.insert(
+                        "", "end", values=parent_row, tags=(row_tag,), open=is_previously_expanded
+                    )
 
-                    if count == 1 and instances:
-                        self.tree_item_game_map[parent_id] = instances[0]
+                    if rep_instance:
+                        self.tree_item_game_map[parent_id] = rep_instance
 
                     for idx, inst in enumerate(instances, 1):
                         headers = inst["headers"]
-                        child_row = []
-                        for col in treeview_cols:
-                            if col == "":
-                                child_row.append("")
-                            elif col == "ECO":
-                                child_row.append(eco)
-                            elif col == "Games":
-                                child_row.append(f"#{idx}")
-                            elif col == "Opening":
-                                child_row.append(opening)
-                            elif col == "Variation":
-                                child_row.append(variation if col == "Variation" else headers.get(col, ""))
-                            else:
-                                child_row.append(headers.get(col, ""))
+                        white = headers.get("White", "Unknown")
+                        black = headers.get("Black", "Unknown")
+
+                        child_val = ""
+                        if self.active_primary_tag == "Players":
+                            child_val = f"{white} vs {black}"
+                        elif self.active_primary_tag == "Elo":
+                            w_elo = headers.get("WhiteElo", "?")
+                            b_elo = headers.get("BlackElo", "?")
+                            child_val = f"{w_elo} vs {b_elo}"
+                        elif self.active_primary_tag == "Event":
+                            child_val = headers.get("Event", "Unknown")
+                        elif self.active_extra_columns:
+                            child_val = " | ".join(
+                                str(headers.get(t, "?")) for t in sorted(list(self.active_extra_columns)))
+                        else:
+                            child_val = f"{white} vs {black}"
+
+                        child_row = [eco, f"#{idx}", opening, child_val, ""]
 
                         child_id = self.tree.insert(parent_id, "end", values=child_row, tags=("eco_child",))
                         self.tree_item_game_map[child_id] = inst
                 else:
-                    parent_id = self.tree.insert("", "end", values=parent_row, tags=(row_tag,))
+                    parent_id = self.tree.insert("", "end", values=parent_row, tags=(row_tag,),
+                                                 open=is_previously_expanded)
                     if instances:
                         self.tree_item_game_map[parent_id] = instances[0]
 
-        self.lbl_tag_count.configure(text=f"Active Columns: {len(current_cols)}")
+        self.lbl_tag_count.configure(text=f"Active Filter: {active_display_tag}")
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
@@ -475,6 +519,12 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
     def load_catalog(self):
         self.toggle_layout(show_search=True)
         set_status_message("Loading catalog in background...")
+
+        # Pop up loading overlay over workspace
+        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Loading Catalog PGN...")
+
+        self.aggregated_games_data = []
+        self.refresh_current_view()
         threading.Thread(target=self._background_load_catalog_worker, daemon=True).start()
 
     def _background_load_catalog_worker(self):
@@ -488,6 +538,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         grouped_variations = {}
         total_raw_games = 0
+        chunk_size = 250  # Process games in chunks for fluid progress rendering
 
         if self.pgn_path.exists():
             try:
@@ -518,18 +569,51 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
                         grouped_variations[key]["count"] += 1
                         grouped_variations[key]["instances"].append({
-                            "headers": cleaned
+                            "headers": cleaned,
+                            "game_object": game
                         })
+
+                        # Yield chunk to keep UI responsive
+                        if total_raw_games % chunk_size == 0:
+                            current_chunk_data = list(grouped_variations.values())
+                            self.after(0,
+                                       lambda d=current_chunk_data, t=total_raw_games: self._merge_catalog_chunk(d, t))
             except Exception as e:
                 print(f"Error loading catalog pgn: {e}")
 
-        headers_data = list(grouped_variations.values())
-        self.after(0, lambda: self._finalize_catalog_load(headers_data, catalog_data, total_raw_games))
+        final_headers_data = list(grouped_variations.values())
+        self.after(0, lambda: self._finalize_catalog_load(final_headers_data, catalog_data, total_raw_games))
+
+    def _merge_catalog_chunk(self, chunk_data, raw_count):
+        self.aggregated_games_data = chunk_data
+
+        for item_data in self.aggregated_games_data:
+            group_key = (item_data["eco"], item_data["opening"], item_data["variation"])
+            if group_key not in self.session_representative_cache and item_data["instances"]:
+                self.session_representative_cache[group_key] = random.choice(item_data["instances"])
+
+        self.refresh_current_view()
+
+        # Update overlay dialog with real-time progress text
+        if hasattr(self, "loading_overlay") and self.loading_overlay.winfo_exists():
+            self.loading_overlay.update_message(f"Processed {raw_count} games...")
 
     def _finalize_catalog_load(self, headers_data, catalog_data, total_raw_games):
         self.aggregated_games_data = headers_data
         self.catalog = catalog_data
+
+        self.session_representative_cache.clear()
+        for item_data in self.aggregated_games_data:
+            if item_data["count"] > 1 and item_data["instances"]:
+                self.session_representative_cache[
+                    (item_data["eco"], item_data["opening"], item_data["variation"])] = random.choice(
+                    item_data["instances"])
+
         self.refresh_current_view()
+
+        # Dismiss loading overlay once complete
+        if hasattr(self, "loading_overlay"):
+            self.loading_overlay.close()
 
         set_status_message(
             f"Catalog loaded: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups.")

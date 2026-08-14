@@ -1,10 +1,19 @@
 # gui/patterns_workspace.py
 
 import os
+import sys
+from pathlib import Path
+
+# Add parent directory to path so we can import splash from root
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from gui.splash import LoadingOverlay
+
+import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 import customtkinter as ctk
 import chess.pgn
+from io import StringIO
 
 # Path to store/load PGN content from the parent directory
 PATTERNS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "personal_catalog.pgn"))
@@ -132,7 +141,9 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.table_frame.grid_columnconfigure(0, weight=1)
 
         self.setup_treeview(("ECO", "Opening", "Variation", "White", "Black", "Result"))
-        self.load_catalog()
+
+        # Trigger background load with splash screen
+        self.after(100, self.load_catalog)
 
         # --- Bottom Pane: Notes & Save ---
         self.bottom_frame = ctk.CTkFrame(
@@ -182,33 +193,53 @@ class PatternsWorkspace(ctk.CTkFrame):
 
     def _configure_styles(self):
         self.style = ttk.Style()
-        self.style.theme_use("default")
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+
+        self.style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+
         self.style.configure(
-            "Treeview",
+            "Borderless.Treeview",
             background="#172134",
+            foreground="#f8fafc",
             fieldbackground="#172134",
-            foreground="white",
             rowheight=26,
+            font=("Arial", 10),
             borderwidth=0,
-        )
-        self.style.configure(
-            "Treeview.Heading",
-            background="#1e293b",
-            foreground="white",
-            borderwidth=0,
+            relief="flat",
+            focuscolor="#172134"
         )
         self.style.map(
-            "Treeview.Heading",
-            background=[("active", "#1e293b"), ("!active", "#1e293b")],
-            foreground=[("active", "white"), ("!active", "white")],
+            "Borderless.Treeview",
+            background=[("selected", "#1f538d")],
+            focuscolor=[('focus', '#172134')]
         )
-        self.style.map("Treeview", background=[("selected", "#1f538d")])
+        self.style.configure(
+            "Borderless.Treeview.Heading",
+            background="#1e293b",
+            foreground="white",
+            font=("Arial", 10, "bold"),
+            relief="flat",
+            borderwidth=0
+        )
+        self.style.map(
+            "Borderless.Treeview.Heading",
+            background=[('active', '#1e293b'), ('selected', '#1e293b')],
+            foreground=[('active', 'white'), ('selected', 'white')]
+        )
 
     def setup_treeview(self, columns):
         for widget in self.table_frame.winfo_children():
             widget.destroy()
 
-        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
+        self.tree = ttk.Treeview(
+            self.table_frame,
+            columns=columns,
+            show="headings",
+            style="Borderless.Treeview"
+        )
 
         for col in columns:
             self.tree.heading(col, text=col, anchor="w")
@@ -232,9 +263,15 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self.on_catalog_select)
 
     def load_catalog(self):
+        # Display splash overlay over workspace
+        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Loading Patterns Catalog...")
+        threading.Thread(target=self._background_load_catalog_worker, daemon=True).start()
+
+    def _background_load_catalog_worker(self):
         all_games_headers = []
         raw_games = []
         parsed_games = []
+        chunk_size = 200
 
         if os.path.exists(PATTERNS_FILE):
             try:
@@ -252,9 +289,17 @@ class PatternsWorkspace(ctk.CTkFrame):
                         cleaned_headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in
                                            game.headers.items()}
                         all_games_headers.append(cleaned_headers)
+
+                        if len(parsed_games) % chunk_size == 0:
+                            count = len(parsed_games)
+                            if hasattr(self, "loading_overlay") and self.loading_overlay.winfo_exists():
+                                self.loading_overlay.update_message(f"Parsed {count} pattern games...")
             except Exception as e:
                 print(f"Error loading catalog pgn: {e}")
 
+        self.after(0, lambda: self._finalize_catalog_load(all_games_headers, raw_games, parsed_games))
+
+    def _finalize_catalog_load(self, all_games_headers, raw_games, parsed_games):
         self.raw_pgn_games = raw_games
         self.parsed_games_objects = parsed_games
 
@@ -290,6 +335,10 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.current_scan_tier = 1
         self.update_tier_button_text()
         self.refresh_tree_view()
+
+        # Dismiss loading overlay once complete
+        if hasattr(self, "loading_overlay"):
+            self.loading_overlay.close()
 
     def refresh_tree_view(self):
         for item in self.tree.get_children():
@@ -426,7 +475,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         target_export_indices = self.filtered_indices if self.filtered_indices else self.last_valid_indices
 
         if not target_export_indices:
-            messagebox.showwarning("No Data", "There are no valid filtered games available to export.")
+            messagebox.showwarning("No Data", "There are not any valid filtered games available to export.")
             return
 
         parent_dir = os.path.dirname(PATTERNS_FILE)
@@ -475,7 +524,6 @@ class PatternsWorkspace(ctk.CTkFrame):
                 if idx < len(self.raw_pgn_games):
                     self.raw_pgn_games[idx] = pgn_data
 
-                    from io import StringIO
                     new_game_obj = chess.pgn.read_game(StringIO(pgn_data))
                     if new_game_obj:
                         self.parsed_games_objects[idx] = new_game_obj
