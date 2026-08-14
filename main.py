@@ -44,7 +44,7 @@ elif "alt" in available_themes:
 
 BG_COLOR = "#172134"
 
-# Global fallback styles so any workspace using standard Treeview headings matches cleanly
+# Global fallback styles locking headings completely against hover/active color shifts
 style.configure(
     "Heading",
     background="#344268",
@@ -55,8 +55,16 @@ style.configure(
 )
 style.map(
     "Heading",
-    background=[('active', '#344268'), ('selected', '#344268')],
-    foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
+    background=[
+        ('active', '#344268'),
+        ('pressed', '#344268'),
+        ('selected', '#344268')
+    ],
+    foreground=[
+        ('active', '#f8fafc'),
+        ('pressed', '#f8fafc'),
+        ('selected', '#f8fafc')
+    ]
 )
 
 # Set base colors to match the app background
