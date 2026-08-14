@@ -88,7 +88,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         )
         self.style.map(
             "Borderless.Treeview.Heading",
-            background=[('active', '#172134'), ('selected', '#172134')],
+            background=[('active', '#344268'), ('selected', '#344268')],
             foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
         )
 
