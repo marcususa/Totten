@@ -6,18 +6,27 @@ import chess.pgn
 def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="personal_catalog.pgn",
                  tag_mappings=None):
     """
-    Parses a PGN file, updates the opening frequencies in the catalog JSON,
-    and accumulates all parsed games into personal_catalog.pgn with clean movetext formatting.
+    Parses a PGN file, updates opening frequencies in the catalog JSON,
+    and accumulates parsed games into personal_catalog.pgn using project-root relative paths.
     """
+    # Determine the project root (parent directory of the 'catalog' folder)
+    project_root = Path(__file__).resolve().parent.parent
+
     pgn_file = Path(pgn_path).resolve()
-    cat_file = Path(catalog_path).resolve()
-    pgn_out = Path(pgn_out_path).resolve()
+    cat_file = (project_root / catalog_path).resolve() if not Path(catalog_path).is_absolute() else Path(catalog_path)
+    pgn_out = (project_root / pgn_out_path).resolve() if not Path(pgn_out_path).is_absolute() else Path(pgn_out_path)
     tag_mappings = tag_mappings or {}
 
     # Prevent importing the catalog's own output file into itself
     if pgn_file == pgn_out:
         print("[Catalog Error]: Cannot import the catalog's output file into itself.")
         return 0
+
+    # Convert incoming pgn path to a relative path string compared to project root for clean storage
+    try:
+        rel_pgn_str = str(pgn_file.relative_to(project_root))
+    except ValueError:
+        rel_pgn_str = str(pgn_file)
 
     # Load existing catalog data if the json already exists
     existing_files = []
@@ -29,26 +38,24 @@ def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="p
                 if isinstance(old_data, dict):
                     catalog = old_data
                     if "cataloged_files" in catalog:
-                        existing_files = [Path(p).resolve() for p in catalog["cataloged_files"]]
+                        existing_files = catalog["cataloged_files"]
         except Exception:
             pass
 
-    file_str = str(pgn_file)
-
-    # GUARD CLAUSE: Stop duplicates if file was already imported
-    if pgn_file in existing_files:
-        print(f"[Catalog Info]: File {pgn_file.name} has already been cataloged.")
+    # GUARD CLAUSE: Stop duplicates using relative path matching
+    if rel_pgn_str in existing_files:
+        print(f"[Catalog Info]: File {Path(pgn_file).name} has already been cataloged.")
         return 0
 
-    existing_files.append(file_str)
-    catalog["cataloged_files"] = [str(p) for p in existing_files]
+    existing_files.append(rel_pgn_str)
+    catalog["cataloged_files"] = existing_files
 
     if not pgn_file.exists():
         return 0
 
     game_count = 0
 
-    # Open the cumulative PGN output file in append mode to preserve previously added games
+    # Open the input PGN file and append to the persistent personal_catalog.pgn at project root
     with open(pgn_file, "r", encoding="utf-8", errors="ignore") as f, \
             open(pgn_out, "a", encoding="utf-8") as out_f:
 
@@ -59,12 +66,10 @@ def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="p
 
             game_count += 1
 
-            # Export game cleanly: columns=None removes hard line wraps in movetext
-            # to prevent ugly gaps and spacing artifacts downstream.
+            # Export game cleanly without hard line wraps in movetext
             exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
             clean_game_str = game.accept(exporter)
 
-            # Write the clean game string to the persistent personal_catalog.pgn file
             out_f.write(clean_game_str + "\n\n")
 
             headers = dict(game.headers)
