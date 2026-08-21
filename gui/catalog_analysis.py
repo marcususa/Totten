@@ -4,8 +4,8 @@ import chess.pgn
 import customtkinter as ctk
 from core.constants import get_saved_pgn_filename
 from gui.chess_board import ChessBoardWidget
+from gui.layout_analysis import LayoutAnalysisMixin
 
-from core.constants import get_saved_pgn_filename
 
 # File 2 module titled "catalog_analysis.py"
 
@@ -164,3 +164,44 @@ class CatalogAnalysisMixin:
         self.board_widget.set_board(board_obj)
         if self.popout_board:
             self.popout_board.set_board(board_obj)
+
+    def load_game_from_state(self, target_game, category_source=None):
+        """Loads either a mixed list or a category file into the tree, with diagnostic checks."""
+        if not target_game:
+            return
+
+        print(f"[DEBUG CatalogAnalysis] load_game_from_state called.")
+        print(f" -> category_source type: {type(category_source)}")
+        print(f" -> category_source value: {category_source}")
+
+        # CONDITIONAL: Check if it's a mixed collection list
+        if isinstance(category_source, list):
+            if hasattr(self, "load_mixed_collection"):
+                print(" -> SUCCESS: Recognized mixed collection list. Handing off to load_mixed_collection.")
+                self.load_mixed_collection(category_source, target_game=target_game)
+            else:
+                print(
+                    " -> ERROR: category_source is a list, but 'load_mixed_collection' method is missing from this class/mixin stack!")
+        else:
+            print(" -> WARNING: category_source is NOT a list. Falling back to default/disk catalog loading.")
+
+            # Otherwise, treat it as a file catalog path or fallback to default catalog
+            if category_source and isinstance(category_source, str):
+                self.load_games(filename=category_source)
+            else:
+                self.load_games()  # Default catalog fallback
+
+            # Find and select the specific game in the file-populated tree
+            for item_id, game in self.preview_lookup.items():
+                if (
+                        game.headers.get("White") == target_game.headers.get("White")
+                        and game.headers.get("Black") == target_game.headers.get("Black")
+                        and game.headers.get("Date") == target_game.headers.get("Date")
+                ):
+                    self.pgn_tree.selection_set(item_id)
+                    self.pgn_tree.see(item_id)
+                    break
+
+        # Trigger display updates via layout mixin
+        if hasattr(self, "board_widget"):
+            LayoutAnalysisMixin.load_game_from_state(self, target_game)

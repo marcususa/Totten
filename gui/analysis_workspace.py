@@ -1,34 +1,73 @@
+# File module titled "mixed_analysis.py"
+
+import chess
+import chess.pgn
 import customtkinter as ctk
+from gui.chess_board import ChessBoardWidget
 
-from layout_workspace import LayoutAnalysisMixin
-from catalog_analysis import CatalogAnalysisMixin
-from format_analysis import FormatAnalysisMixin
-from engine_analysis import EngineAnalysisMixin
-import app_state as state
+class MixedAnalysisMixin:
+    def init_mixed_bindings(self):
+        """Explicit tree bindings for mixed collection analysis view."""
+        if hasattr(self, "pgn_tree") and self.pgn_tree:
+            self.pgn_tree.bind("<Button-1>", lambda e: self.toggle_game(e))
+            self.pgn_tree.bind("<FocusIn>", lambda e: "break")
 
+        self.after(100, self._bind_global_keys)
 
-class AnalysisWorkspace(
-    ctk.CTkFrame,
-    LayoutAnalysisMixin,
-    CatalogAnalysisMixin,
-    FormatAnalysisMixin,
-    EngineAnalysisMixin
-):
-    def __init__(self, master, filename=None, app_state=None):
-        super().__init__(master, fg_color="#172134", corner_radius=0)
-        self.app_state = app_state or state
-        self.filename = filename
+    def _bind_global_keys(self):
+        top = self.winfo_toplevel()
+        top.bind("<Left>", lambda e: self.on_prev_move())
+        top.bind("<Right>", lambda e: self.on_next_move())
+        top.bind("<Up>", lambda e: self.on_first_move())
+        top.bind("<Down>", lambda e: self.on_last_move())
 
-        # 1. Initialize UI layout and register the global cross-workspace callback
-        self.init_layout()
+    def load_mixed_collection(self, games_list, target_game=None):
+        """Populates the tree view with a dynamic list of game objects for mixed collections."""
+        if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
+            return
 
-        # 2. Initialize catalog tree bindings and load games into the second workspace tree
-        self.init_catalog_bindings()
+        self.pgn_tree.delete(*self.pgn_tree.get_children())
+        self.preview_lookup.clear()
 
-        # 3. Check if a game was already selected in workspace 1 before loading this view
-        self.check_initial_state()
+        if games_list:
+            if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
+                self.lbl_empty_state.pack_forget()
 
-    def check_initial_state(self):
-        """Checks if an active game was already selected in workspace 1 before loading."""
-        if hasattr(state, "active_analysis_game") and state.active_analysis_game:
-            self.load_game_from_state(state.active_analysis_game)
+            for idx, game in enumerate(games_list, start=1):
+                headers = game.headers
+                white = headers.get("White", "Unknown")
+                black = headers.get("Black", "Unknown")
+                result = headers.get("Result", "*")
+
+                item_id = self.pgn_tree.insert(
+                    "",
+                    "end",
+                    values=(idx, white, black, result)
+                )
+                self.preview_lookup[item_id] = game
+
+                # Auto-select the target game if it matches
+                if target_game and (
+                    game.headers.get("White") == target_game.headers.get("White")
+                    and game.headers.get("Black") == target_game.headers.get("Black")
+                    and game.headers.get("Date") == target_game.headers.get("Date")
+                ):
+                    self.pgn_tree.selection_set(item_id)
+                    self.pgn_tree.see(item_id)
+        else:
+            if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
+                self.lbl_empty_state.pack(padx=10, pady=15, anchor="center")
+
+    def toggle_game(self, event):
+        """Handles clicking a game inside the sidebar tree view."""
+        item_id = self.pgn_tree.identify_row(event.y)
+        if not item_id or item_id not in self.preview_lookup:
+            return
+
+        game = self.preview_lookup[item_id]
+
+        # Grab the full list of games currently loaded in the tree view to keep as the active source
+        current_games_list = list(self.preview_lookup.values())
+
+        if hasattr(self, "load_game_from_state"):
+            self.load_game_from_state(game, category_source=current_games_list)

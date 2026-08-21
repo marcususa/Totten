@@ -1,4 +1,3 @@
-# gui/workspace.py
 import customtkinter as ctk
 from tkinter import ttk
 import gui.app_state as state
@@ -33,6 +32,22 @@ class AnalysisWorkspace(
 
         # 2. Hook up catalog bindings and load PGN games into the tree
         self.init_catalog_bindings()
+
+        # 3. Register as an analysis callback listener so EditWorkspace clicks route here properly
+        if not hasattr(state, "analysis_callbacks") or state.analysis_callbacks is None:
+            state.analysis_callbacks = []
+        if self.load_game_from_state not in state.analysis_callbacks:
+            state.analysis_callbacks.append(self.load_game_from_state)
+
+        # 4. Check if a game was already selected before loading this view
+        self.check_initial_state()
+
+    def check_initial_state(self):
+        """Checks if an active game and category source were already selected before loading."""
+        game = getattr(state, "active_analysis_game", None)
+        source = getattr(state, "active_category_source", None)
+        if game:
+            self.load_game_from_state(game, category_source=source)
 
     def refresh_view(self):
         """Called by WorkspaceManager every time this workspace is brought into view."""
@@ -71,7 +86,7 @@ class AnalysisWorkspace(
 class WorkspaceManager(ctk.CTkFrame):
     """
     Manages the active workspace container and switches between views
-    (Analysis, Catalog, Edit, Patterns, Mixed Collections, Calendar) using lazy loading.
+    (Analysis, Catalog, Edit, Patterns, Mixed Collections, Calendar, Quick Analysis) using lazy loading.
     """
 
     def __init__(self, master, app_state=None):
@@ -103,17 +118,15 @@ class WorkspaceManager(ctk.CTkFrame):
         elif target_key == "catalog":
             catalog_ws = SearchCatalogWorkspace(self, self.app_state)
             self.workspaces["catalog"] = catalog_ws
-        elif target_key == "edit":
+        elif target_key in ("edit", "edit_workspace", "mixed_collections"):
+            # Map all these aliases to the real EditWorkspace
             edit_ws = EditWorkspace(self, self.app_state)
+            self.workspaces["edit_workspace"] = edit_ws
+            self.workspaces["mixed_collections"] = edit_ws
             self.workspaces["edit"] = edit_ws
         elif target_key == "patterns":
-            patterns_ws = PatternsWorkspace(self, app_state=self.app_state)
+            patterns_ws = PatternsWorkspace(self, self.app_state)
             self.workspaces["patterns"] = patterns_ws
-        elif target_key == "mixed_collections":
-            mixed_ws = ctk.CTkFrame(self, fg_color="#172134")
-            ctk.CTkLabel(mixed_ws, text="Mixed Collections Workspace", font=("Arial", 16), text_color="#94a3b8").pack(
-                expand=True)
-            self.workspaces["mixed_collections"] = mixed_ws
         elif target_key == "calendar":
             calendar_ws = CalendarWorkspace(self, self.app_state)
             self.workspaces["calendar"] = calendar_ws
@@ -128,8 +141,10 @@ class WorkspaceManager(ctk.CTkFrame):
         target_key = key.lower().strip()
         if target_key == "pgn_games":
             target_key = "analysis"
+        elif target_key in ("edit", "edit_workspace", "mixed_collections"):
+            target_key = "edit_workspace"
 
-        if target_key not in ["analysis", "catalog", "edit", "patterns", "mixed_collections", "calendar"]:
+        if target_key not in ["analysis", "catalog", "edit_workspace", "patterns", "calendar"]:
             target_key = "analysis"
 
         # Ensure the target workspace is initialized before trying to show it

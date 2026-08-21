@@ -1,429 +1,941 @@
 import os
+import json
 import threading
 from pathlib import Path
 from tkinter import ttk, filedialog
+import tkinter as tk
 
 import chess.pgn
 import customtkinter as ctk
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
-from catalog.catalog_builder import catalog_pgns
+from gui.splash import LoadingOverlay
 
-STANDARD_TAG_BANK = {
-    "essential": {"ECO", "Opening", "Variation"},
-    "common": {
-        "Event", "Site", "Date", "Round", "White", "Black", "Result",
-        "WhiteElo", "BlackElo", "TimeControl", "Termination", "Annotator",
-        "PlyCount", "EventDate", "WhiteTitle", "BlackTitle", "WhiteFideId",
-        "BlackFideId", "SetUp", "FEN", "Mode", "Variant"
-    }
+# Base preset categories
+DEFAULT_COLLECTION_CATEGORIES = [
+    "Open Events", "Women's Events", "Tournaments", "Matches",
+    "Championships", "Openings", "Middlegames", "Endgames",
+    "Time Periods / Eras", "Notable People / Players"
+]
+
+CATEGORY_FOLDER_MAP = {
+    "Open Events": ("open", "open_events.pgn"),
+    "Women's Events": ("women", "womens_events.pgn"),
+    "Tournaments": ("tournaments", "tournaments.pgn"),
+    "Matches": ("matches", "matches.pgn"),
+    "Championships": ("championships", "championships.pgn"),
+    "Openings": ("openings", "openings.pgn"),
+    "Middlegames": ("middlegames", "middlegames.pgn"),
+    "Endgames": ("endgames", "endgames.pgn"),
+    "Time Periods / Eras": ("era", "era.pgn"),
+    "Notable People / Players": ("players", "players.pgn"),
 }
+
+CONFIG_FILE = Path(__file__).resolve().parent.parent / "pgn" / "categories_config.json"
+
+
+def load_categories_config():
+    """Loads categories and their display order, falling back to defaults."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                cats = data.get("categories", DEFAULT_COLLECTION_CATEGORIES)
+                custom_map = data.get("custom_map", {})
+                for k, v in custom_map.items():
+                    CATEGORY_FOLDER_MAP[k] = (v[0], v[1])
+                return cats
+        except Exception:
+            pass
+    return list(DEFAULT_COLLECTION_CATEGORIES)
+
+
+def save_categories_config(categories):
+    """Saves the current category ordering and custom folder maps to disk."""
+    custom_map = {cat: CATEGORY_FOLDER_MAP[cat] for cat in categories if cat not in DEFAULT_COLLECTION_CATEGORIES}
+    data = {
+        "categories": categories,
+        "custom_map": custom_map
+    }
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"Error saving category config: {e}")
+
+
+class ConfirmationDialog(ctk.CTkToplevel):
+    """Popup confirmation dialog with Yes and No buttons centered."""
+
+    def __init__(self, master, title, message):
+        super().__init__(master)
+        self.title(title)
+        self.geometry("420x200")
+        self.configure(fg_color="#172134")
+        self.grab_set()
+
+        self.confirmed = False
+        self._center_window(master)
+        self._build_ui(message)
+
+    def _center_window(self, master):
+        self.update_idletasks()
+        width = 420
+        height = 200
+        try:
+            x = master.winfo_rootx() + (master.winfo_width() // 2) - (width // 2)
+            y = master.winfo_rooty() + (master.winfo_height() // 2) - (height // 2)
+        except Exception:
+            x = (self.winfo_screenwidth() // 2) - (width // 2)
+            y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{max(0, x)}+{max(0, y)}")
+
+    def _build_ui(self, message):
+        ctk.CTkLabel(
+            self, text="⚠️ Are you sure?",
+            font=("Arial", 15, "bold"), text_color="#f87171"
+        ).pack(anchor="w", padx=20, pady=(20, 5))
+
+        ctk.CTkLabel(
+            self, text=message, font=("Arial", 12), text_color="#e2e8f0",
+            justify="left", wraplength=380
+        ).pack(anchor="w", padx=20, pady=5)
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(15, 20))
+        btn_frame.grid_columnconfigure((0, 1), weight=1)
+
+        inner_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        inner_container.pack(anchor="center")
+
+        ctk.CTkButton(
+            inner_container, text="Yes", fg_color="#b91c1c", hover_color="#991b1b",
+            border_width=2, border_color="#7f1d1d", font=("Arial", 12, "bold"),
+            width=90, command=self._on_yes
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            inner_container, text="No", fg_color="#334155", hover_color="#475569",
+            border_width=2, border_color="#64748b", font=("Arial", 12),
+            width=90, command=self.destroy
+        ).pack(side="left", padx=5)
+
+    def _on_yes(self):
+        self.confirmed = True
+        self.destroy()
+
+
+class GameSelectionDialog(ctk.CTkToplevel):
+    """Popup dialog to let users pick specific games from selected PGN files."""
+
+    def __init__(self, master, games_data):
+        super().__init__(master)
+        self.title("Select Games to Include")
+        self.geometry("700x450")
+        self.configure(fg_color="#172134")
+        self.grab_set()
+
+        self.games_data = games_data
+        self.selected_games = []
+
+        self._center_window(master)
+        self._build_ui()
+
+    def _center_window(self, master):
+        self.update_idletasks()
+        width = 700
+        height = 450
+        try:
+            x = master.winfo_rootx() + (master.winfo_width() // 2) - (width // 2)
+            y = master.winfo_rooty() + (master.winfo_height() // 2) - (height // 2)
+        except Exception:
+            x = (self.winfo_screenwidth() // 2) - (width // 2)
+            y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{max(0, x)}+{max(0, y)}")
+
+    def _build_ui(self):
+        lbl = ctk.CTkLabel(
+            self, text="Review and select games to include in your collection:",
+            font=("Arial", 13, "bold"), text_color="white"
+        )
+        lbl.pack(anchor="w", padx=15, pady=(15, 5))
+
+        container = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8)
+        container.pack(fill="both", expand=True, padx=15, pady=10)
+
+        canvas = ctk.CTkCanvas(container, bg="#1e293b", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        self.scrollable_frame = ctk.CTkFrame(canvas, fg_color="#1e293b")
+
+        self.scrollable_frame.bind(
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas_window = canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        scrollbar.pack(side="right", fill="y")
+
+        self.checkbox_vars = []
+
+        header_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="#334155", corner_radius=4)
+        header_frame.pack(fill="x", padx=5, pady=2)
+        ctk.CTkLabel(header_frame, text="Include", width=60, font=("Arial", 11, "bold"), text_color="white").pack(
+            side="left", padx=5)
+        ctk.CTkLabel(header_frame, text="White vs Black", width=240, font=("Arial", 11, "bold"), text_color="white",
+                     anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header_frame, text="Opening", width=240, font=("Arial", 11, "bold"), text_color="white",
+                     anchor="w").pack(side="left", padx=5)
+
+        for gdata in self.games_data:
+            row_frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
+            row_frame.pack(fill="x", padx=5, pady=2)
+
+            var = ctk.BooleanVar(value=gdata["auto_select"])
+            self.checkbox_vars.append((var, gdata["game"]))
+
+            chk = ctk.CTkCheckBox(row_frame, text="", variable=var, width=30)
+            chk.pack(side="left", padx=15)
+
+            players_text = f"{gdata['white']} vs {gdata['black']}"
+            ctk.CTkLabel(row_frame, text=players_text, width=240, anchor="w", text_color="white",
+                         font=("Arial", 11)).pack(side="left", padx=5)
+
+            opening_text = f"{gdata['opening']} ({gdata['variation']})" if gdata['variation'] else gdata['opening']
+            ctk.CTkLabel(row_frame, text=opening_text, width=240, anchor="w", text_color="#94a3b8",
+                         font=("Arial", 11)).pack(side="left", padx=5)
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=15)
+
+        ctk.CTkButton(
+            btn_frame, text="Confirm Selection", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", font=("Arial", 12, "bold"), command=self._on_confirm
+        ).pack(side="right", padx=5)
+
+        ctk.CTkButton(
+            btn_frame, text="Cancel", fg_color="#334155", hover_color="#475569",
+            border_width=2, border_color="#64748b", font=("Arial", 12), command=self.destroy
+        ).pack(side="right", padx=5)
+
+    def _on_confirm(self):
+        self.selected_games = [game for var, game in self.checkbox_vars if var.get()]
+        self.destroy()
+
+
+class CollectionLimitDialog(ctk.CTkToplevel):
+    """Popup alert dialog when selected games exceed the collection limit."""
+
+    def __init__(self, master, total_count):
+        super().__init__(master)
+        self.title("Collection Limit Exceeded")
+        self.geometry("450x230")
+        self.configure(fg_color="#172134")
+        self.grab_set()
+
+        self._center_window(master)
+        self._build_ui(total_count)
+
+    def _center_window(self, master):
+        self.update_idletasks()
+        width = 450
+        height = 230
+        try:
+            x = master.winfo_rootx() + (master.winfo_width() // 2) - (width // 2)
+            y = master.winfo_rooty() + (master.winfo_height() // 2) - (height // 2)
+        except Exception:
+            x = (self.winfo_screenwidth() // 2) - (width // 2)
+            y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{max(0, x)}+{max(0, y)}")
+
+    def _build_ui(self, total_count):
+        ctk.CTkLabel(
+            self, text="⚠️ Collection Limit Exceeded",
+            font=("Arial", 15, "bold"), text_color="#f87171"
+        ).pack(anchor="w", padx=20, pady=(20, 5))
+
+        msg = (
+            f"The selected PGN file(s) contain {total_count} games.\n\n"
+            "Collections are restricted to a maximum of 300 games to ensure smooth performance. "
+            "Please split your PGN file into smaller parts or select fewer files."
+        )
+        ctk.CTkLabel(
+            self, text=msg, font=("Arial", 12), text_color="#e2e8f0",
+            justify="left", wraplength=410
+        ).pack(anchor="w", padx=20, pady=5)
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(15, 20))
+
+        ctk.CTkButton(
+            btn_frame, text="Understood", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", font=("Arial", 12, "bold"),
+            command=self.destroy
+        ).pack(side="right")
+
+
+class AddCategoryDialog(ctk.CTkToplevel):
+    """Dialog to create a new custom category name."""
+
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Add New Category")
+        self.geometry("400x200")
+        self.configure(fg_color="#172134")
+        self.grab_set()
+
+        self.category_name = None
+        self._center_window(master)
+        self._build_ui()
+
+    def _center_window(self, master):
+        self.update_idletasks()
+        width = 400
+        height = 200
+        try:
+            x = master.winfo_rootx() + (master.winfo_width() // 2) - (width // 2)
+            y = master.winfo_rooty() + (master.winfo_height() // 2) - (height // 2)
+        except Exception:
+            x = (self.winfo_screenwidth() // 2) - (width // 2)
+            y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{max(0, x)}+{max(0, y)}")
+
+    def _build_ui(self):
+        ctk.CTkLabel(
+            self, text="Create New Collection Category",
+            font=("Arial", 13, "bold"), text_color="white"
+        ).pack(anchor="w", padx=20, pady=(20, 5))
+
+        self.entry_name = ctk.CTkEntry(
+            self, placeholder_text="Category Name (e.g., My Best Games)", width=360,
+            fg_color="#344268", text_color="#FFFFFF", placeholder_text_color="#94a3b8",
+            border_width=1, border_color="#475569"
+        )
+        self.entry_name.pack(padx=20, pady=10)
+        self.entry_name.focus()
+
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+
+        ctk.CTkButton(
+            btn_frame, text="Create", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", font=("Arial", 12, "bold"),
+            command=self._on_submit
+        ).pack(side="right", padx=5)
+
+        ctk.CTkButton(
+            btn_frame, text="Cancel", fg_color="#334155", hover_color="#475569",
+            border_width=2, border_color="#64748b", font=("Arial", 12),
+            command=self.destroy
+        ).pack(side="right", padx=5)
+
+    def _on_submit(self):
+        name = self.entry_name.get().strip()
+        if name:
+            self.category_name = name
+            self.destroy()
 
 
 class EditWorkspace(ctk.CTkFrame):
-    """
-    Workspace dedicated to advanced PGN curation, batch management,
-    mixed collection playlists, FEN overrides, metadata hygiene,
-    and integrated Chess Engine configuration.
-    """
 
     def __init__(self, master, app_state=None, filename=None):
-        super().__init__(master, fg_color="#172134", corner_radius=0)
+        super().__init__(master, fg_color="#1e293b", corner_radius=0)
         self.app_state = app_state or state
         self.filename = filename or getattr(state, "current_filename", None)
 
-        self.all_data = []
-        self.unknown_tags = []
-        self.mapping_vars = {}
-        self.playlist_items = []
+        self.collection_categories = load_categories_config()
+        self.collection_files_map = {cat: {} for cat in self.collection_categories}
+        self.selected_files = []
+        self.active_expanded_category = None
+        self.expanded_files = set()
 
         self._configure_styles()
         self._build_ui()
+
+        for cat in self.collection_categories:
+            self._load_category_files(cat)
+
         self.refresh_view()
 
     def _configure_styles(self):
-        self.style = ttk.Style()
-        self.style.theme_use("default")
+        self.style = ttk.Style(self)
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+
+        BG_COLOR = "#172134"
         self.style.configure(
             "Treeview",
-            background="#172134",
-            fieldbackground="#172134",
+            background=BG_COLOR,
+            fieldbackground=BG_COLOR,
             foreground="white",
             rowheight=26,
+            font=("Arial", 10),
             borderwidth=0,
-        )
-        self.style.configure(
-            "Treeview.Heading",
-            background="#1e293b",
-            foreground="white",
-            borderwidth=0,
+            relief="flat",
+            bordercolor=BG_COLOR,
+            lightcolor=BG_COLOR,
+            darkcolor=BG_COLOR,
+            focuscolor=BG_COLOR
         )
         self.style.map(
-            "Treeview.Heading",
-            background=[("active", "#1e293b"), ("!active", "#1e293b")],
-            foreground=[("active", "white"), ("!active", "white")],
+            "Treeview",
+            focuscolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
+            bordercolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
+            lightcolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
+            darkcolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
+            background=[("selected", BG_COLOR), ("active", BG_COLOR)],
+            foreground=[("selected", "white"), ("active", "white")]
         )
-        self.style.map("Treeview", background=[("selected", "#3b82f6")])
+
+        # Completely hide the native built-in indicator column/element to disable hollow arrows
+        self.style.layout("Treeview.Item", [
+            ('Treeitem.padding', {'sticky': 'nswe', 'children': [
+                ('Treeitem.image', {'side': 'left', 'sticky': ''}),
+                ('Treeitem.text', {'side': 'left', 'sticky': ''})
+            ], 'border': 0})
+        ])
+
+    def refresh_view(self):
+        self._refresh_treeview()
 
     def _build_ui(self):
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0)
+        self.grid_columnconfigure(0, weight=2)
+        self.grid_columnconfigure(1, weight=3)
 
-        # Left Panel: Multi-tab view for editing operations (Table, Playlist, Engines)
-        self.left_panel = ctk.CTkFrame(self, fg_color="#172134", corner_radius=0)
-        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
-        self.left_panel.grid_rowconfigure(1, weight=1)
-        self.left_panel.grid_columnconfigure(0, weight=1)
+        left_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#334155", border_width=1)
+        left_box.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
+        left_box.grid_rowconfigure(0, weight=1)
+        left_box.grid_columnconfigure(0, weight=1)
 
-        # Mode Selector Toolbar inside Left Panel
-        self.mode_bar = ctk.CTkFrame(self.left_panel, fg_color="#1e293b", height=40, corner_radius=6)
-        self.mode_bar.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-
-        self.btn_tab_table = ctk.CTkButton(
-            self.mode_bar, text="PGN Anatomy & Tags", fg_color="#3b82f6", text_color="white",
-            width=140, height=28, font=("Arial", 11, "bold"), command=lambda: self.switch_tab("table")
+        self.col_tree = ttk.Treeview(
+            left_box, show="tree", selectmode="browse"
         )
-        self.btn_tab_table.pack(side="left", padx=6, pady=6)
 
-        self.btn_tab_playlist = ctk.CTkButton(
-            self.mode_bar, text="Mixed Playlist", fg_color="transparent", text_color="#94a3b8",
-            width=130, height=28, font=("Arial", 11, "bold"), command=lambda: self.switch_tab("playlist")
+        self.col_tree.heading("#0", text="Categories, Collections & Games", anchor="w")
+        self.col_tree.column("#0", width=400, anchor="w")
+
+        self.col_tree.bind("<Button-1>", self._on_tree_click)
+
+        col_scroll = ttk.Scrollbar(left_box, orient="vertical", command=self.col_tree.yview)
+        self.col_tree.configure(yscrollcommand=col_scroll.set)
+        self.col_tree.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        col_scroll.grid(row=0, column=1, sticky="ns", pady=6, padx=(0, 6))
+
+        right_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#334155", border_width=1)
+        right_box.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
+        right_box.grid_columnconfigure(0, weight=1)
+
+        header_box = ctk.CTkFrame(right_box, fg_color="transparent")
+        header_box.pack(fill="x", padx=10, pady=(15, 5))
+
+        ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color="white").pack(
+            anchor="w")
+        ctk.CTkLabel(header_box, text="Select category first.", font=("Arial", 12),
+                     text_color="#94a3b8").pack(anchor="w", pady=(0, 0))
+
+        col_ctrl = ctk.CTkFrame(right_box, fg_color="transparent")
+        col_ctrl.pack(fill="x", padx=10, pady=5)
+
+        opt_border_frame = ctk.CTkFrame(col_ctrl, fg_color="transparent", border_width=2, border_color="#475569",
+                                        corner_radius=0)
+        opt_border_frame.pack(side="left", padx=(0, 4))
+
+        default_category = self.collection_categories[0] if self.collection_categories else ""
+        self.opt_category = ctk.CTkOptionMenu(
+            opt_border_frame, values=self.collection_categories, width=110,
+            corner_radius=0, fg_color="#344268", button_color="#344268",
+            button_hover_color="#2e4a8c", dropdown_hover_color="#2e4a8c",
+            dropdown_fg_color="#344268", command=self._on_category_changed
         )
-        self.btn_tab_playlist.pack(side="left", padx=2, pady=6)
+        self.opt_category.set(default_category)
+        self.opt_category.pack(padx=1, pady=1)
 
-        self.btn_tab_engines = ctk.CTkButton(
-            self.mode_bar, text="Engine Manager", fg_color="transparent", text_color="#94a3b8",
-            width=130, height=28, font=("Arial", 11, "bold"), command=lambda: self.switch_tab("engines")
+        ctk.CTkButton(
+            col_ctrl, text="+ Category", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", width=75, height=28, font=("Arial", 12),
+            command=self._add_category
+        ).pack(side="right")
+
+        # --- SECTION 1: ADDING & ORDERING ---
+        move_row = ctk.CTkFrame(right_box, fg_color="transparent")
+        move_row.pack(fill="x", padx=10, pady=(5, 2))
+        move_row.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkButton(
+            move_row, text="Up", fg_color="#334155", hover_color="#475569",
+            border_width=1, border_color="#64748b", height=28, font=("Arial", 12),
+            command=lambda: self._move_category(-1)
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
+
+        ctk.CTkButton(
+            move_row, text="Down", fg_color="#334155", hover_color="#475569",
+            border_width=1, border_color="#64748b", height=28, font=("Arial", 12),
+            command=lambda: self._move_category(1)
+        ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        info_row = ctk.CTkFrame(right_box, fg_color="transparent")
+        info_row.pack(fill="x", padx=10, pady=(5, 2))
+
+        self.lbl_selected_files = ctk.CTkLabel(info_row, text="No PGN files selected.", font=("Arial", 12),
+                                               text_color="#94a3b8", anchor="w")
+        self.lbl_selected_files.pack(side="left", anchor="w")
+
+        action_row = ctk.CTkFrame(right_box, fg_color="transparent")
+        action_row.pack(fill="x", padx=10, pady=(2, 10))
+
+        self.btn_undo_pgn = ctk.CTkButton(
+            action_row, text="✕", fg_color="#dd0000", hover_color="#b91c1c",
+            border_width=2, border_color="#660000", width=26, height=30, font=("Arial", 12, "bold"),
+            text_color="white", command=self._undo_last_pgn
         )
-        self.btn_tab_engines.pack(side="left", padx=6, pady=6)
 
-        # Tab Containers
-        self.tab_container = ctk.CTkFrame(self.left_panel, fg_color="#172134")
-        self.tab_container.grid(row=1, column=0, sticky="nsew")
-        self.tab_container.grid_rowconfigure(0, weight=1)
-        self.tab_container.grid_columnconfigure(0, weight=1)
-
-        # -- TAB 1: PGN Anatomy Table --
-        self.table_frame = ctk.CTkFrame(self.tab_container, fg_color="#172134")
-        self.table_frame.grid(row=0, column=0, sticky="nsew")
-        self.table_frame.grid_rowconfigure(0, weight=1)
-        self.table_frame.grid_columnconfigure(0, weight=1)
-
-        columns = ("ECO", "Games", "Opening", "Variation")
-        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
-        self.tree.heading("ECO", text="ECO", anchor="w")
-        self.tree.column("ECO", width=65, minwidth=50, anchor="w", stretch=False)
-        self.tree.heading("Games", text="Games", anchor="w")
-        self.tree.column("Games", width=65, minwidth=50, anchor="w", stretch=False)
-        self.tree.heading("Opening", text="Opening", anchor="w")
-        self.tree.column("Opening", width=220, minwidth=140, anchor="w", stretch=True)
-        self.tree.heading("Variation", text="Variation", anchor="w")
-        self.tree.column("Variation", width=250, minwidth=140, anchor="w", stretch=True)
-
-        scrollbar = ttk.Scrollbar(self.table_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.grid(row=0, column=0, sticky="nsew")
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # -- TAB 2: Mixed Playlist Manager --
-        self.playlist_frame = ctk.CTkFrame(self.tab_container, fg_color="#172134")
-        self.playlist_frame.grid_rowconfigure(0, weight=1)
-        self.playlist_frame.grid_columnconfigure(0, weight=1)
-
-        pl_columns = ("Index", "Source PGN", "Title / Matchup", "Status")
-        self.pl_tree = ttk.Treeview(self.playlist_frame, columns=pl_columns, show="headings")
-        for col in pl_columns:
-            self.pl_tree.heading(col, text=col, anchor="w")
-            self.pl_tree.column(col, width=120, anchor="w")
-
-        pl_scrollbar = ttk.Scrollbar(self.playlist_frame, orient="vertical", command=self.pl_tree.yview)
-        self.pl_tree.configure(yscrollcommand=pl_scrollbar.set)
-        self.pl_tree.grid(row=0, column=0, sticky="nsew")
-        pl_scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # -- TAB 3: Integrated Engine Configuration Manager --
-        self.engine_frame = ctk.CTkFrame(self.tab_container, fg_color="#1e293b", corner_radius=8)
-        self.engine_frame.grid_rowconfigure(4, weight=1)
-        self.engine_frame.grid_columnconfigure(1, weight=1)
-
-        lbl_eng_title = ctk.CTkLabel(
-            self.engine_frame, text="UCI Engine & Analysis Settings",
-            font=("Arial", 16, "bold"), text_color="white", anchor="w"
+        self.btn_select_pgns = ctk.CTkButton(
+            action_row, text="Select PGNs", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", width=95, height=30, font=("Arial", 12),
+            command=self._select_pgn_files
         )
-        lbl_eng_title.grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 15), sticky="w")
+        self.btn_select_pgns.pack(side="left", padx=(0, 3))
 
-        # Stockfish Binary Path Selection
-        ctk.CTkLabel(self.engine_frame, text="Stockfish Binary Path:", font=("Arial", 12, "bold"),
-                     text_color="#94a3b8").grid(
-            row=1, column=0, padx=(20, 10), pady=10, sticky="w"
+        ctk.CTkButton(
+            action_row, text="Create Collection", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", width=125, height=30, font=("Arial", 12, "bold"),
+            command=self._create_collection
+        ).pack(side="left", padx=(3, 0))
+
+        # --- SECTION 2: DELETING ---
+        separator1 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
+        separator1.pack(fill="x", padx=10, pady=10)
+
+        del_header_box = ctk.CTkFrame(right_box, fg_color="transparent")
+        del_header_box.pack(fill="x", padx=10, pady=(0, 4))
+        ctk.CTkLabel(
+            del_header_box, text="Use with caution when deleting",
+            font=("Arial", 11, "bold"), text_color="#f87171"
+        ).pack(anchor="w")
+
+        del_row = ctk.CTkFrame(right_box, fg_color="transparent")
+        del_row.pack(fill="x", padx=10, pady=2)
+        del_row.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkButton(
+            del_row, text="Delete Category", fg_color="#334155", hover_color="#475569",
+            border_width=1, border_color="#64748b", height=28, font=("Arial", 12),
+            command=self._delete_category
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
+
+        ctk.CTkButton(
+            del_row, text="Delete PGN File", fg_color="#334155", hover_color="#475569",
+            border_width=1, border_color="#64748b", height=28, font=("Arial", 12),
+            command=self._delete_selected_pgn_file
+        ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+
+        # --- SECTION 3: ECO REPAIR & ENGINE SELECTION ---
+        separator2 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
+        separator2.pack(fill="x", padx=10, pady=10)
+
+        eco_box = ctk.CTkFrame(right_box, fg_color="transparent")
+        eco_box.pack(fill="x", padx=10, pady=2)
+        ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color="white").pack(anchor="w")
+        ctk.CTkButton(
+            eco_box, text="Scan & Repair ECOs", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", height=30, font=("Arial", 12),
+            command=self._repair_eco_tags
+        ).pack(fill="x", pady=(4, 0))
+
+        engine_box = ctk.CTkFrame(right_box, fg_color="transparent")
+        engine_box.pack(fill="x", padx=10, pady=(12, 5))
+        ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color="white").pack(anchor="w")
+
+        eng_btn_row = ctk.CTkFrame(engine_box, fg_color="transparent")
+        eng_btn_row.pack(fill="x", pady=(4, 0))
+        ctk.CTkButton(
+            eng_btn_row, text="Browse Engine", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=2, border_color="#475569", height=30, font=("Arial", 12),
+            command=self._browse_engine
+        ).pack(side="left", fill="x", expand=True, padx=(0, 2))
+        ctk.CTkButton(
+            eng_btn_row, text="Save Settings", fg_color="#334155", hover_color="#475569",
+            border_width=1, border_color="#64748b", height=30, font=("Arial", 12),
+            command=self._save_engine_settings
+        ).pack(side="right", fill="x", expand=True, padx=(2, 0))
+
+    def _load_category_files(self, category):
+        base_dir = Path(__file__).resolve().parent.parent / "pgn"
+        subfolder = CATEGORY_FOLDER_MAP.get(category, ("", ""))[0]
+        cat_dir = base_dir / subfolder if subfolder else base_dir
+
+        files_dict = {}
+        if cat_dir.exists():
+            for fpath in cat_dir.glob("*.pgn"):
+                rows = []
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        while True:
+                            game = chess.pgn.read_game(f)
+                            if game is None:
+                                break
+                            result = game.headers.get("Result", "*")
+                            opening = game.headers.get("Opening", "")
+                            white = game.headers.get("White", "?")
+                            black = game.headers.get("Black", "?")
+                            rows.append(((f"{white} vs {black}", result, opening), game, fpath))
+                except Exception as e:
+                    print(f"Error loading PGN file {fpath.name}: {e}")
+
+                if rows:
+                    files_dict[str(fpath)] = rows
+
+        self.collection_files_map[category] = files_dict
+
+        if len(files_dict) == 1:
+            only_file_path = list(files_dict.keys())[0]
+            self.expanded_files.add(only_file_path)
+
+    def _on_category_changed(self, choice):
+        self._load_category_files(choice)
+        self._refresh_treeview()
+
+    def _refresh_treeview(self):
+        for item in self.col_tree.get_children():
+            self.col_tree.delete(item)
+
+        if not hasattr(self, "game_lookup"):
+            self.game_lookup = {}
+        if not hasattr(self, "file_lookup"):
+            self.file_lookup = {}
+        self.game_lookup.clear()
+        self.file_lookup.clear()
+
+        for cat in self.collection_categories:
+            files_dict = self.collection_files_map.get(cat, {})
+            is_cat_expanded = (cat == self.active_expanded_category)
+
+            total_games_in_cat = sum(len(rows) for rows in files_dict.values())
+
+            # Use custom explicit solid arrows for category headers
+            arrow = "▼ " if is_cat_expanded else "▶ "
+            cat_title = f"{arrow}{cat}  ({total_games_in_cat})"
+
+            cat_id = self.col_tree.insert(
+                "", "end", text=cat_title, open=is_cat_expanded
+            )
+            self.file_lookup[cat_id] = ("category", cat)
+
+            if is_cat_expanded:
+                if files_dict:
+                    for fpath_str, rows in files_dict.items():
+                        fpath = Path(fpath_str)
+                        is_file_expanded = fpath_str in self.expanded_files
+
+                        file_arrow = "▼ " if is_file_expanded else "▶ "
+                        file_title = f"    {file_arrow}{fpath.name}  ({len(rows)})"
+                        file_id = self.col_tree.insert(
+                            cat_id, "end", text=file_title, open=is_file_expanded
+                        )
+                        self.file_lookup[file_id] = ("file", cat, fpath_str)
+
+                        if is_file_expanded:
+                            file_games_list = [entry[1] for entry in rows]
+                            for entry in rows:
+                                r, game, path = entry
+                                players_text, result, opening = r
+                                display_text = f"        {players_text}  [{result}]" + (
+                                    f" - {opening}" if opening else "")
+
+                                item_id = self.col_tree.insert(
+                                    file_id, "end", text=display_text
+                                )
+                                self.game_lookup[item_id] = (game, file_games_list)
+                else:
+                    self.col_tree.insert(
+                        cat_id, "end", text="    (No collections in this category yet)"
+                    )
+
+        self.col_tree.selection_remove(self.col_tree.selection())
+
+    def _on_tree_click(self, event):
+        item_id = self.col_tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        if item_id in self.game_lookup:
+            game, source_data = self.game_lookup[item_id]
+
+            state.active_analysis_game = game
+            state.active_category_source = source_data
+
+            if hasattr(state, "analysis_callbacks"):
+                for cb in state.analysis_callbacks:
+                    try:
+                        cb(game, category_source=source_data)
+                    except TypeError:
+                        try:
+                            cb(game, source_data)
+                        except TypeError:
+                            try:
+                                cb(game)
+                            except Exception:
+                                pass
+
+            if hasattr(state, "show_analysis_workspace"):
+                state.show_analysis_workspace()
+            return
+
+        if item_id in self.file_lookup:
+            node_type = self.file_lookup[item_id][0]
+            if node_type == "category":
+                cat = self.file_lookup[item_id][1]
+                if cat in self.collection_categories:
+                    self.opt_category.set(cat)
+
+                if self.active_expanded_category == cat:
+                    self.active_expanded_category = None
+                else:
+                    self.active_expanded_category = cat
+                self._refresh_treeview()
+            elif node_type == "file":
+                cat = self.file_lookup[item_id][1]
+                fpath_str = self.file_lookup[item_id][2]
+
+                if cat in self.collection_categories:
+                    self.opt_category.set(cat)
+
+                if fpath_str in self.expanded_files:
+                    self.expanded_files.remove(fpath_str)
+                else:
+                    self.expanded_files.add(fpath_str)
+                self._refresh_treeview()
+
+    def _select_pgn_files(self):
+        base_dir = Path(__file__).resolve().parent.parent / "pgn"
+        current_cat = self.opt_category.get()
+
+        subfolder = CATEGORY_FOLDER_MAP[current_cat][0] if current_cat in CATEGORY_FOLDER_MAP else ""
+        default_dir = base_dir / subfolder if subfolder else base_dir
+
+        files = filedialog.askopenfilenames(
+            title="Select PGN Files for Collection",
+            initialdir=str(default_dir) if default_dir.exists() else str(base_dir),
+            filetypes=[("PGN Files", "*.pgn"), ("All Files", "*.*")]
         )
-        self.entry_engine_path = ctk.CTkEntry(self.engine_frame, placeholder_text="/usr/games/stockfish", width=340)
-        self.entry_engine_path.grid(row=1, column=1, padx=(0, 20), pady=10, sticky="ew")
+        if files:
+            self.selected_files.extend(list(files))
+            count = len(self.selected_files)
+            self.lbl_selected_files.configure(text=f"{count} file(s) selected")
+            self.btn_undo_pgn.pack(side="left", before=self.btn_select_pgns, padx=(0, 3))
+            set_status_message(f"Selected {count} PGN file(s). Click Create Collection to verify & pick games.")
 
-        btn_browse_eng = ctk.CTkButton(
-            self.engine_frame, text="Browse...", width=90, fg_color="#3b82f6", command=self._browse_engine_binary
+    def _undo_last_pgn(self):
+        if not self.selected_files:
+            set_status_message("No selected PGN files to undo.")
+            return
+
+        removed = self.selected_files.pop()
+        count = len(self.selected_files)
+
+        if count == 0:
+            self.lbl_selected_files.configure(text="No PGN files selected.")
+            self.btn_undo_pgn.pack_forget()
+            set_status_message(f"Removed last selected PGN: {Path(removed).name}. No files selected remaining.")
+        else:
+            self.lbl_selected_files.configure(text=f"{count} file(s) selected")
+            set_status_message(f"Removed last selected PGN: {Path(removed).name}. {count} file(s) remaining.")
+
+    def _add_category(self):
+        dialog = AddCategoryDialog(self)
+        self.wait_window(dialog)
+
+        if not dialog.category_name:
+            return
+
+        new_cat = dialog.category_name
+        if new_cat in self.collection_categories:
+            set_status_message(f"Error: Category '{new_cat}' already exists.")
+            return
+
+        safe_folder = new_cat.lower().replace(" ", "_").replace("/", "_")
+        filename = f"{safe_folder}.pgn"
+        CATEGORY_FOLDER_MAP[new_cat] = (safe_folder, filename)
+
+        self.collection_categories.append(new_cat)
+        self.collection_files_map[new_cat] = {}
+        save_categories_config(self.collection_categories)
+
+        self.opt_category.configure(values=self.collection_categories)
+        self.opt_category.set(new_cat)
+        self._refresh_treeview()
+        set_status_message(f"Created new category: {new_cat}")
+
+    def _move_category(self, direction):
+        current_cat = self.opt_category.get()
+        try:
+            idx = self.collection_categories.index(current_cat)
+        except ValueError:
+            return
+
+        new_idx = idx + direction
+        if 0 <= new_idx < len(self.collection_categories):
+            self.collection_categories[idx], self.collection_categories[new_idx] = (
+                self.collection_categories[new_idx],
+                self.collection_categories[idx],
+            )
+            save_categories_config(self.collection_categories)
+            self.opt_category.configure(values=self.collection_categories)
+            self.opt_category.set(current_cat)
+            self._refresh_treeview()
+
+    def _delete_category(self):
+        current_cat = self.opt_category.get()
+        if current_cat in DEFAULT_COLLECTION_CATEGORIES:
+            set_status_message("Cannot delete default preset categories.")
+            return
+
+        dialog = ConfirmationDialog(
+            self, "Delete Category",
+            f"Are you sure you want to delete category '{current_cat}' and all its collections?"
         )
-        btn_browse_eng.grid(row=1, column=2, padx=(0, 20), pady=10)
+        self.wait_window(dialog)
 
-        # Thread Count Config
-        ctk.CTkLabel(self.engine_frame, text="CPU Threads:", font=("Arial", 12, "bold"), text_color="#94a3b8").grid(
-            row=2, column=0, padx=(20, 10), pady=10, sticky="w"
+        if not dialog.confirmed:
+            return
+
+        if current_cat in self.collection_categories:
+            self.collection_categories.remove(current_cat)
+        if current_cat in self.collection_files_map:
+            del self.collection_files_map[current_cat]
+        if current_cat in CATEGORY_FOLDER_MAP:
+            del CATEGORY_FOLDER_MAP[current_cat]
+
+        save_categories_config(self.collection_categories)
+
+        if self.collection_categories:
+            self.opt_category.configure(values=self.collection_categories)
+            self.opt_category.set(self.collection_categories[0])
+        else:
+            self.opt_category.configure(values=[""])
+            self.opt_category.set("")
+
+        self._refresh_treeview()
+        set_status_message(f"Deleted category '{current_cat}'.")
+
+    def _delete_selected_pgn_file(self):
+        selected_items = self.col_tree.selection()
+        if not selected_items:
+            set_status_message("Please select a PGN collection file in the tree to delete.")
+            return
+
+        item_id = selected_items[0]
+        if item_id not in self.file_lookup or self.file_lookup[item_id][0] != "file":
+            set_status_message("Please select a specific PGN collection file (not a category header).")
+            return
+
+        cat = self.file_lookup[item_id][1]
+        fpath_str = self.file_lookup[item_id][2]
+        fpath = Path(fpath_str)
+
+        dialog = ConfirmationDialog(
+            self, "Delete PGN File",
+            f"Are you sure you want to delete collection file '{fpath.name}'?"
         )
-        self.opt_threads = ctk.CTkOptionMenu(self.engine_frame, values=["1", "2", "4", "8", "16"], width=120)
-        self.opt_threads.set("2")
-        self.opt_threads.grid(row=2, column=1, padx=(0, 20), pady=10, sticky="w")
+        self.wait_window(dialog)
 
-        # Hash Size Config
-        ctk.CTkLabel(self.engine_frame, text="Hash Size (MB):", font=("Arial", 12, "bold"), text_color="#94a3b8").grid(
-            row=3, column=0, padx=(20, 10), pady=10, sticky="w"
-        )
-        self.opt_hash = ctk.CTkOptionMenu(self.engine_frame, values=["16", "64", "256", "512", "1024", "2048"],
-                                          width=120)
-        self.opt_hash.set("256")
-        self.opt_hash.grid(row=3, column=1, padx=(0, 20), pady=10, sticky="w")
+        if not dialog.confirmed:
+            return
 
-        # Save Button
-        btn_save_eng = ctk.CTkButton(
-            self.engine_frame, text="Save Engine Settings", fg_color="#22c55e", hover_color="#16a34a",
-            font=("Arial", 12, "bold"), command=self._save_engine_settings
-        )
-        btn_save_eng.grid(row=5, column=0, padx=20, pady=20, sticky="w")
+        try:
+            if fpath.exists():
+                fpath.unlink()
+        except Exception as e:
+            set_status_message(f"Error deleting file from disk: {e}")
+            return
 
-        # Right Panel: File Metadata, Health Stats, and Curation Action Hub
-        self.right_panel = ctk.CTkFrame(self, fg_color="#0f172a", width=320, corner_radius=8)
-        self.right_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 15), pady=15)
-        self.right_panel.grid_propagate(False)
+        if cat in self.collection_files_map and fpath_str in self.collection_files_map[cat]:
+            del self.collection_files_map[cat][fpath_str]
 
-        self.lbl_filename = ctk.CTkLabel(
-            self.right_panel, text="No File Selected", font=("Arial", 15, "bold"), text_color="white", anchor="w",
-            wraplength=290
-        )
-        self.lbl_filename.pack(anchor="w", padx=15, pady=(15, 2))
+        if fpath_str in self.expanded_files:
+            self.expanded_files.remove(fpath_str)
 
-        self.lbl_game_count = ctk.CTkLabel(
-            self.right_panel, text="0 Games Detected", font=("Arial", 12), text_color="#94a3b8", anchor="w"
-        )
-        self.lbl_game_count.pack(anchor="w", padx=15, pady=(0, 15))
+        self._refresh_treeview()
+        set_status_message(f"Deleted collection file '{fpath.name}'.")
 
-        self.health_frame = ctk.CTkFrame(self.right_panel, fg_color="#1e293b", corner_radius=6)
-        self.health_frame.pack(fill="x", padx=15, pady=(0, 15))
+    def _repair_eco_tags(self):
+        set_status_message("ECO tag repair scan initiated...")
 
-        self.lbl_essential = ctk.CTkLabel(self.health_frame, text="■ Blue (Essential) : 0%", text_color="#3b82f6",
-                                          anchor="w")
-        self.lbl_essential.pack(anchor="w", padx=12, pady=(10, 2))
-
-        self.lbl_common = ctk.CTkLabel(self.health_frame, text="■ Green (Common)   : 0%", text_color="#22c55e",
-                                       anchor="w")
-        self.lbl_common.pack(anchor="w", padx=12, pady=(0, 2))
-
-        self.lbl_unknown = ctk.CTkLabel(self.health_frame, text="■ Orange (Unrecognized) : 0 found",
-                                        text_color="#f97316", anchor="w")
-        self.lbl_unknown.pack(anchor="w", padx=12, pady=(0, 10))
-
-        # Action Hub Buttons
-        self.action_frame = ctk.CTkFrame(self.right_panel, fg_color="transparent")
-        self.action_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-        ctk.CTkLabel(self.action_frame, text="CURATION ACTIONS", font=("Arial", 11, "bold"), text_color="#38bdf8",
-                     anchor="w").pack(anchor="w", pady=(0, 6))
-
-        self.btn_add_playlist = ctk.CTkButton(
-            self.action_frame, text="+ Add to Mixed Playlist", fg_color="#3b82f6", text_color="white",
-            height=30, font=("Arial", 11, "bold"), command=self._add_current_to_playlist
-        )
-        self.btn_add_playlist.pack(fill="x", pady=3)
-
-        self.btn_inject_fen = ctk.CTkButton(
-            self.action_frame, text="Inject FEN / Position Override", fg_color="#1e293b", text_color="white",
-            hover_color="#334155", height=30, font=("Arial", 11), command=self._open_fen_dialog
-        )
-        self.btn_inject_fen.pack(fill="x", pady=3)
-
-        self.mapping_frame = ctk.CTkFrame(self.right_panel, fg_color="transparent")
-        self.mapping_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-    def switch_tab(self, tab_name):
-        """Switches between table, playlist, and engine configuration views."""
-        self.btn_tab_table.configure(fg_color="transparent", text_color="#94a3b8")
-        self.btn_tab_playlist.configure(fg_color="transparent", text_color="#94a3b8")
-        self.btn_tab_engines.configure(fg_color="transparent", text_color="#94a3b8")
-
-        self.table_frame.grid_forget()
-        self.playlist_frame.grid_forget()
-        self.engine_frame.grid_forget()
-
-        if tab_name == "table":
-            self.btn_tab_table.configure(fg_color="#3b82f6", text_color="white")
-            self.table_frame.grid(row=0, column=0, sticky="nsew")
-        elif tab_name == "playlist":
-            self.btn_tab_playlist.configure(fg_color="#3b82f6", text_color="white")
-            self.playlist_frame.grid(row=0, column=0, sticky="nsew")
-        elif tab_name == "engines":
-            self.btn_tab_engines.configure(fg_color="#3b82f6", text_color="white")
-            self.engine_frame.grid(row=0, column=0, sticky="nsew")
-
-    def _browse_engine_binary(self):
-        filepath = filedialog.askopenfilename(title="Select Engine Executable")
-        if filepath:
-            self.entry_engine_path.delete(0, "end")
-            self.entry_engine_path.insert(0, filepath)
+    def _browse_engine(self):
+        filetypes = [("Executable Files", "*.exe"), ("All Files", "*.*")] if os.name == "nt" else [("All Files", "*")]
+        path = filedialog.askopenfilename(title="Select UCI Chess Engine", filetypes=filetypes)
+        if path:
+            set_status_message(f"Selected engine: {Path(path).name}")
 
     def _save_engine_settings(self):
-        eng_path = self.entry_engine_path.get()
-        threads = self.opt_threads.get()
-        hash_size = self.opt_hash.get()
-        set_status_message(f"Engine options saved: Threads={threads}, Hash={hash_size}MB, Path={eng_path}")
+        set_status_message("Engine settings saved successfully.")
 
-    def refresh_view(self):
-        self.filename = getattr(state, "current_filename", self.filename)
-
-        if not self.filename or not os.path.exists(self.filename):
-            self.lbl_filename.configure(text="No File Loaded")
-            self.lbl_game_count.configure(text="0 Games Detected")
-            set_status_message("No PGN file loaded in Edit Workspace.")
-            self.clear_table()
+    def _create_collection(self):
+        if not self.selected_files:
+            set_status_message("No PGN files selected to create a collection.")
             return
 
-        file_path = Path(self.filename)
-        self.lbl_filename.configure(text=file_path.name)
-        self._scan_and_process_pgn()
-
-    def _scan_and_process_pgn(self):
-        if not self.filename or not os.path.exists(self.filename):
-            return
-
-        def _scan():
-            file_path_name = Path(self.filename).name
-            total_games = 0
-            essential_complete_count = 0
-            all_detected_tags = set()
-            grouped_data = {}
-
+        all_games = []
+        games_data = []
+        for fpath_str in self.selected_files:
             try:
-                with open(self.filename, encoding="utf-8", errors="replace") as pgn_file:
+                with open(fpath_str, "r", encoding="utf-8", errors="ignore") as f:
                     while True:
-                        headers = chess.pgn.read_headers(pgn_file)
-                        if headers is None:
+                        game = chess.pgn.read_game(f)
+                        if game is None:
                             break
-
-                        total_games += 1
-                        all_detected_tags.update(headers.keys())
-
-                        eco = headers.get("ECO", "").strip()
-                        opening = headers.get("Opening", "").strip()
-
-                        if eco or opening:
-                            essential_complete_count += 1
-
-                        raw_eco = eco.upper() if eco else "UNKNOWN"
-                        raw_opening = opening
-                        raw_variation = headers.get("Variation", "").strip()
-
-                        key = (raw_eco, raw_opening, raw_variation)
-                        grouped_data[key] = grouped_data.get(key, 0) + 1
-
-                def _update_ui():
-                    self.lbl_game_count.configure(text=f"{total_games:,} Games Detected")
-                    set_status_message(f"Loaded {file_path_name} into Edit Workspace ({total_games:,} games)")
-
-                    essential_pct = (essential_complete_count / total_games * 100) if total_games > 0 else 0
-                    self.lbl_essential.configure(text=f"■ Blue (Essential) : {essential_pct:.0f}% complete")
-
-                    common_tags_found = set()
-                    unknown_tags_found = set()
-
-                    for tag in all_detected_tags:
-                        if tag in STANDARD_TAG_BANK["essential"]:
-                            continue
-                        elif tag in STANDARD_TAG_BANK["common"]:
-                            common_tags_found.add(tag)
-                        else:
-                            unknown_tags_found.add(tag)
-
-                    self.lbl_common.configure(text=f"■ Green (Common)   : {len(common_tags_found)} tags present")
-                    self.lbl_unknown.configure(text=f"■ Orange (Unrecognized) : {len(unknown_tags_found)} found")
-
-                    self._build_tag_mapping_ui(unknown_tags_found)
-
-                    imported_rows = [
-                        [key[0], count, key[1], key[2]]
-                        for key, count in grouped_data.items()
-                    ]
-                    imported_rows.sort(key=lambda x: (x[0], x[2], x[3]))
-
-                    self.all_data = imported_rows
-                    self.update_table(self.all_data)
-
-                self.after(0, _update_ui)
-
+                        all_games.append(game)
+                        games_data.append({
+                            "game": game,
+                            "auto_select": True,
+                            "white": game.headers.get("White", "?"),
+                            "black": game.headers.get("Black", "?"),
+                            "opening": game.headers.get("Opening", "Unknown"),
+                            "variation": game.headers.get("Variation", "")
+                        })
             except Exception as e:
-                print(f"Error scanning PGN file in EditWorkspace: {e}")
-                self.after(0, lambda: set_status_message(f"Error scanning file: {e}"))
-                self.after(0, self.clear_table)
+                print(f"Error reading {fpath_str}: {e}")
 
-        set_status_message("Scanning PGN metadata for editing...")
-        threading.Thread(target=_scan, daemon=True).start()
-
-    def _build_tag_mapping_ui(self, unknown_tags):
-        for widget in self.mapping_frame.winfo_children():
-            widget.destroy()
-
-        self.mapping_vars.clear()
-        self.unknown_tags = sorted(list(unknown_tags))
-
-        if not self.unknown_tags:
+        if len(all_games) > 300:
+            CollectionLimitDialog(self, len(all_games))
             return
 
-        lbl_title = ctk.CTkLabel(
-            self.mapping_frame, text="NON-STANDARD TAGS", font=("Arial", 11, "bold"), text_color="#f97316",
-            anchor="w"
-        )
-        lbl_title.pack(anchor="w", pady=(0, 6))
+        dialog = GameSelectionDialog(self, games_data)
+        self.wait_window(dialog)
 
-        target_options = ["(Ignore)", "ECO", "Opening", "Variation", "Event", "Site", "Date", "Round", "Annotator"]
-
-        for tag in self.unknown_tags:
-            row = ctk.CTkFrame(self.mapping_frame, fg_color="transparent")
-            row.pack(fill="x", pady=2)
-
-            ctk.CTkLabel(row, text=f'"{tag}"', font=("Arial", 12), text_color="#f97316", anchor="w", width=95).pack(
-                side="left")
-            ctk.CTkLabel(row, text="─►", font=("Arial", 10), text_color="#64748b").pack(side="left", padx=2)
-
-            var = ctk.StringVar(value="(Ignore)")
-            self.mapping_vars[tag] = var
-
-            dropdown = ctk.CTkOptionMenu(
-                row, values=target_options, variable=var, width=110, height=24, font=("Arial", 11)
-            )
-            dropdown.pack(side="right")
-
-    def _add_current_to_playlist(self):
-        if not self.filename:
+        selected = dialog.selected_games
+        if not selected:
+            set_status_message("Collection creation cancelled (no games selected).")
             return
-        path_obj = Path(self.filename)
-        self.playlist_items.append((len(self.playlist_items) + 1, path_obj.name, "Full Batch Collection", "Queued"))
 
-        for item in self.pl_tree.get_children():
-            self.pl_tree.delete(item)
-        for row in self.playlist_items:
-            self.pl_tree.insert("", "end", values=row)
+        current_cat = self.opt_category.get()
+        base_dir = Path(__file__).resolve().parent.parent / "pgn"
+        subfolder = CATEGORY_FOLDER_MAP.get(current_cat, ("", ""))[0]
+        cat_dir = base_dir / subfolder if subfolder else base_dir
+        cat_dir.mkdir(parents=True, exist_ok=True)
 
-        set_status_message(f"Added {path_obj.name} to Mixed Playlist queue.")
+        new_filename = f"custom_collection_{os.urandom(4).hex()}.pgn"
+        dest_path = cat_dir / new_filename
 
-    def _open_fen_dialog(self):
-        set_status_message("FEN / Position Override utility opened.")
+        try:
+            with open(dest_path, "w", encoding="utf-8") as out_f:
+                for game in selected:
+                    exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+                    out_f.write(str(game.accept(exporter)) + "\n\n")
+        except Exception as e:
+            set_status_message(f"Error saving collection: {e}")
+            return
 
-    def clear_table(self):
-        self.all_data = []
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.selected_files.clear()
+        self.lbl_selected_files.configure(text="No PGN files selected.")
+        self.btn_undo_pgn.pack_forget()
 
-    def update_table(self, data):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        for row in data:
-            self.tree.insert("", "end", values=row)
+        self._load_category_files(current_cat)
+        self._refresh_treeview()
+        set_status_message(f"Successfully created collection with {len(selected)} games under '{current_cat}'.")

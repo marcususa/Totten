@@ -58,11 +58,15 @@ class LayoutAnalysisMixin:
     def __init__(self, parent, filename=None):
         pass
 
-    def load_game_from_state(self, game_node):
-        """Called automatically when a game is clicked in the Search Catalog Workspace."""
+    def load_game_from_state(self, game_node, category_source=None):
+        """Called automatically when a game is clicked in the Catalog or Mixed Collections."""
         self.active_game = game_node
         self.root_game_node = game_node
         self.current_node = game_node
+
+        # Fallback to app_state if category_source wasn't passed directly
+        if category_source is None and hasattr(state, "active_category_source"):
+            category_source = state.active_category_source
 
         # 1. Update the main chessboard widget using its required FEN bridge
         if hasattr(self, "board_widget") and self.board_widget:
@@ -84,21 +88,48 @@ class LayoutAnalysisMixin:
             self.pgn_data_text.insert("end", pgn_text_export)
             self.pgn_data_text.configure(state="disabled")
 
-        # 3. Ensure the tree view on the left reflects or highlights this game if loaded,
-        # or load/inject this single game context into the tree/preview lookup.
+        # 3. Handle Tree View population conditionally (Catalog vs Mixed List)
         if hasattr(self, "pgn_tree") and hasattr(self, "preview_lookup"):
-            # Clear tree and insert the incoming single game so the tree view shows it
             self.pgn_tree.delete(*self.pgn_tree.get_children())
             self.preview_lookup.clear()
 
-            headers = game_node.headers
-            white = headers.get("White", "Unknown")
-            black = headers.get("Black", "Unknown")
-            result = headers.get("Result", "*")
+            # CONDITIONAL: If category_source is a list of game objects (Mixed Collection)
+            if isinstance(category_source, list):
+                if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
+                    self.lbl_empty_state.pack_forget()
 
-            item_id = self.pgn_tree.insert("", "end", values=(1, white, black, result))
-            self.preview_lookup[item_id] = game_node
-            self.pgn_tree.selection_set(item_id)
+                for idx, g in enumerate(category_source, start=1):
+                    headers = g.headers
+                    white = headers.get("White", "Unknown")
+                    black = headers.get("Black", "Unknown")
+                    result = headers.get("Result", "*")
+
+                    item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
+                    self.preview_lookup[item_id] = g
+
+                    # Highlight the active game if it matches
+                    if g == game_node:
+                        self.pgn_tree.selection_set(item_id)
+                        self.pgn_tree.see(item_id)
+            elif isinstance(category_source, str) and hasattr(self, "load_games"):
+                # ONLY load from disk if category_source is explicitly a file path string
+                self.load_games(filename=category_source)
+
+                for item_id, g in self.preview_lookup.items():
+                    if g == game_node:
+                        self.pgn_tree.selection_set(item_id)
+                        self.pgn_tree.see(item_id)
+                        break
+            else:
+                # Fallback safety: Just display the single active game in the tree without touching disk
+                headers = game_node.headers
+                white = headers.get("White", "Unknown")
+                black = headers.get("Black", "Unknown")
+                result = headers.get("Result", "*")
+
+                item_id = self.pgn_tree.insert("", "end", values=(1, white, black, result))
+                self.preview_lookup[item_id] = game_node
+                self.pgn_tree.selection_set(item_id)
 
         # 4. Load plain game moves into analysis view immediately so navigation & text window work
         if hasattr(self, "_load_plain_game_moves"):

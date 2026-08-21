@@ -1,5 +1,3 @@
-# gui/patterns_workspace.py
-
 import os
 import sys
 from pathlib import Path
@@ -14,9 +12,31 @@ from tkinter import messagebox, ttk
 import customtkinter as ctk
 import chess.pgn
 from io import StringIO
+import io
+from PIL import Image
+
+try:
+    import cairosvg
+
+    HAS_CAIROSVG = True
+except ImportError:
+    HAS_CAIROSVG = False
 
 # Path to store/load PGN content from the parent directory
 PATTERNS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "personal_catalog.pgn"))
+
+
+def load_chess_svg_icon(filepath, size=(28, 28)):
+    """Loads a chess piece .svg icon as a larger PIL Image safely."""
+    try:
+        if HAS_CAIROSVG:
+            png_data = cairosvg.svg2png(url=filepath, output_width=size[0], output_height=size[1])
+            return Image.open(io.BytesIO(png_data)).convert("RGBA")
+        else:
+            img = Image.new("RGBA", size, (0, 0, 0, 0))
+            return img
+    except Exception:
+        return Image.new("RGBA", size, (0, 0, 0, 0))
 
 
 class PatternsWorkspace(ctk.CTkFrame):
@@ -37,6 +57,14 @@ class PatternsWorkspace(ctk.CTkFrame):
         # Track the last valid indices that yielded results before a tier wiped them out
         self.last_valid_indices = []
 
+        # Load piece icons cache from /assets/pieces (Larger size for better visual quality)
+        self.piece_icons = {}
+        self.load_piece_icon_cache()
+
+        # Track current selection internal code state (default: None until chosen)
+        self.current_piece_code = None
+        self.current_piece_desc = None
+
         self._configure_styles()
 
         # Configure grid layout: Equal 50/50 vertical stack (Top sections, Notes window below)
@@ -47,77 +75,43 @@ class PatternsWorkspace(ctk.CTkFrame):
         # --- Top Pane: Contains Controls & The Tree Catalog ---
         self.top_frame = ctk.CTkFrame(
             self,
-            fg_color="#1f2c42",
+            fg_color="#1e293b",
             corner_radius=8,
             border_width=1,
-            border_color="#2a3b59"
+            border_color="#334155"
         )
-        self.top_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=(5, 3))
+        self.top_frame.grid(row=0, column=0, sticky="nsew", padx=15, pady=(15, 8))
         self.top_frame.grid_rowconfigure(1, weight=1)
         self.top_frame.grid_columnconfigure(0, weight=1)
 
-        # Form / Attributes Frame for Piece Pull-down Menu and Scan Progression Controls
+        # Form / Attributes Frame for Piece Matrix Popup Button and Scan Progression Controls
         self.attr_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        self.attr_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+        self.attr_frame.grid(row=0, column=0, padx=15, pady=(15, 8), sticky="ew")
         self.attr_frame.grid_columnconfigure(0, weight=2)
         self.attr_frame.grid_columnconfigure(1, weight=2)
         self.attr_frame.grid_columnconfigure(2, weight=1)
 
-        self.piece_menu = ctk.CTkComboBox(
+        # Custom 4-Column FEN Matrix Button with bold text and centered alignment
+        self.piece_selector_btn = ctk.CTkButton(
             self.attr_frame,
-            values=[
-                # Black Pieces (Back rank: Rook to Rook)
-                "Black Queen's Rook",
-                "Black Queen's Knight",
-                "Black Queen's Bishop",
-                "Black Queen",
-                "Black King",
-                "Black King's Bishop",
-                "Black King's Knight",
-                "Black King's Rook",
-                # Black Pawns (a through h)
-                "Black Pawn a6",
-                "Black Pawn b6",
-                "Black Pawn c6",
-                "Black Pawn d6",
-                "Black Pawn e6",
-                "Black Pawn f6",
-                "Black Pawn g6",
-                "Black Pawn h6",
-                # White Pawns (a through h)
-                "White Pawn a3",
-                "White Pawn b3",
-                "White Pawn c3",
-                "White Pawn d3",
-                "White Pawn e3",
-                "White Pawn f3",
-                "White Pawn g3",
-                "White Pawn h3",
-                # White Pieces (Back rank: Rook to Rook)
-                "White Queen's Rook",
-                "White Queen's Knight",
-                "White Queen's Bishop",
-                "White Queen",
-                "White King",
-                "White King's Bishop",
-                "White King's Knight",
-                "White King's Rook",
-            ],
-            fg_color="#172134",
-            button_color="#1f538d",
-            button_hover_color="#14375f",
-            dropdown_fg_color="#172134",
-            command=lambda choice: self.reset_and_apply_filter()
+            text="Click to choose piece",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            border_width=1,
+            border_color="#344268",
+            font=("Arial", 12, "bold"),
+            anchor="center",
+            command=self.open_fen_matrix_popup
         )
-        self.piece_menu.grid(row=0, column=0, padx=(0, 5), pady=5, sticky="ew")
-        self.piece_menu.set("Black Queen's Rook")
+        self.piece_selector_btn.grid(row=0, column=0, padx=(0, 8), pady=5, sticky="ew")
 
         # Progressive Scan Action Button
         self.btn_scan_tier = ctk.CTkButton(
             self.attr_frame,
             text="Scan Deeper (Tier 1)",
-            fg_color="#1f538d",
-            hover_color="#14375f",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            font=("Arial", 12, "bold"),
             command=self.progress_scan_tier,
             width=140,
         )
@@ -127,16 +121,29 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.btn_export_pattern = ctk.CTkButton(
             self.attr_frame,
             text="Export Results",
-            fg_color="#2b7a4b",
-            hover_color="#1e5631",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            font=("Arial", 12, "bold"),
             command=self.export_filtered_to_new_catalog,
             width=110,
         )
-        self.btn_export_pattern.grid(row=0, column=2, padx=(5, 0), pady=5, sticky="ew")
+        self.btn_export_pattern.grid(row=0, column=2, padx=(8, 0), pady=5, sticky="ew")
 
-        # Table / Treeview Frame
-        self.table_frame = ctk.CTkFrame(self.top_frame, fg_color="#172134")
-        self.table_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        # Table / Treeview Outer Container Frame with Rounded Border & Bottom Padding
+        self.table_outer_frame = ctk.CTkFrame(
+            self.top_frame,
+            fg_color="#172134",
+            corner_radius=8,
+            border_width=1,
+            border_color="#334155"
+        )
+        self.table_outer_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 20))
+        self.table_outer_frame.grid_rowconfigure(0, weight=1)
+        self.table_outer_frame.grid_columnconfigure(0, weight=1)
+
+        # Internal Table Frame for the Treeview and Scrollbars
+        self.table_frame = ctk.CTkFrame(self.table_outer_frame, fg_color="transparent")
+        self.table_frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
@@ -148,18 +155,18 @@ class PatternsWorkspace(ctk.CTkFrame):
         # --- Bottom Pane: Notes & Save ---
         self.bottom_frame = ctk.CTkFrame(
             self,
-            fg_color="#1f2c42",
+            fg_color="#1e293b",
             corner_radius=8,
             border_width=1,
-            border_color="#2a3b59"
+            border_color="#334155"
         )
-        self.bottom_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=(3, 5))
+        self.bottom_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(8, 15))
         self.bottom_frame.grid_rowconfigure(0, weight=1)
         self.bottom_frame.grid_columnconfigure(0, weight=1)
 
         # Content Inner Container to properly layout Textbox and Centered Button
         self.content_inner = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
-        self.content_inner.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.content_inner.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
         self.content_inner.grid_rowconfigure(0, weight=1)
         self.content_inner.grid_rowconfigure(1, weight=0)
         self.content_inner.grid_columnconfigure(0, weight=1)
@@ -180,21 +187,124 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.btn_container.grid_columnconfigure(0, weight=1)
         self.btn_container.grid_columnconfigure(2, weight=1)
 
-        # Save Button (Centered, Blue theme)
+        # Save Button (Centered, Matching Blue theme)
         self.btn_save_recipe = ctk.CTkButton(
             self.btn_container,
             text="Save Game",
-            fg_color="#1f538d",
-            hover_color="#14375f",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            font=("Arial", 12, "bold"),
             command=self.save_recipe_node,
             width=120,
         )
         self.btn_save_recipe.grid(row=0, column=1)
 
+    def load_piece_icon_cache(self):
+        """Locates /assets/pieces relative to gui/patterns_workspace.py with a larger icon size."""
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets", "pieces"))
+
+        piece_codes = ["br", "bn", "bb", "bq", "bk", "bp", "wr", "wn", "wb", "wq", "wk", "wp"]
+
+        for code in piece_codes:
+            svg_path = os.path.join(assets_dir, f"{code}.svg")
+            if os.path.exists(svg_path):
+                pil_img = load_chess_svg_icon(svg_path, size=(28, 28))
+                self.piece_icons[code] = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(28, 28))
+
+    def open_fen_matrix_popup(self):
+        """Opens a precise popup dialog with balanced top/bottom framing bounds and correct vertical sizing."""
+        popup = ctk.CTkToplevel(self)
+        popup.title("Select Piece by FEN Ranks")
+
+        width, height = 680, 360
+        popup.update_idletasks()
+        screen_width = popup.winfo_screenwidth()
+        screen_height = popup.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        popup.configure(fg_color="#172134")
+        popup.grab_set()
+
+        # Matrix Frame (4 Columns) with tight symmetric padding
+        matrix_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        matrix_frame.pack(fill="both", expand=True, padx=16, pady=10)
+
+        for col_idx in range(4):
+            matrix_frame.grid_columnconfigure(col_idx, weight=1)
+
+        columns_data = [
+            ("Black 8th",
+             ["br", "bn", "bb", "bq", "bk", "bb", "bn", "br"],
+             ["Ra8", "Nb8", "Bc8", "Qd8", "Ke8", "Bf8", "Ng8", "Rh8"],
+             ["Black Queen's Rook", "Black Queen's Knight", "Black Queen's Bishop", "Black Queen", "Black King",
+              "Black King's Bishop", "Black King's Knight", "Black King's Rook"]),
+
+            ("Black 6th",
+             ["bp"] * 8,
+             ["a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6"],
+             ["Black Pawn a6", "Black Pawn b6", "Black Pawn c6", "Black Pawn d6", "Black Pawn e6", "Black Pawn f6",
+              "Black Pawn g6", "Black Pawn h6"]),
+
+            ("White 3rd",
+             ["wp"] * 8,
+             ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3"],
+             ["White Pawn a3", "White Pawn b3", "White Pawn c3", "White Pawn d3", "White Pawn e3", "White Pawn f3",
+              "White Pawn g3", "White Pawn h3"]),
+
+            ("White 1st",
+             ["wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"],
+             ["Ra1", "Nb1", "Bc1", "Qd1", "Ke1", "Bf1", "Ng1", "Rh1"],
+             ["White Queen's Rook", "White Queen's Knight", "White Queen's Bishop", "White Queen", "White King",
+              "White King's Bishop", "White King's Knight", "White King's Rook"])
+        ]
+
+        for col_idx, (col_title, p_codes, p_labels, p_desc) in enumerate(columns_data):
+            col_box = ctk.CTkFrame(matrix_frame, fg_color="#1e293b", corner_radius=6, border_width=1,
+                                   border_color="#334155")
+            col_box.grid(row=0, column=col_idx, sticky="nsew", padx=6, pady=2)
+
+            lbl = ctk.CTkLabel(col_box, text=col_title, font=("Arial", 11, "bold"), text_color="white")
+            lbl.pack(pady=(4, 2))
+
+            for i in range(len(p_codes)):
+                code = p_codes[i]
+                label_text = p_labels[i]
+                desc_text = p_desc[i]
+                icon = self.piece_icons.get(code, None)
+
+                btn = ctk.CTkButton(
+                    col_box,
+                    text=label_text,
+                    image=icon,
+                    compound="left",
+                    anchor="w",
+                    height=26,
+                    font=("Arial", 10),
+                    fg_color="#344268",
+                    text_color="white",
+                    hover_color="#2e4a8c",
+                    command=lambda c=code, d=desc_text: self.on_piece_selected(c, d, popup)
+                )
+                btn.pack(fill="x", padx=4, pady=1)
+
+    def on_piece_selected(self, piece_code, piece_desc, popup_window):
+        popup_window.destroy()
+        self.current_piece_code = piece_code
+        self.current_piece_desc = piece_desc
+
+        # Update button label with selection description (no icon)
+        self.piece_selector_btn.configure(text=piece_desc)
+
+        # Reset and run filter
+        self.reset_and_apply_filter()
+
     def _configure_styles(self):
         self.style = ttk.Style()
         try:
-            self.style.theme_use("clam")
+            self.style.theme_use("default")
         except Exception:
             pass
 
@@ -213,7 +323,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         )
         self.style.map(
             "Borderless.Treeview",
-            background=[("selected", "#1f538d")],
+            background=[("selected", "#344268")],
             focuscolor=[('focus', '#172134')]
         )
         self.style.configure(
@@ -263,7 +373,6 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self.on_catalog_select)
 
     def load_catalog(self):
-        # Display splash overlay over workspace
         self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Loading Patterns Catalog...")
         threading.Thread(target=self._background_load_catalog_worker, daemon=True).start()
 
@@ -336,7 +445,6 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.update_tier_button_text()
         self.refresh_tree_view()
 
-        # Dismiss loading overlay once complete
         if hasattr(self, "loading_overlay"):
             self.loading_overlay.close()
 
@@ -357,6 +465,10 @@ class PatternsWorkspace(ctk.CTkFrame):
 
     def progress_scan_tier(self):
         """Advances to the next progressive scan tier using the current filtered subset."""
+        if not self.current_piece_desc:
+            messagebox.showwarning("Select Piece", "Please select a piece first before scanning deeper tiers.")
+            return
+
         if self.current_scan_tier < 3:
             self.current_scan_tier += 1
         else:
@@ -375,12 +487,14 @@ class PatternsWorkspace(ctk.CTkFrame):
             self.btn_scan_tier.configure(text="Scan Deeper (Tier 3: Plies 15-30)")
 
     def apply_filter(self):
-        selected_piece_desc = self.piece_menu.get()
+        if not self.current_piece_desc:
+            return
+
+        selected_piece_desc = self.current_piece_desc
 
         target_piece_symbol = None
         target_squares = []
 
-        # Map FEN-ordered dropdown selections
         if "Pawn" in selected_piece_desc:
             target_piece_symbol = chess.PAWN
             if "a3" in selected_piece_desc or "a6" in selected_piece_desc:
@@ -457,12 +571,15 @@ class PatternsWorkspace(ctk.CTkFrame):
             if matched:
                 new_filtered_indices.append(idx)
 
-        # Handle zero-match cases gracefully by preserving the previous successful pool
+        # Handle zero-match cases by resetting back to Tier 1
         if not new_filtered_indices and self.current_scan_tier > 1:
             messagebox.showwarning(
                 "No Further Matches",
-                f"Scan Tier {self.current_scan_tier} returned 0 results.\nExport will use the results from the previous valid tier."
+                f"Scan Tier {self.current_scan_tier} returned 0 results.\nResetting back to Tier 1."
             )
+            self.current_scan_tier = 1
+            self.filtered_indices = [i for i, _ in self.all_games_data]
+            self.last_valid_indices = list(self.filtered_indices)
         else:
             self.filtered_indices = new_filtered_indices
             self.last_valid_indices = list(self.filtered_indices)
@@ -480,7 +597,6 @@ class PatternsWorkspace(ctk.CTkFrame):
 
         parent_dir = os.path.dirname(PATTERNS_FILE)
 
-        # Determine next sequential filename (patterns1.pgn, patterns2.pgn, etc.)
         counter = 1
         while True:
             new_file_name = f"patterns{counter}.pgn"
@@ -516,7 +632,7 @@ class PatternsWorkspace(ctk.CTkFrame):
     def save_recipe_node(self):
         pgn_data = self.text_rationale.get("1.0", "end").strip()
         selection = self.tree.selection()
-        piece_type = self.piece_menu.get()
+        piece_type = self.current_piece_desc if self.current_piece_desc else "General"
 
         try:
             if selection:
