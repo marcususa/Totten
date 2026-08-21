@@ -1,4 +1,3 @@
-# main.py
 import os
 from tkinter import ttk
 import customtkinter as ctk
@@ -10,9 +9,6 @@ from gui.sidebar import create_sidebar
 from gui.workspace import create_workspace, show_workspace
 from gui.menus import create_menu
 
-print("PYTHON WORKING DIRECTORY:", os.getcwd())
-print("FILE EXISTS ON DISK:", os.path.exists("personal_catalog.pgn"))
-
 # ----------------------------
 # Main Window Setup
 # ----------------------------
@@ -20,15 +16,13 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 app = ctk.CTk()
-app.withdraw()  # Hide main window temporarily to prevent raw layout flashing
+app.withdraw()
 app.configure(fg_color="#172134")
 app.title("Totten")
 
-# Expanded size & minimum boundaries to fit sidebar + workspace + 200px buffer
 app.geometry("1000x800")
 app.minsize(1000, 800)
 
-# Pop up the loading splash screen
 splash = StandaloneSplash(title_text="Totten", message="Starting up...")
 
 # ----------------------------
@@ -67,32 +61,40 @@ style.map(
     ]
 )
 
-# Set base colors to match the app background
+# Set base colors to match the app background and keep font size strictly at 10
 style.configure(
     "Treeview",
     background=BG_COLOR,
     fieldbackground=BG_COLOR,
     foreground="white",
-    rowheight=25,
+    rowheight=26,
+    font=("Arial", 10),
     borderwidth=0,
     relief="flat",
-    focuscolor=BG_COLOR  # Paint focus color same as background
+    focuscolor=BG_COLOR
 )
 
-# Paint ALL state borders & highlights as the background color
+style.configure(
+    "Treeview.Item",
+    font=("Arial", 10)
+)
+
+# Paint ALL state borders & highlights as the background color, completely suppressing white selection states
 style.map(
     "Treeview",
     focuscolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
     bordercolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
     lightcolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
-    darkcolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)]
+    darkcolor=[("focus", BG_COLOR), ("active", BG_COLOR), ("selected", BG_COLOR)],
+    background=[("selected", BG_COLOR), ("active", BG_COLOR)],
+    foreground=[("selected", "white"), ("active", "white")]
 )
 
 # ----------------------------
 # 1. Configure Grid Rows/Cols
 # ----------------------------
 app.grid_rowconfigure(0, weight=1)
-app.grid_columnconfigure(0, minsize=150)
+app.grid_columnconfigure(0, minsize=105)
 app.grid_columnconfigure(1, weight=1)
 
 # ----------------------------
@@ -115,9 +117,8 @@ state.workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 # ----------------------------
 def reveal_main_app():
     splash.close()
-    app.deiconify()  # Bring the fully rendered main window forward
+    app.deiconify()
 
-# Small delay to ensure everything settles before displaying
 app.after(600, reveal_main_app)
 
 # ----------------------------
