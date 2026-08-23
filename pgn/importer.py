@@ -5,8 +5,9 @@ from pathlib import Path
 import chess.pgn
 import gui.app_state as state
 from tkinter import filedialog
+from gui.splash import LoadingOverlay
 
-# Target catalog_builder.py inside the catalog/ directory
+# Resolve path to catalog_builder.py in cousin folder /catalog/
 CATALOG_BUILDER_PATH = Path(__file__).resolve().parent.parent / "catalog" / "catalog_builder.py"
 
 spec = importlib.util.spec_from_file_location("catalog_builder", CATALOG_BUILDER_PATH)
@@ -21,7 +22,6 @@ def reset_importer_state():
     state.pgn_lookup = {}
     state.current_filename = None
 
-    # Clear tree items if they exist
     tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
     pgn_item_lookup = getattr(state, 'pgn_item_lookup', {})
 
@@ -45,10 +45,22 @@ def import_pgn():
     if not filename:
         return
 
+    # Force the main application window to flash/clear the OS file picker ghost frame immediately
+    root_window = state.workspaces.get("catalog") or getattr(state, "app_root", None)
+    if not root_window:
+        for ws in state.workspaces.values():
+            root_window = ws
+            break
+
+    if root_window:
+        try:
+            root_window.update()
+        except Exception:
+            pass
+
     print(f"2 - Selected: {filename}")
     short_name = Path(filename).name
 
-    # Initialize data stores in app_state if needed
     if not hasattr(state, 'imported_files'):
         state.imported_files = []
     if not hasattr(state, 'pgn_games_lookup'):
@@ -56,7 +68,7 @@ def import_pgn():
     if not hasattr(state, 'pgn_lookup'):
         state.pgn_lookup = {}
 
-    # Check duplicate
+    # Check duplicate in memory
     if filename in state.imported_files:
         if getattr(state, 'status', None):
             try:
@@ -65,17 +77,38 @@ def import_pgn():
                 pass
         return
 
-    # --- 1. Parse PGN Games into memory ---
+    overlay = None
+    if root_window:
+        try:
+            overlay = LoadingOverlay(root_window, title_text="Totten", message="Reading PGN games... (0)")
+            root_window.update_idletasks()
+        except Exception:
+            pass
+
+    # --- 1. Parse PGN Games into memory with live counter ---
     games = []
     try:
         with open(filename, "r", encoding="utf-8", errors="replace") as pgn_file:
+            count = 0
             while True:
                 game = chess.pgn.read_game(pgn_file)
                 if game is None:
                     break
                 games.append(game)
+                count += 1
+                if count % 25 == 0 and overlay:
+                    try:
+                        overlay.update_message(f"Reading PGN games... ({count})")
+                        root_window.update_idletasks()
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"Error reading PGN file: {e}")
+        if overlay:
+            try:
+                overlay.close()
+            except Exception:
+                pass
         if getattr(state, 'status', None):
             try:
                 state.status.configure(text=f"Failed to read {short_name}")
@@ -83,70 +116,42 @@ def import_pgn():
                 pass
         return
 
-    # Store parsed games into state
     state.pgn_games_lookup[filename] = games
-
-    # Prepend (insert at index 0) so newest file is FIRST
     state.imported_files.insert(0, filename)
     state.pgn_lookup[short_name] = filename
     state.current_filename = filename
 
     print(f"3 - Successfully loaded {len(games)} games from {short_name}")
 
-    # --- 2. Safely Execute catalog_builder.catalog_pgns ---
-    if hasattr(catalog_builder, "catalog_pgns"):
-        sig = inspect.signature(catalog_builder.catalog_pgns)
-        params = sig.parameters
-
-        # Check if function accepts **kwargs or standard positional args
-        accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
-
-        class MockWidget:
-            def configure(self, **kwargs): pass
-
-        add_btn = getattr(state, 'add_catalog_button', MockWidget())
-        imp_btn = getattr(state, 'import_button', MockWidget())
-        cat_btn = getattr(state, 'catalog_button', MockWidget())
-        status_lbl = getattr(state, 'status', MockWidget())
-        workspace_obj = getattr(state, 'workspace', MockWidget())
-
-        kwargs_payload = {
-            "add_catalog_button": add_btn,
-            "import_button": imp_btn,
-            "catalog_button": cat_btn,
-            "imported_files": state.imported_files,
-            "status": status_lbl,
-            "workspace": workspace_obj,
-            "game_data_vars": {},
-            "other_data_vars": {}
-        }
-
+    if overlay:
         try:
-            if accepts_kwargs:
-                # Target function accepts **kwargs, pass everything
-                catalog_builder.catalog_pgns(**kwargs_payload)
-            else:
-                # Filter payload to match ONLY the parameters catalog_pgns actually accepts
-                filtered_args = {k: v for k, v in kwargs_payload.items() if k in params}
-                if filtered_args:
-                    catalog_builder.catalog_pgns(**filtered_args)
-                else:
-                    # Fallback to single path arg or parameterless call
-                    try:
-                        catalog_builder.catalog_pgns(filename)
-                    except TypeError:
-                        catalog_builder.catalog_pgns()
-        except Exception as err:
-            print(f"Warning: catalog_builder.catalog_pgns failed gracefully: {err}")
+            overlay.update_message("Building catalog database...")
+            root_window.update_idletasks()
+        except Exception:
+            pass
 
-    # --- 3. Update Sidebar Tree (Insert newest at index 0 / TOP) ---
+    # --- 2. Execute catalog_builder.catalog_pgns with relative path handling ---
+    try:
+        if hasattr(catalog_builder, "catalog_pgns"):
+            added_count = catalog_builder.catalog_pgns(filename)
+            print(f"Catalog builder processed {added_count} new games.")
+    except Exception as err:
+        print(f"Warning: catalog_builder.catalog_pgns failed: {err}")
+
+    if overlay:
+        try:
+            overlay.close()
+        except Exception:
+            pass
+
+    # --- 3. Update Sidebar Tree ---
     tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
     parent_node = getattr(state, 'pgn_games_node', '')
 
     if tree_widget and hasattr(tree_widget, 'insert'):
         pgn_item = tree_widget.insert(
             parent_node,
-            0,  # Insert at index 0 so second.pgn lands above first.pgn
+            0,
             text=short_name,
             open=True
         )
@@ -158,12 +163,10 @@ def import_pgn():
 
     # --- 4. Refresh Workspace Views ---
     if hasattr(state, 'workspaces'):
-        # Update PGN Games Workspace
         pgn_ws = state.workspaces.get("pgn_games")
         if pgn_ws and hasattr(pgn_ws, 'load_games'):
             pgn_ws.load_games()
 
-        # Update Search Catalog Workspace
         for cat_key in ["catalog", "search_catalog", "search"]:
             cat_ws = state.workspaces.get(cat_key)
             if cat_ws:
@@ -172,7 +175,6 @@ def import_pgn():
                 elif hasattr(cat_ws, 'load_data'):
                     cat_ws.load_data()
 
-        # Update Import Workspace UI if loaded
         imp_ws = state.workspaces.get("import")
         if imp_ws:
             if hasattr(imp_ws, "filename"):
