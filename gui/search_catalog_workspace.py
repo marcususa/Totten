@@ -7,6 +7,7 @@ import threading
 import random
 import customtkinter as ctk
 import chess.pgn
+import duckdb
 
 import gui.app_state as state
 import chess
@@ -28,6 +29,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         self.json_path = Path("personal_catalog.json")
         self.pgn_path = Path("personal_catalog.pgn")
+        self.db_path = Path("personal_catalog.duckdb")
 
         self.eco_dir = Path("catalog_eco")
         self.eco_files = {cat: self.eco_dir / f"{cat.lower()}.pgn" for cat in ["A", "B", "C", "D", "E"]}
@@ -94,7 +96,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.entry_filter.grid(row=0, column=0, sticky="w", padx=(0, 10))
         self.entry_filter.bind("<KeyRelease>", lambda e: self.apply_filter())
 
-        self.tag_buttons_frame = ctk.CTkFrame(self.toolbar, fg_color="#1e293b", corner_radius=6, border_color="#334155", border_width=1)
+        self.tag_buttons_frame = ctk.CTkFrame(self.toolbar, fg_color="#1e293b", corner_radius=6, border_color="#334155",
+                                              border_width=1)
         self.tag_buttons_frame.grid(row=0, column=1, sticky="w", padx=0)
 
         for tag in ["Players", "Elo", "Event", "Variation", "All"]:
@@ -108,8 +111,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 btn_width = 80
 
             is_active = (tag == self.active_primary_tag)
-            btn_fg = "#3b82f6" if is_active else "transparent"
-            btn_hover = "#2563eb" if is_active else "#2b3856"
+            btn_fg = "#2e4a8c" if is_active else "transparent"
+            btn_hover = "#3b5998" if is_active else "#2b3856"
             text_color = "#ffffff" if is_active else "#cbd5e1"
 
             if tag == "All":
@@ -197,16 +200,22 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         dialog.transient(self)
         dialog.grab_set()
 
-        dialog.configure(fg_color="#344268")
+        dialog.configure(fg_color="#172134")
         dialog.grid_rowconfigure(0, weight=1)
         dialog.grid_columnconfigure(0, weight=1)
 
-        frame = ctk.CTkFrame(dialog, fg_color="#344268")
+        frame = ctk.CTkFrame(dialog, fg_color="#172134", corner_radius=0)
         frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
-        scrollable_frame = ctk.CTkScrollableFrame(frame, fg_color="#33445e", label_fg_color="#33445e")
+        scrollable_frame = ctk.CTkScrollableFrame(
+            frame,
+            fg_color="#1e293b",
+            label_fg_color="#1e293b",
+            border_color="#445577",
+            border_width=1
+        )
         scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         all_possible_tags = sorted(list(STANDARD_TAG_BANK["common"] | STANDARD_TAG_BANK["essential"]))
@@ -222,13 +231,20 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 variable=var,
                 font=("Arial", 12),
                 command=lambda t=tag, v=var: self.toggle_tag_from_dialog(t, v.get()),
-                text_color="white",
-                fg_color="white",
-                hover_color="#e2e8f0",
-                checkmark_color="#172134",
-                border_color="#445577"
+                text_color="#f8fafc",
+                fg_color="#2e4a8c",
+                hover_color="#3b5998",
+                checkmark_color="#ffffff",
+                border_color="#2e4a8c",
+                border_width=2
             )
-            chk.pack(anchor="w", pady=5, padx=5)
+
+            # Dynamic hover color adjustment based on check state
+            def on_enter(e, c=chk, v=var):
+                c.configure(hover_color="#3b5998" if v.get() else "#2e4a8c")
+
+            chk.bind("<Enter>", on_enter)
+            chk.pack(anchor="w", pady=6, padx=8)
 
     def toggle_tag_from_dialog(self, tag, is_checked):
         if is_checked:
@@ -261,8 +277,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 btn_width = 80
 
             is_active = (tag == self.active_primary_tag) and not self.active_extra_columns
-            btn_fg = "#3b82f6" if is_active else "transparent"
-            btn_hover = "#2563eb" if is_active else "#2b3856"
+            btn_fg = "#2e4a8c" if is_active else "transparent"
+            btn_hover = "#3b5998" if is_active else "#2b3856"
             text_color = "#ffffff" if is_active else "#cbd5e1"
 
             if tag == "All":
@@ -371,7 +387,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             if not filtered_items:
                 continue
 
-            unique_openings = sorted(list({item["opening"] for item, _ in filtered_items if item["opening"] and item["opening"] != "Unknown"}))
+            unique_openings = sorted(list(
+                {item["opening"] for item, _ in filtered_items if item["opening"] and item["opening"] != "Unknown"}))
             openings_str = ", ".join(unique_openings) if unique_openings else ""
 
             group_frame = ctk.CTkFrame(
@@ -493,42 +510,49 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             self.expanded_eco_sections.remove(cat)
         else:
             self.expanded_eco_sections = {cat}
-            # Lazy load game objects / moves for this section on demand if missing
             self.lazy_load_eco_section(cat)
         self.refresh_current_view()
 
     def lazy_load_eco_section(self, cat):
-        # Check if any item in this category lacks loaded game objects/instances
-        needs_loading = False
+        unloaded_count = 0
         for item in self.aggregated_games_data:
             eco = item["eco"]
             eco_base = eco[0].upper() if eco else "A"
             if eco_base == cat:
                 for inst in item["instances"]:
                     if inst.get("game_object") is None:
-                        needs_loading = True
-                        break
-                if needs_loading:
-                    break
+                        unloaded_count += 1
 
-        if not needs_loading:
+        if unloaded_count == 0:
             return
 
-        set_status_message(f"Loading games for ECO {cat}...")
-        threading.Thread(target=self._background_load_eco_section_worker, args=(cat,), daemon=True).start()
+        overlay = None
+        try:
+            overlay = LoadingOverlay(self, title_text="Totten", message=f"Loading ECO {cat} games... (0/{unloaded_count})")
+            self.update_idletasks()
+        except Exception:
+            pass
 
-    def _background_load_eco_section_worker(self, target_cat):
+        set_status_message(f"Loading games for ECO {cat} ({unloaded_count} games)...")
+        threading.Thread(target=self._background_load_eco_section_worker, args=(cat, overlay), daemon=True).start()
+
+    def _background_load_eco_section_worker(self, target_cat, overlay):
         if not self.pgn_path.exists():
+            if overlay:
+                try:
+                    overlay.close()
+                except Exception:
+                    pass
             return
 
-        # Map offsets or re-scan file selectively for target category headers and game objects
         updated_items = {}
         try:
-            with open(self.pgn_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(self.pgn_path, "r", encoding="utf-8", errors="replace") as f:
                 while True:
                     game = chess.pgn.read_game(f)
                     if game is None:
                         break
+
                     headers = game.headers
                     cleaned = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in headers.items()}
                     eco = self.get_header(cleaned, "ECO", "A00")
@@ -547,10 +571,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         except Exception as e:
             print(f"Error lazy loading ECO {target_cat}: {e}")
 
-        # Update aggregated data safely on the main thread
-        self.after(0, lambda: self._merge_lazy_eco_section(target_cat, updated_items))
+        self.after(0, lambda: self._merge_lazy_eco_section(target_cat, updated_items, overlay))
 
-    def _merge_lazy_eco_section(self, target_cat, updated_items):
+    def _merge_lazy_eco_section(self, target_cat, updated_items, overlay):
         for item in self.aggregated_games_data:
             eco = item["eco"]
             eco_base = eco[0].upper() if eco else "A"
@@ -559,8 +582,14 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 if key in updated_items:
                     item["instances"] = updated_items[key]
 
+        if overlay:
+            try:
+                overlay.close()
+            except Exception:
+                pass
+
         self.refresh_current_view()
-        set_status_message(f"ECO {cat if 'cat' in locals() else target_cat} loaded.")
+        set_status_message(f"ECO {target_cat} loaded.")
 
     def toggle_group_expansion(self, group_key):
         if group_key in self.expanded_groups:
@@ -590,19 +619,29 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
-        if self.pgn_path.exists() or eco_exists:
-            self.load_catalog()
+        if self.db_path.exists() or self.pgn_path.exists() or eco_exists:
+            self.pack_propagate(True)
+            self.update_idletasks()
+            self.after(50, self.load_catalog)
         else:
             self.aggregated_games_data = []
             self.refresh_current_view()
 
     def load_catalog(self):
-        set_status_message("Loading catalog headers...")
-        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Indexing Catalog Headers...")
+        set_status_message("Loading catalog via DuckDB...")
+
+        if hasattr(self, "loading_overlay") and self.loading_overlay:
+            try:
+                self.loading_overlay.close()
+            except Exception:
+                pass
+
+        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Initializing catalog...")
 
         self.aggregated_games_data = []
         self.refresh_current_view()
-        threading.Thread(target=self._background_load_catalog_worker, daemon=True).start()
+
+        self.after(50, lambda: threading.Thread(target=self._background_load_catalog_worker, daemon=True).start())
 
     def _background_load_catalog_worker(self):
         catalog_data = {}
@@ -616,57 +655,65 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         grouped_variations = {}
         total_raw_games = 0
 
-        if self.pgn_path.exists():
-            try:
-                with open(self.pgn_path, "r", encoding="utf-8", errors="ignore") as f:
-                    while True:
-                        line = f.readline()
-                        if not line:
-                            break
-                        # Ultra-fast header scanning without fully parsing move trees on startup
-                        if line.startswith("[Event "):
-                            total_raw_games += 1
-                            headers = {}
-                            # Read current game headers block quickly
-                            while line and line.strip():
-                                line_str = line.strip()
-                                if line_str.startswith("[") and line_str.endswith("]"):
-                                    parts = line_str[1:-1].split(" ", 1)
-                                    if len(parts) == 2:
-                                        k = parts[0].strip()
-                                        v = parts[1].strip().strip('"')
-                                        headers[k] = v
-                                line = f.readline()
+        try:
+            con = duckdb.connect(str(self.db_path))
 
-                            cleaned = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in headers.items()}
-                            eco = self.get_header(cleaned, "ECO", "A00")
-                            opening = self.get_header(cleaned, "Opening", "Unknown")
-                            variation = self.get_header(cleaned, "Variation", "")
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS catalog_headers (
+                    game_index INTEGER,
+                    eco VARCHAR,
+                    opening VARCHAR,
+                    variation VARCHAR,
+                    white VARCHAR,
+                    black VARCHAR,
+                    headers_json VARCHAR
+                )
+            """)
 
-                            key = (eco, opening, variation)
-                            if key not in grouped_variations:
-                                grouped_variations[key] = {
-                                    "eco": eco,
-                                    "opening": opening,
-                                    "variation": variation,
-                                    "count": 0,
-                                    "instances": []
-                                }
+            existing_count = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
+            print(f"[Catalog Import] Existing games in DuckDB: {existing_count}")
 
-                            grouped_variations[key]["count"] += 1
-                            # Leave game_object as None initially for extreme startup speed
-                            grouped_variations[key]["instances"].append({
-                                "headers": cleaned,
-                                "game_object": None
-                            })
-            except Exception as e:
-                print(f"Error indexing catalog headers: {e}")
+            self.after(0, lambda: self.loading_overlay.update_message("Building and querying variation groups..."))
+
+            query_res = con.execute("""
+                SELECT eco, opening, variation, COUNT(*), json_group_array(headers_json)
+                FROM catalog_headers
+                GROUP BY eco, opening, variation
+            """).fetchall()
+
+            total_raw_games = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
+            con.close()
+
+            print(f"[Catalog Import] Total catalog size: {total_raw_games} games across {len(query_res)} variation groups.")
+
+            for row in query_res:
+                eco, opening, variation, count, headers_json_list = row
+                key = (eco, opening, variation)
+
+                instances = []
+                try:
+                    parsed_list = json.loads(headers_json_list)
+                    for h_dict in parsed_list:
+                        instances.append({
+                            "headers": h_dict,
+                            "game_object": None
+                        })
+                except Exception:
+                    pass
+
+                grouped_variations[key] = {
+                    "eco": eco,
+                    "opening": opening,
+                    "variation": variation,
+                    "count": count,
+                    "instances": instances
+                }
+
+        except Exception as e:
+            print(f"Error indexing catalog with DuckDB: {e}")
 
         final_headers_data = list(grouped_variations.values())
         self.after(0, lambda: self._finalize_catalog_load(final_headers_data, catalog_data, total_raw_games))
-
-    def _merge_catalog_chunk(self, chunk_data, raw_count):
-        pass
 
     def _finalize_catalog_load(self, headers_data, catalog_data, total_raw_games):
         self.aggregated_games_data = headers_data
@@ -675,11 +722,14 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.session_representative_cache.clear()
         self.refresh_current_view()
 
-        if hasattr(self, "loading_overlay"):
-            self.loading_overlay.close()
+        if hasattr(self, "loading_overlay") and self.loading_overlay:
+            try:
+                self.loading_overlay.close()
+            except Exception:
+                pass
 
         set_status_message(
-            f"Catalog indexed: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups across A–E sections.")
+            f"Catalog indexed via DuckDB: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups across A–E sections.")
 
-    def apply_filter(self, event=None):
+    def apply_filter(self):
         self.refresh_current_view()
