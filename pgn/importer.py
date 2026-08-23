@@ -5,7 +5,7 @@ from pathlib import Path
 import chess.pgn
 import gui.app_state as state
 from tkinter import filedialog
-from gui.splash import LoadingOverlay
+from gui.statusbar import set_status_message, start_progress, update_progress, stop_progress
 
 # Resolve path to catalog_builder.py in cousin folder /catalog/
 CATALOG_BUILDER_PATH = Path(__file__).resolve().parent.parent / "catalog" / "catalog_builder.py"
@@ -45,7 +45,6 @@ def import_pgn():
     if not filename:
         return
 
-    # Force the main application window to flash/clear the OS file picker ghost frame immediately
     root_window = state.workspaces.get("catalog") or getattr(state, "app_root", None)
     if not root_window:
         for ws in state.workspaces.values():
@@ -70,50 +69,44 @@ def import_pgn():
 
     # Check duplicate in memory
     if filename in state.imported_files:
-        if getattr(state, 'status', None):
-            try:
-                state.status.configure(text=f"{short_name} is already imported.")
-            except Exception:
-                pass
+        set_status_message(f"{short_name} is already imported.")
         return
 
-    overlay = None
-    if root_window:
-        try:
-            overlay = LoadingOverlay(root_window, title_text="Totten", message="Reading PGN games... (0)")
-            root_window.update_idletasks()
-        except Exception:
-            pass
+    # Start determinate progress bar (grows from left to right)
+    start_progress(indeterminate=False)
+    set_status_message(f"Reading {short_name}...")
 
-    # --- 1. Parse PGN Games into memory with live counter ---
+    # Get file size in bytes to calculate smooth progress percentages
+    file_size = Path(filename).stat().st_size
+    if file_size == 0:
+        file_size = 1
+
+    # --- 1. Parse PGN Games into memory with progressive UI updates ---
     games = []
     try:
         with open(filename, "r", encoding="utf-8", errors="replace") as pgn_file:
-            count = 0
             while True:
                 game = chess.pgn.read_game(pgn_file)
                 if game is None:
                     break
                 games.append(game)
-                count += 1
-                if count % 25 == 0 and overlay:
-                    try:
-                        overlay.update_message(f"Reading PGN games... ({count})")
+
+                # Update progress based on file reading position every 25 games to prevent lag
+                if len(games) % 25 == 0:
+                    current_pos = pgn_file.tell()
+                    fraction = min(0.8, current_pos / file_size)  # Reserve last 20% for catalog building
+                    update_progress(fraction)
+
+                    # Force GUI to refresh and animate the red bar
+                    if root_window and hasattr(root_window, "update_idletasks"):
                         root_window.update_idletasks()
-                    except Exception:
-                        pass
+                    elif hasattr(state, "app_root") and state.app_root:
+                        state.app_root.update_idletasks()
+
     except Exception as e:
         print(f"Error reading PGN file: {e}")
-        if overlay:
-            try:
-                overlay.close()
-            except Exception:
-                pass
-        if getattr(state, 'status', None):
-            try:
-                state.status.configure(text=f"Failed to read {short_name}")
-            except Exception:
-                pass
+        stop_progress()
+        set_status_message(f"Failed to read {short_name}")
         return
 
     state.pgn_games_lookup[filename] = games
@@ -122,27 +115,20 @@ def import_pgn():
     state.current_filename = filename
 
     print(f"3 - Successfully loaded {len(games)} games from {short_name}")
-
-    if overlay:
-        try:
-            overlay.update_message("Building catalog database...")
-            root_window.update_idletasks()
-        except Exception:
-            pass
+    update_progress(0.85)  # File reading done, moving to catalog building
 
     # --- 2. Execute catalog_builder.catalog_pgns with relative path handling ---
     try:
         if hasattr(catalog_builder, "catalog_pgns"):
+            set_status_message("Building catalog database...")
             added_count = catalog_builder.catalog_pgns(filename)
             print(f"Catalog builder processed {added_count} new games.")
     except Exception as err:
         print(f"Warning: catalog_builder.catalog_pgns failed: {err}")
 
-    if overlay:
-        try:
-            overlay.close()
-        except Exception:
-            pass
+    # Complete the progress bar animation
+    update_progress(1.0)
+    stop_progress()
 
     # --- 3. Update Sidebar Tree ---
     tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
@@ -182,11 +168,7 @@ def import_pgn():
             if hasattr(imp_ws, "refresh_view"):
                 imp_ws.refresh_view()
 
-    if getattr(state, 'status', None):
-        try:
-            state.status.configure(text=f"Added {short_name} ({len(games)} games) to catalog.")
-        except Exception:
-            pass
+    set_status_message(f"Added {short_name} ({len(games)} games) to catalog.")
 
 
 def import_fen():
