@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import chess.pgn
 import duckdb
+from gui.statusbar import update_progress, set_status_message
 
 DB_Path = Path("personal_catalog.duckdb")
 PGN_Path = Path("personal_catalog.pgn")
@@ -22,11 +23,16 @@ def get_header(headers, key, default="Unknown"):
 
 def catalog_pgns(filename):
     """
-    Parses a PGN file and appends its games directly into DuckDB and personal_catalog.pgn.
+    Parses a PGN file and appends its games directly into DuckDB and personal_catalog.pgn
+    with live progress updates.
     """
     path_to_import = Path(filename)
     if not path_to_import.exists():
         return 0
+
+    file_size = path_to_import.stat().st_size
+    if file_size == 0:
+        file_size = 1
 
     con = duckdb.connect(str(DB_Path))
     con.execute("""
@@ -55,6 +61,8 @@ def catalog_pgns(filename):
 
     added_count = 0
     games_to_insert = []
+
+    set_status_message("Building catalog database...")
 
     with open(path_to_import, "r", encoding="utf-8", errors="replace") as f_in, \
             open(PGN_Path, "a", encoding="utf-8") as f_out:
@@ -88,13 +96,23 @@ def catalog_pgns(filename):
             ))
             added_count += 1
 
+            # Update progress incrementally from 0.8 (80%) to 0.98 (98%) during catalog building
+            if added_count % 20 == 0:
+                current_pos = f_in.tell()
+                # Map file reading progress from 0.8 to 0.98 range
+                fraction = 0.8 + min(0.18, 0.18 * (current_pos / file_size))
+                update_progress(fraction)
+
     # Batch insert into DuckDB
     if games_to_insert:
+        set_status_message("Saving to database...")
+        update_progress(0.99)
         con.executemany("""
                         INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, games_to_insert)
 
     con.close()
+    update_progress(1.0)
     print(f"[Catalog Builder] Successfully ingested {added_count} games into DuckDB.")
     return added_count
