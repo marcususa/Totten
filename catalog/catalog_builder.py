@@ -1,122 +1,100 @@
 import json
 from pathlib import Path
 import chess.pgn
+import duckdb
+
+DB_Path = Path("personal_catalog.duckdb")
+PGN_Path = Path("personal_catalog.pgn")
+JSON_Path = Path("personal_catalog.json")
 
 
-def catalog_pgns(pgn_path, catalog_path="personal_catalog.json", pgn_out_path="personal_catalog.pgn",
-                 tag_mappings=None):
+def get_header(headers, key, default="Unknown"):
+    if not headers:
+        return default
+    if key in headers:
+        return headers[key]
+    lower_key = key.lower()
+    for k, v in headers.items():
+        if k.lower() == lower_key:
+            return v
+    return default
+
+
+def catalog_pgns(filename):
     """
-    Parses a PGN file, updates opening frequencies in the catalog JSON,
-    and accumulates parsed games into personal_catalog.pgn using project-root relative paths.
+    Parses a PGN file and appends its games directly into DuckDB and personal_catalog.pgn.
     """
-    # Determine the project root (parent directory of the 'catalog' folder)
-    project_root = Path(__file__).resolve().parent.parent
-
-    pgn_file = Path(pgn_path).resolve()
-    cat_file = (project_root / catalog_path).resolve() if not Path(catalog_path).is_absolute() else Path(catalog_path)
-    pgn_out = (project_root / pgn_out_path).resolve() if not Path(pgn_out_path).is_absolute() else Path(pgn_out_path)
-    tag_mappings = tag_mappings or {}
-
-    # Prevent importing the catalog's own output file into itself
-    if pgn_file == pgn_out:
-        print("[Catalog Error]: Cannot import the catalog's output file into itself.")
+    path_to_import = Path(filename)
+    if not path_to_import.exists():
         return 0
 
-    # Convert incoming pgn path to a relative path string compared to project root for clean storage
-    try:
-        rel_pgn_str = str(pgn_file.relative_to(project_root))
-    except ValueError:
-        rel_pgn_str = str(pgn_file)
+    con = duckdb.connect(str(DB_Path))
+    con.execute("""
+                CREATE TABLE IF NOT EXISTS catalog_headers
+                (
+                    game_index
+                    INTEGER,
+                    eco
+                    VARCHAR,
+                    opening
+                    VARCHAR,
+                    variation
+                    VARCHAR,
+                    white
+                    VARCHAR,
+                    black
+                    VARCHAR,
+                    headers_json
+                    VARCHAR
+                )
+                """)
 
-    # Load existing catalog data if the json already exists
-    existing_files = []
-    catalog = {}
-    if cat_file.exists():
-        try:
-            with open(cat_file, "r", encoding="utf-8") as f:
-                old_data = json.load(f)
-                if isinstance(old_data, dict):
-                    catalog = old_data
-                    if "cataloged_files" in catalog:
-                        existing_files = catalog["cataloged_files"]
-        except Exception:
-            pass
+    # Get current max index to append properly
+    max_idx_res = con.execute("SELECT MAX(game_index) FROM catalog_headers").fetchone()
+    start_idx = (max_idx_res[0] + 1) if max_idx_res and max_idx_res[0] is not None else 0
 
-    # GUARD CLAUSE: Stop duplicates using relative path matching
-    if rel_pgn_str in existing_files:
-        print(f"[Catalog Info]: File {Path(pgn_file).name} has already been cataloged.")
-        return 0
+    added_count = 0
+    games_to_insert = []
 
-    existing_files.append(rel_pgn_str)
-    catalog["cataloged_files"] = existing_files
-
-    if not pgn_file.exists():
-        return 0
-
-    game_count = 0
-
-    # Open the input PGN file and append to the persistent personal_catalog.pgn at project root
-    with open(pgn_file, "r", encoding="utf-8", errors="ignore") as f, \
-            open(pgn_out, "a", encoding="utf-8") as out_f:
+    with open(path_to_import, "r", encoding="utf-8", errors="replace") as f_in, \
+            open(PGN_Path, "a", encoding="utf-8") as f_out:
 
         while True:
-            game = chess.pgn.read_game(f)
+            game = chess.pgn.read_game(f_in)
             if game is None:
                 break
 
-            game_count += 1
+            # Export game string back to permanent pgn file for lazy-loading boards later if needed
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+            pgn_string = game.accept(exporter)
+            f_out.write(pgn_string + "\n\n")
 
-            # Export game cleanly without hard line wraps in movetext
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
-            clean_game_str = game.accept(exporter)
+            headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in game.headers.items()}
+            eco = get_header(headers, "ECO", "A00")
+            opening = get_header(headers, "Opening", "Unknown")
+            variation = get_header(headers, "Variation", "")
+            white = get_header(headers, "White", "Unknown")
+            black = get_header(headers, "Black", "Unknown")
 
-            out_f.write(clean_game_str + "\n\n")
+            current_idx = start_idx + added_count
+            games_to_insert.append((
+                current_idx,
+                eco,
+                opening,
+                variation,
+                white,
+                black,
+                json.dumps(headers)
+            ))
+            added_count += 1
 
-            headers = dict(game.headers)
+    # Batch insert into DuckDB
+    if games_to_insert:
+        con.executemany("""
+                        INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, games_to_insert)
 
-            for raw_tag, target_tag in tag_mappings.items():
-                if raw_tag in headers:
-                    val = headers.pop(raw_tag)
-                    if target_tag != "(Ignore)" and target_tag:
-                        headers[target_tag] = val
-
-            eco = str(headers.get("ECO", "UNKNOWN")).strip().upper() or "UNKNOWN"
-            opening = str(headers.get("Opening", "")).strip()
-            variation = str(headers.get("Variation", "")).strip()
-
-            if eco not in catalog:
-                catalog[eco] = {}
-
-            var_key = f"{opening} - {variation}".strip(" -")
-            if not var_key:
-                var_key = "General"
-
-            if var_key in catalog[eco]:
-                if isinstance(catalog[eco][var_key], dict):
-                    catalog[eco][var_key]["frequency"] = catalog[eco][var_key].get("frequency", 0) + 1
-                else:
-                    catalog[eco][var_key] += 1
-            else:
-                catalog[eco][var_key] = {
-                    "eco": eco,
-                    "opening": opening,
-                    "variation": variation,
-                    "frequency": 1
-                }
-
-    sorted_catalog = {
-        "cataloged_files": sorted(list(set(catalog["cataloged_files"])))
-    }
-
-    for eco in sorted(k for k in catalog.keys() if k != "cataloged_files"):
-        sorted_catalog[eco] = dict(sorted(
-            catalog[eco].items(),
-            key=lambda item: (item[1].get("opening", ""), item[1].get("variation", "")) if isinstance(item[1],
-                                                                                                      dict) else ("",
-                                                                                                                  "")
-        ))
-
-    with open(cat_file, "w", encoding="utf-8") as f:
-        json.dump(sorted_catalog, f, indent=4)
-
-    return game_count
+    con.close()
+    print(f"[Catalog Builder] Successfully ingested {added_count} games into DuckDB.")
+    return added_count
