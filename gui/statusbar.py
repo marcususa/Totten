@@ -1,17 +1,63 @@
-import customtkinter as ctk
+# gui/statusbar.py
+
 import gui.app_state as state
 
-def create_statusbar(app):
-    state.status = ctk.CTkLabel(
-        app,
-        text="Ready",
-        anchor="w",
-        height=26,
-        padx=10,
-        text_color="#94a3b8"
-    )
 
-def set_status_message(text: str):
-    """Utility helper to update state.status text from any workspace."""
-    if hasattr(state, "status") and state.status:
-        state.status.configure(text=text)
+def set_status_message(message, text_color="#ddddff"):
+    """Updates the status bar label in the sidebar safely with #ddddff default."""
+    print(f"[DEBUG STATUS]: {message}")
+    try:
+        label = getattr(state, "status", None) or getattr(state, "status_label", None)
+        if label:
+            active_color = text_color if text_color else "#ddddff"
+            label.configure(text=message, text_color=active_color)
+            if hasattr(label, "update_idletasks"):
+                label.update_idletasks()
+    except Exception as e:
+        print(f"Status Error: {e}")
+
+
+def start_progress(indeterminate=False):
+    """Forces determinate mode so the bar always starts empty on the left (0.0)."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            # Force determinate mode so it grows from left to right instead of sliding in the middle
+            pb.configure(mode="determinate")
+            pb.set(0.0)  # Starts completely empty at the left edge
+
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Start Error: {e}")
+
+
+def update_progress(value):
+    """Grows the red bar smoothly from left to right (value between 0.0 and 1.0)."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            if pb.cget("mode") != "determinate":
+                pb.configure(mode="determinate")
+
+            pb.set(max(0.0, min(1.0, value)))
+
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Update Error: {e}")
+
+
+def stop_progress():
+    """Completes the bar to 1.0 briefly or resets it back to empty (0.0)."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            pb.set(1.0)  # Fill completely on finish
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Stop Error: {e}")
