@@ -18,7 +18,6 @@ from PIL import Image
 
 try:
     import cairosvg
-
     HAS_CAIROSVG = True
 except ImportError:
     HAS_CAIROSVG = False
@@ -52,10 +51,9 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.parsed_games_cache = {}  # Lazily cache full game objects as they are needed
         self.filtered_indices = []
 
-        # Store categorized data for the 3 tiers (Start completely empty on launch)
+        # Store categorized data for the 2 tiers
         self.tier1_data = []
         self.tier2_data = []
-        self.tier3_data = []
 
         # Track selected row state across custom tables
         self.selected_row_frame = None
@@ -74,7 +72,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1, uniform="group1")
         self.grid_rowconfigure(1, weight=1, uniform="group1")
 
-        # --- Top Pane: Contains Controls & The 3-Tier Stack Catalog ---
+        # --- Top Pane: Contains Controls & The 2-Tier Stack Catalog ---
         self.top_frame = ctk.CTkFrame(
             self,
             fg_color="#1e293b",
@@ -147,8 +145,8 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.scrollable_tree_container.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
         self.scrollable_tree_container.grid_columnconfigure(0, weight=1)
 
-        # Initialize the 3 Custom Grid Tiers
-        self.tier_containers = self.setup_three_custom_tiers(self.scrollable_tree_container)
+        # Initialize the 2 Custom Grid Tiers
+        self.tier_containers = self.setup_two_custom_tiers(self.scrollable_tree_container)
 
         self.after(100, self.load_catalog)
 
@@ -210,7 +208,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         popup = ctk.CTkToplevel(self)
         popup.title("Select Piece")
 
-        width, height = 680, 320
+        width, height = 360, 280
         popup.update_idletasks()
         screen_width = popup.winfo_screenwidth()
         screen_height = popup.winfo_screenheight()
@@ -224,50 +222,38 @@ class PatternsWorkspace(ctk.CTkFrame):
         matrix_frame = ctk.CTkFrame(popup, fg_color="transparent")
         matrix_frame.pack(fill="both", expand=True, padx=16, pady=10)
 
-        for col_idx in range(4):
+        for col_idx in range(2):
             matrix_frame.grid_columnconfigure(col_idx, weight=1)
 
         columns_data = [
-            (["br", "bn", "bb", "bq", "bk", "bb", "bn", "br"],
-             ["Ra8", "Nb8", "Bc8", "Qd8", "Ke8", "Bf8", "Ng8", "Rh8"],
-             ["Black Queen's Rook", "Black Queen's Knight", "Black Queen's Bishop", "Black Queen", "Black King",
-              "Black King's Bishop", "Black King's Knight", "Black King's Rook"]),
-
-            (["bp"] * 8,
-             ["a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6"],
-             ["Black Pawn a6", "Black Pawn b6", "Black Pawn c6", "Black Pawn d6", "Black Pawn e6", "Black Pawn f6",
-              "Black Pawn g6", "Black Pawn h6"]),
-
-            (["wp"] * 8,
-             ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3"],
-             ["White Pawn a3", "White Pawn b3", "White Pawn c3", "White Pawn d3", "White Pawn e3", "White Pawn f3",
-              "White Pawn g3", "White Pawn h3"]),
-
-            (["wr", "wn", "wb", "wq", "wk", "wb", "wn", "wr"],
-             ["Ra1", "Nb1", "Bc1", "Qd1", "Ke1", "Bf1", "Ng1", "Rh1"],
-             ["White Queen's Rook", "White Queen's Knight", "White Queen's Bishop", "White Queen", "White King",
-              "White King's Bishop", "White King's Knight", "White King's Rook"])
+            (
+                ["bp", "bn", "bb", "br", "bq", "bk"],
+                ["Black Pawn", "Black Knight", "Black Bishop", "Black Rook", "Black Queen", "Black King"]
+            ),
+            (
+                ["wp", "wn", "wb", "wr", "wq", "wk"],
+                ["White Pawn", "White Knight", "White Bishop", "White Rook", "White Queen", "White King"]
+            )
         ]
 
-        for col_idx, (p_codes, p_labels, p_desc) in enumerate(columns_data):
+        for col_idx, (p_codes, p_desc) in enumerate(columns_data):
             col_box = ctk.CTkFrame(matrix_frame, fg_color="#1e293b", corner_radius=6, border_width=1,
                                    border_color="#334155")
             col_box.grid(row=0, column=col_idx, sticky="nsew", padx=6, pady=2)
 
             for i in range(len(p_codes)):
                 code = p_codes[i]
-                label_text = p_labels[i]
                 desc_text = p_desc[i]
                 icon = self.piece_icons.get(code, None)
 
                 btn = ctk.CTkButton(
                     col_box,
-                    text=label_text,
+                    text=desc_text,
                     image=icon,
                     compound="left",
                     anchor="w",
-                    height=26,
-                    font=("Arial", 10),
+                    height=30,
+                    font=("Arial", 11),
                     fg_color="#344268",
                     text_color="white",
                     hover_color="#2e4a8c",
@@ -275,7 +261,7 @@ class PatternsWorkspace(ctk.CTkFrame):
                 )
                 t_pad = 4 if i == 0 else 1
                 b_pad = 4 if i == len(p_codes) - 1 else 1
-                btn.pack(fill="x", padx=4, pady=(t_pad, b_pad))
+                btn.pack(fill="x", padx=6, pady=(t_pad, b_pad))
 
     def on_piece_selected(self, piece_code, piece_desc, popup_window):
         popup_window.destroy()
@@ -283,22 +269,18 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.current_piece_desc = piece_desc
         self.piece_selector_btn.configure(text=piece_desc)
 
-        # Run filter in a background thread to prevent GUI freezing
         self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Filtering Patterns...")
         threading.Thread(target=self._background_apply_filter, daemon=True).start()
 
-    def setup_three_custom_tiers(self, parent_container):
+    def setup_two_custom_tiers(self, parent_container):
         for widget in parent_container.winfo_children():
             widget.destroy()
 
-        tier_names = ["Moves 1-4", "Moves 5-15", "Moves 16-30"]
+        tier_names = ["Moves 8-15", "Moves 16-25"]
         tiers = []
 
         def configure_columns(frame):
-            frame.grid_columnconfigure(0, weight=0, minsize=115)  # Move Match
-            frame.grid_columnconfigure(1, weight=0, minsize=74)  # ECO (+2 px right)
-            frame.grid_columnconfigure(2, weight=1, minsize=155)  # Opening (+2 px right)
-            frame.grid_columnconfigure(3, weight=2, minsize=178)  # Variation
+            frame.grid_columnconfigure(0, weight=1, minsize=150)  # Move Match Display
 
         for i, t_name in enumerate(tier_names):
             tier_box = ctk.CTkFrame(
@@ -317,22 +299,14 @@ class PatternsWorkspace(ctk.CTkFrame):
             tier_frame.grid_columnconfigure(0, weight=1)
             tier_frame.grid_rowconfigure(1, weight=1)
 
-            # --- Custom Header Frame ---
             header_frame = ctk.CTkFrame(tier_frame, fg_color="#1e293b", corner_radius=4)
             header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 2))
             configure_columns(header_frame)
 
             ctk.CTkLabel(header_frame, text=t_name, font=("Arial", 14, "bold"), text_color="white", anchor="w").grid(
-                row=0, column=0, sticky="w", padx=(5, 6), pady=4)
-            ctk.CTkLabel(header_frame, text="ECO", font=("Arial", 13, "bold"), text_color="#cbd5e1", anchor="w").grid(
-                row=0, column=1, sticky="w", padx=(0, 6), pady=4)
-            ctk.CTkLabel(header_frame, text="Opening", font=("Arial", 13, "bold"), text_color="#cbd5e1",
-                         anchor="w").grid(row=0, column=2, sticky="w", padx=(0, 6), pady=4)
-            ctk.CTkLabel(header_frame, text="Variation", font=("Arial", 13, "bold"), text_color="#cbd5e1",
-                         anchor="w").grid(row=0, column=3, sticky="w", padx=(0, 6), pady=4)
+                row=0, column=0, sticky="w", padx=(8, 6), pady=4)
 
-            # --- Rows Container ---
-            rows_scroll_frame = ctk.CTkScrollableFrame(tier_frame, fg_color="transparent", height=120)
+            rows_scroll_frame = ctk.CTkScrollableFrame(tier_frame, fg_color="transparent", height=140)
             rows_scroll_frame.grid(row=1, column=0, sticky="nsew")
             rows_scroll_frame.grid_columnconfigure(0, weight=1)
             configure_columns(rows_scroll_frame)
@@ -347,18 +321,6 @@ class PatternsWorkspace(ctk.CTkFrame):
 
     def _background_load_catalog_worker(self):
         raw_games = []
-        headers_list = []
-
-        # 1. Load instantly from JSON cache if available
-        if os.path.exists(METADATA_JSON_FILE):
-            try:
-                with open(METADATA_JSON_FILE, "r", encoding="utf-8") as jf:
-                    data = json.load(jf)
-                    headers_list = data.get("headers", [])
-            except Exception:
-                headers_list = []
-
-        # 2. Load raw PGN blocks fast using standard splitting
         if os.path.exists(PATTERNS_FILE):
             try:
                 with open(PATTERNS_FILE, "r", encoding="utf-8", errors="ignore") as f:
@@ -368,46 +330,16 @@ class PatternsWorkspace(ctk.CTkFrame):
                         raw_games[0] = "[Event " + raw_games[0]
                     for i in range(1, len(raw_games)):
                         raw_games[i] = "[Event " + raw_games[i]
-
-                # Fallback if JSON cache was out of sync or missing
-                if not headers_list or len(headers_list) != len(raw_games):
-                    headers_list = []
-                    for g_str in raw_games:
-                        g_obj = chess.pgn.read_game(StringIO(g_str))
-                        if g_obj:
-                            cleaned_headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in
-                                               g_obj.headers.items()}
-                            headers_list.append(cleaned_headers)
-                        else:
-                            headers_list.append({})
-
-                    with open(METADATA_JSON_FILE, "w", encoding="utf-8") as jf:
-                        json.dump({"headers": headers_list}, jf)
             except Exception as e:
-                print(f"Error parsing catalog: {e}")
+                print(f"Error reading catalog: {e}")
 
-        self.after(0, lambda: self._finalize_catalog_load(headers_list, raw_games))
+        self.after(0, lambda: self._finalize_catalog_load(raw_games))
 
-    def _finalize_catalog_load(self, all_games_headers, raw_games):
+    def _finalize_catalog_load(self, raw_games):
         self.raw_pgn_games = raw_games
         self.parsed_games_cache = {}
-
-        self.all_games_data = []
-        for i, h in enumerate(all_games_headers):
-            row = [
-                "",  # Placeholder for match move
-                h.get("ECO", ""),
-                h.get("Opening", ""),
-                h.get("Variation", "")
-            ]
-            self.all_games_data.append((i, row))
-
+        self.all_games_data = [(i, []) for i in range(len(raw_games))]
         self.filtered_indices = [i for i, _ in self.all_games_data]
-
-        # Keep workspace completely clean on launch (no residue/pre-population)
-        self.tier1_data = []
-        self.tier2_data = []
-        self.tier3_data = []
         self.refresh_tree_view()
 
         if hasattr(self, "loading_overlay"):
@@ -422,26 +354,19 @@ class PatternsWorkspace(ctk.CTkFrame):
 
         self._populate_tier_rows(self.tier_containers[0], self.tier1_data)
         self._populate_tier_rows(self.tier_containers[1], self.tier2_data)
-        self._populate_tier_rows(self.tier_containers[2], self.tier3_data)
 
     def _populate_tier_rows(self, container, data_list):
         for row_idx, (real_idx, row_values) in enumerate(data_list):
             row_frame = ctk.CTkFrame(container, fg_color="transparent", corner_radius=4, height=30)
-            row_frame.grid(row=row_idx, column=0, columnspan=4, sticky="ew", pady=1)
-            row_frame.grid_columnconfigure(0, weight=0, minsize=110)
-            row_frame.grid_columnconfigure(1, weight=0, minsize=74)
-            row_frame.grid_columnconfigure(2, weight=1, minsize=164)
-            row_frame.grid_columnconfigure(3, weight=2, minsize=178)
+            row_frame.grid(row=row_idx, column=0, sticky="ew", pady=1)
+            row_frame.grid_columnconfigure(0, weight=1)
             row_frame.grid_propagate(False)
 
-            labels = []
-            for col_i, val in enumerate(row_values):
-                cell_padx = (5, 6) if col_i == 0 else (0, 6)
-                lbl = ctk.CTkLabel(row_frame, text=str(val), font=("Arial", 12), anchor="w", text_color="#DDDDEE")
-                lbl.grid(row=0, column=col_i, sticky="w", padx=cell_padx, pady=0)
-                labels.append(lbl)
+            val_text = row_values[0] if row_values else ""
+            lbl = ctk.CTkLabel(row_frame, text=str(val_text), font=("Arial", 12), anchor="w", text_color="#DDDDEE")
+            lbl.grid(row=0, column=0, sticky="w", padx=(8, 6), pady=0)
 
-            for widget in [row_frame] + labels:
+            for widget in [row_frame, lbl]:
                 widget.bind("<Button-1>",
                             lambda e, r_frame=row_frame, idx=real_idx: self.select_custom_row(r_frame, idx))
 
@@ -459,61 +384,19 @@ class PatternsWorkspace(ctk.CTkFrame):
             self.text_rationale.insert("1.0", pgn_content)
 
     def _background_apply_filter(self):
-        if not self.current_piece_desc:
+        if not self.current_piece_code:
             if hasattr(self, "loading_overlay"):
                 self.after(0, self.loading_overlay.close)
             return
 
-        selected_piece_desc = self.current_piece_desc
-        target_piece_symbol = None
-        target_squares = []
+        target_color = chess.WHITE if self.current_piece_code.startswith("w") else chess.BLACK
+        piece_char = self.current_piece_code[1].upper()
+        symbol_map = {'P': chess.PAWN, 'N': chess.KNIGHT, 'B': chess.BISHOP, 'R': chess.ROOK, 'Q': chess.QUEEN, 'K': chess.KING}
+        target_piece_symbol = symbol_map.get(piece_char)
 
-        if "Pawn" in selected_piece_desc:
-            target_piece_symbol = chess.PAWN
-            if "a3" in selected_piece_desc or "a6" in selected_piece_desc:
-                target_squares = [chess.A3, chess.A6]
-            elif "b3" in selected_piece_desc or "b6" in selected_piece_desc:
-                target_squares = [chess.B3, chess.B6]
-            elif "c3" in selected_piece_desc or "c6" in selected_piece_desc:
-                target_squares = [chess.C3, chess.C6]
-            elif "d3" in selected_piece_desc or "d6" in selected_piece_desc:
-                target_squares = [chess.D3, chess.D6]
-            elif "e3" in selected_piece_desc or "e6" in selected_piece_desc:
-                target_squares = [chess.E3, chess.E6]
-            elif "f3" in selected_piece_desc or "f6" in selected_piece_desc:
-                target_squares = [chess.F3, chess.F6]
-            elif "g3" in selected_piece_desc or "g6" in selected_piece_desc:
-                target_squares = [chess.G3, chess.G6]
-            elif "h3" in selected_piece_desc or "h6" in selected_piece_desc:
-                target_squares = [chess.H3, chess.H6]
-        elif "Knight" in selected_piece_desc:
-            target_piece_symbol = chess.KNIGHT
-            if "Queen's Knight" in selected_piece_desc:
-                target_squares = [chess.B1, chess.B8]
-            elif "King's Knight" in selected_piece_desc:
-                target_squares = [chess.G1, chess.G8]
-        elif "Bishop" in selected_piece_desc:
-            target_piece_symbol = chess.BISHOP
-            if "Queen's Bishop" in selected_piece_desc:
-                target_squares = [chess.C1, chess.C8]
-            elif "King's Bishop" in selected_piece_desc:
-                target_squares = [chess.F1, chess.F8]
-        elif "Rook" in selected_piece_desc:
-            target_piece_symbol = chess.ROOK
-            if "Queen's Rook" in selected_piece_desc:
-                target_squares = [chess.A1, chess.A8]
-            elif "King's Rook" in selected_piece_desc:
-                target_squares = [chess.H1, chess.H8]
-        elif "Queen" in selected_piece_desc:
-            target_piece_symbol = chess.QUEEN
-            target_squares = [chess.D1, chess.D8]
-        elif "King" in selected_piece_desc:
-            target_piece_symbol = chess.KING
-            target_squares = [chess.E1, chess.E8]
+        t1, t2 = [], []
 
-        t1, t2, t3 = [], [], []
-
-        for idx, (_, base_row) in enumerate(self.all_games_data):
+        for idx, _ in self.all_games_data:
             if idx >= len(self.raw_pgn_games):
                 continue
 
@@ -526,50 +409,34 @@ class PatternsWorkspace(ctk.CTkFrame):
                 continue
 
             board = game.board()
-            first_match_ply = None
             first_match_move_str = ""
-            total_piece_moves = 0
+            found_move_number = None
 
             for ply_idx, move in enumerate(game.mainline_moves()):
-                if ply_idx < 60:
+                move_number = (ply_idx // 2) + 1
+                is_black = (ply_idx % 2 == 1)
+                turn_color = chess.BLACK if is_black else chess.WHITE
+
+                if move_number >= 8:
                     piece = board.piece_at(move.from_square)
-                    if piece and piece.piece_type == target_piece_symbol:
-                        if not target_squares or move.from_square in target_squares:
-                            total_piece_moves += 1
-                            if first_match_ply is None:
-                                first_match_ply = ply_idx
-                                move_num = (ply_idx // 2) + 1
-                                is_black = (ply_idx % 2 == 1)
-                                san_str = board.san(move)
-                                first_match_move_str = f"{move_num}...{san_str}" if is_black else f"{move_num}.{san_str}"
+                    if piece and piece.piece_type == target_piece_symbol and turn_color == target_color:
+                        san_str = board.san(move)
+                        first_match_move_str = f"{move_number}...{san_str}" if is_black else f"{move_number}. {san_str}"
+                        found_move_number = move_number
+                        break
                 board.push(move)
 
-            if first_match_ply is not None:
-                move_number = (first_match_ply // 2) + 1
-                new_row = [
-                    first_match_move_str,
-                    base_row[1],
-                    base_row[2],
-                    base_row[3]
-                ]
+            if found_move_number is not None:
+                new_row = [first_match_move_str]
 
-                if 1 <= move_number <= 4:
+                if 8 <= found_move_number <= 15:
                     t1.append((idx, new_row))
-                elif 5 <= move_number <= 15:
-                    t2.append((idx, new_row, total_piece_moves))
-                elif 16 <= move_number <= 30:
-                    t3.append((idx, new_row, total_piece_moves))
-
-        t2.sort(key=lambda x: x[2])
-        t2 = [(item[0], item[1]) for item in t2]
-
-        t3.sort(key=lambda x: x[2], reverse=True)
-        t3 = [(item[0], item[1]) for item in t3]
+                elif 16 <= found_move_number <= 25:
+                    t2.append((idx, new_row))
 
         self.tier1_data = t1
         self.tier2_data = t2
-        self.tier3_data = t3
-        self.filtered_indices = [item[0] for item in t1 + t2 + t3]
+        self.filtered_indices = [item[0] for item in t1 + t2]
 
         self.after(0, self._finish_apply_filter)
 
@@ -586,7 +453,6 @@ class PatternsWorkspace(ctk.CTkFrame):
             return
 
         parent_dir = os.path.dirname(PATTERNS_FILE)
-
         counter = 1
         while True:
             new_file_name = f"patterns{counter}.pgn"
