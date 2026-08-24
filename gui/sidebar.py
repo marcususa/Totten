@@ -1,39 +1,38 @@
-# gui/sidebar.py
-
-import customtkinter as ctk
-import chess
-import chess.pgn
 import io
 from pathlib import Path
+import chess
+import chess.pgn
+import customtkinter as ctk
 import gui.app_state as state
-from gui.statusbar import set_status_message
 
 
 class Sidebar(ctk.CTkFrame):
+
     def __init__(self, parent, on_navigate_callback):
         # Reduce sidebar width from 150 to ~105 to reclaim ~50-75px for the analysis view
         super().__init__(parent, width=105, corner_radius=0, fg_color="#172134")
         self.on_navigate = on_navigate_callback
 
-        # --- STATUS DISPLAY (Anchored at the bottom) ---
+        # --- STATUS DISPLAY (Anchored at the very bottom, text fixed at bottom) ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.status_container.pack(side="bottom", fill="x", padx=4, pady=(5, 10))
+        self.status_container.pack(side="bottom", fill="x", padx=4, pady=(2, 6))
 
+        # Status Label (At the bottom, soft blue/white color #ddddff)
         self.lbl_status = ctk.CTkLabel(
             self.status_container,
             text="Ready",
             anchor="sw",
             justify="left",
-            wraplength=95,  # Adjusted wraplength to match narrower width
+            wraplength=95,
             font=ctk.CTkFont(size=11),
-            text_color=("gray40", "gray60")
+            text_color="#ddddff"
         )
         self.lbl_status.pack(side="bottom", fill="x", anchor="sw")
 
-        # Save reference to app_state for global updates
+        # Save reference for global management
         state.status = self.lbl_status
 
-        # --- NAVIGATION TREE / BUTTONS (Packed from top) ---
+        # --- NAVIGATION TREE / BUTTONS (Packed sequentially from top) ---
 
         # 1. Catalog
         self.btn_catalog = ctk.CTkButton(
@@ -93,23 +92,34 @@ class Sidebar(ctk.CTkFrame):
             text_color="white",
             command=lambda: self.on_navigate("calendar")
         )
-        self.btn_calendar.pack(fill="x", padx=4, pady=(5, 10))
-
-        # --- DIVIDER LINE ---
-        self.divider = ctk.CTkFrame(self, height=2, fg_color="#334155")
-        self.divider.pack(fill="x", padx=6, pady=(5, 10))
+        self.btn_calendar.pack(fill="x", padx=4, pady=(5, 8))
 
         # --- QUICK EVALUATION SECTION ---
-        self.lbl_qeval = ctk.CTkLabel(
-            self,
-            text="Quick Evaluation",
-            anchor="center",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=("gray10", "gray90")
-        )
-        self.lbl_qeval.pack(fill="x", padx=4, pady=(0, 5))
 
-        # Analyze Button moved ABOVE the text box
+        self.placeholder_text = "Paste PGN for quick analysis."
+
+        # Text box placed closer to Calendar with standard text attributes
+        self.txt_qeval_moves = ctk.CTkTextbox(
+            self,
+            height=130,
+            fg_color="#1e293b",
+            text_color="#f8fafc",
+            font=ctk.CTkFont(size=10),
+            border_color="#344268",
+            border_width=1,
+            wrap="word"
+        )
+        self.txt_qeval_moves.pack(fill="x", padx=4, pady=(0, 4))
+
+        # Insert initial placeholder text and set color dimmer for placeholder appearance
+        self.txt_qeval_moves.insert("1.0", self.placeholder_text)
+        self.txt_qeval_moves.configure(text_color="#94a3b8")
+
+        # Bind focus events to handle placeholder behavior cleanly
+        self.txt_qeval_moves.bind("<FocusIn>", self._on_qeval_focus_in)
+        self.txt_qeval_moves.bind("<FocusOut>", self._on_qeval_focus_out)
+
+        # Analyze Button placed below the text area
         self.btn_qeval_analysis = ctk.CTkButton(
             self,
             text="Analyze",
@@ -119,35 +129,41 @@ class Sidebar(ctk.CTkFrame):
             hover_color="#2e4a8c",
             command=self.handle_qeval_send_analysis
         )
-        self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 5))
+        self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 6))
 
-        # Text box for Quick Evaluation moves
-        self.txt_qeval_moves = ctk.CTkTextbox(
+        # --- PROGRESS BAR (Always visible in layout, red and ready) ---
+        self.progress_bar = ctk.CTkProgressBar(
             self,
-            height=130,
-            fg_color="#1e293b",
-            text_color="#f8fafc",
-            font=ctk.CTkFont(size=10),
-            wrap="word"
+            height=4,
+            corner_radius=0,
+            fg_color="#172134",
+            progress_color="#DD0000",
+            mode="determinate"
         )
-        self.txt_qeval_moves.pack(fill="x", padx=4, pady=(0, 5))
+        self.progress_bar.pack(fill="x", padx=6, pady=(4, 4))
+        self.progress_bar.set(0.0)
 
-        # Add to Catalog Button
-        self.btn_qeval_catalog = ctk.CTkButton(
-            self,
-            text="Add to Catalog",
-            height=24,
-            font=ctk.CTkFont(size=10),
-            fg_color="#344268",
-            hover_color="#2e4a8c",
-            command=self.handle_qeval_add_catalog
-        )
-        self.btn_qeval_catalog.pack(fill="x", padx=4, pady=(2, 5))
+        # Save reference for global management
+        state.progress_bar = self.progress_bar
+
+    def _on_qeval_focus_in(self, event):
+        """Clears placeholder text when user clicks into the box."""
+        current_text = self.txt_qeval_moves.get("1.0", "end").strip()
+        if current_text == self.placeholder_text:
+            self.txt_qeval_moves.delete("1.0", "end")
+            self.txt_qeval_moves.configure(text_color="#f8fafc")
+
+    def _on_qeval_focus_out(self, event):
+        """Restores placeholder text if box is left empty."""
+        current_text = self.txt_qeval_moves.get("1.0", "end").strip()
+        if not current_text:
+            self.txt_qeval_moves.insert("1.0", self.placeholder_text)
+            self.txt_qeval_moves.configure(text_color="#94a3b8")
 
     def parse_qeval_pgn(self):
         """Helper to parse sidebar quick eval text box."""
         raw_text = self.txt_qeval_moves.get("1.0", "end").strip()
-        if not raw_text:
+        if not raw_text or raw_text == self.placeholder_text:
             set_status_message("Error: Quick Evaluation box is empty.")
             return None
         try:
@@ -162,33 +178,93 @@ class Sidebar(ctk.CTkFrame):
             return None
 
     def handle_qeval_send_analysis(self):
-        """Sends quick evaluation moves directly to the analysis view."""
+        """Sends quick evaluation moves directly to the analysis view and resets state."""
         game_node = self.parse_qeval_pgn()
         if not game_node:
             return
 
         state.set_active_analysis_game(game_node)
 
+        # Revert text box back to initial placeholder state after successful send
+        self.txt_qeval_moves.delete("1.0", "end")
+        self.txt_qeval_moves.insert("1.0", self.placeholder_text)
+        self.txt_qeval_moves.configure(text_color="#94a3b8")
+
         self.on_navigate("analysis")
         set_status_message("Quick Evaluation sent to Analysis.")
 
-    def handle_qeval_add_catalog(self):
-        """Appends quick evaluation moves to personal_catalog.pgn."""
-        game_node = self.parse_qeval_pgn()
-        if not game_node:
-            return
 
-        try:
-            catalog_path = Path("personal_catalog.pgn")
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-            game_string = game_node.accept(exporter)
+# --- LOCALIZED STATUS & PROGRESS BAR CONTROLLERS ---
 
-            with open(catalog_path, "a", encoding="utf-8") as f:
-                f.write("\n\n" + game_string + "\n")
+def set_status_message(message, text_color="#ddddff"):
+    """Updates the status bar label in the sidebar safely with #ddddff default."""
+    print(f"[DEBUG STATUS]: {message}")
+    try:
+        label = getattr(state, "status", None)
+        if label:
+            label.configure(text=message, text_color=text_color)
+            if hasattr(label, "update_idletasks"):
+                label.update_idletasks()
+    except Exception as e:
+        print(f"Status Error: {e}")
 
-            set_status_message("Quick Evaluation added to personal_catalog.pgn!")
-        except Exception as e:
-            set_status_message(f"Failed to add to catalog: {e}")
+
+def start_progress(indeterminate=False):
+    """Prepares the progress bar to run."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            pb.configure(progress_color="#DD0000")
+            if indeterminate:
+                pb.configure(mode="indeterminate")
+                pb.start()
+            else:
+                pb.configure(mode="determinate")
+                pb.set(0.0)
+
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Start Error: {e}")
+
+
+def update_progress(value):
+    """Grows the red bar from left to right (value between 0.0 and 1.0)."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            clamped_val = max(0.0, min(1.0, value))
+            pb.set(clamped_val)
+
+            if clamped_val >= 1.0:
+                stop_progress()
+                return
+
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Update Error: {e}")
+
+
+def stop_progress():
+    """Resets the progress bar back to empty (0.0)."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            try:
+                pb.stop()
+            except Exception:
+                pass
+
+            pb.set(0.0)
+
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Stop Error: {e}")
 
 
 # --- TOP LEVEL FUNCTIONS ---
@@ -203,7 +279,6 @@ def create_sidebar(app, on_navigate_callback=None):
     state.left_frame = sidebar
     state.sidebar_visible = True
 
-    # Lock column 0 to match the new narrower width (~105px instead of 150)
     if hasattr(app, "grid_columnconfigure"):
         app.grid_columnconfigure(0, minsize=105, weight=0)
 
