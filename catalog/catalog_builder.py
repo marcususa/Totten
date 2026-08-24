@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import threading
 import chess.pgn
 import duckdb
 from gui.statusbar import update_progress, set_status_message
@@ -21,7 +22,7 @@ def get_header(headers, key, default="Unknown"):
     return default
 
 
-def catalog_pgns(filename):
+def catalog_pgns(filename, progress_callback=None):
     """
     Parses a PGN file and appends its games directly into DuckDB and personal_catalog.pgn
     with live progress updates.
@@ -96,23 +97,43 @@ def catalog_pgns(filename):
             ))
             added_count += 1
 
-            # Update progress incrementally from 0.8 (80%) to 0.98 (98%) during catalog building
-            if added_count % 20 == 0:
-                current_pos = f_in.tell()
-                # Map file reading progress from 0.8 to 0.98 range
-                fraction = 0.8 + min(0.18, 0.18 * (current_pos / file_size))
-                update_progress(fraction)
+    # Signal Phase 1 is done, moving to DB save
+    if progress_callback:
+        progress_callback("phase_1_complete")
 
     # Batch insert into DuckDB
     if games_to_insert:
         set_status_message("Saving to database...")
-        update_progress(0.99)
         con.executemany("""
                         INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, games_to_insert)
 
     con.close()
-    update_progress(1.0)
+
+    if progress_callback:
+        progress_callback("phase_2_complete")
+
     print(f"[Catalog Builder] Successfully ingested {added_count} games into DuckDB.")
     return added_count
+
+
+def run_import_in_background(filename, tk_root=None, on_complete_callback=None, progress_callback=None):
+    """
+    Runs catalog_pgns in a background daemon thread with smooth progress callbacks.
+    """
+
+    def worker():
+        try:
+            count = catalog_pgns(filename, progress_callback=progress_callback)
+            if on_complete_callback:
+                if tk_root and hasattr(tk_root, "after"):
+                    tk_root.after(0, lambda: on_complete_callback(count))
+                else:
+                    on_complete_callback(count)
+        except Exception as e:
+            print(f"[Error] Cataloging failed in background: {e}")
+            set_status_message("Import failed.")
+
+    import_thread = threading.Thread(target=worker, daemon=True)
+    import_thread.start()
