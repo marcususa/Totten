@@ -2,7 +2,6 @@ import json
 import os
 from pathlib import Path
 from tkinter import messagebox, filedialog
-from .splash import LoadingOverlay
 import threading
 import random
 import customtkinter as ctk
@@ -11,7 +10,12 @@ import duckdb
 
 import gui.app_state as state
 import chess
+# Updated import to include progress controls
+from gui.statusbar import set_status_message, start_progress, update_progress, stop_progress
+
+from gui.sidebar import start_progress, update_progress, stop_progress
 from gui.statusbar import set_status_message
+
 
 STANDARD_TAG_BANK = {
     "essential": {"ECO", "Opening", "Variation", "Games"},
@@ -239,7 +243,6 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 border_width=2
             )
 
-            # Dynamic hover color adjustment based on check state
             def on_enter(e, c=chk, v=var):
                 c.configure(hover_color="#3b5998" if v.get() else "#2e4a8c")
 
@@ -526,26 +529,25 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         if unloaded_count == 0:
             return
 
-        overlay = None
-        try:
-            overlay = LoadingOverlay(self, title_text="Totten", message=f"Loading ECO {cat} games... (0/{unloaded_count})")
-            self.update_idletasks()
-        except Exception:
-            pass
-
         set_status_message(f"Loading games for ECO {cat} ({unloaded_count} games)...")
-        threading.Thread(target=self._background_load_eco_section_worker, args=(cat, overlay), daemon=True).start()
+        # Start progress bar for lazy section parsing
+        start_progress(indeterminate=False)
+        update_progress(0.0)
 
-    def _background_load_eco_section_worker(self, target_cat, overlay):
+        threading.Thread(target=self._background_load_eco_section_worker, args=(cat,), daemon=True).start()
+
+    def _background_load_eco_section_worker(self, target_cat):
         if not self.pgn_path.exists():
-            if overlay:
-                try:
-                    overlay.close()
-                except Exception:
-                    pass
+            self.after(0, stop_progress)
             return
 
+        file_size = self.pgn_path.stat().st_size if self.pgn_path.exists() else 1
+        if file_size == 0:
+            file_size = 1
+
         updated_items = {}
+        processed_count = 0
+
         try:
             with open(self.pgn_path, "r", encoding="utf-8", errors="replace") as f:
                 while True:
@@ -568,12 +570,20 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                             "headers": cleaned,
                             "game_object": game
                         })
+                        processed_count += 1
+
+                        # Periodically update progress safely on main UI thread
+                        if processed_count % 15 == 0:
+                            current_pos = f.tell()
+                            fraction = min(0.95, current_pos / file_size)
+                            self.after(0, lambda p=fraction: update_progress(p))
+
         except Exception as e:
             print(f"Error lazy loading ECO {target_cat}: {e}")
 
-        self.after(0, lambda: self._merge_lazy_eco_section(target_cat, updated_items, overlay))
+        self.after(0, lambda: self._merge_lazy_eco_section(target_cat, updated_items))
 
-    def _merge_lazy_eco_section(self, target_cat, updated_items, overlay):
+    def _merge_lazy_eco_section(self, target_cat, updated_items):
         for item in self.aggregated_games_data:
             eco = item["eco"]
             eco_base = eco[0].upper() if eco else "A"
@@ -582,14 +592,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 if key in updated_items:
                     item["instances"] = updated_items[key]
 
-        if overlay:
-            try:
-                overlay.close()
-            except Exception:
-                pass
-
         self.refresh_current_view()
         set_status_message(f"ECO {target_cat} loaded.")
+        update_progress(1.0)
+        stop_progress()
 
     def toggle_group_expansion(self, group_key):
         if group_key in self.expanded_groups:
@@ -629,14 +635,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
     def load_catalog(self):
         set_status_message("Loading catalog via DuckDB...")
-
-        if hasattr(self, "loading_overlay") and self.loading_overlay:
-            try:
-                self.loading_overlay.close()
-            except Exception:
-                pass
-
-        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Initializing catalog...")
+        start_progress(indeterminate=False)
+        update_progress(0.1)
 
         self.aggregated_games_data = []
         self.refresh_current_view()
@@ -651,6 +651,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                     catalog_data = json.load(f)
             except Exception as e:
                 print(f"Error loading catalog json: {e}")
+
+        self.after(0, lambda: update_progress(0.3))
 
         grouped_variations = {}
         total_raw_games = 0
@@ -673,7 +675,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             existing_count = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
             print(f"[Catalog Import] Existing games in DuckDB: {existing_count}")
 
-            self.after(0, lambda: self.loading_overlay.update_message("Building and querying variation groups..."))
+            self.after(0, lambda: update_progress(0.5))
 
             query_res = con.execute("""
                 SELECT eco, opening, variation, COUNT(*), json_group_array(headers_json)
@@ -684,9 +686,12 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             total_raw_games = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
             con.close()
 
+            self.after(0, lambda: update_progress(0.75))
+
             print(f"[Catalog Import] Total catalog size: {total_raw_games} games across {len(query_res)} variation groups.")
 
-            for row in query_res:
+            total_rows = len(query_res)
+            for idx, row in enumerate(query_res):
                 eco, opening, variation, count, headers_json_list = row
                 key = (eco, opening, variation)
 
@@ -709,6 +714,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                     "instances": instances
                 }
 
+                if idx % 50 == 0 and total_rows > 0:
+                    frac = 0.75 + 0.20 * (idx / total_rows)
+                    self.after(0, lambda p=frac: update_progress(p))
+
         except Exception as e:
             print(f"Error indexing catalog with DuckDB: {e}")
 
@@ -722,14 +731,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.session_representative_cache.clear()
         self.refresh_current_view()
 
-        if hasattr(self, "loading_overlay") and self.loading_overlay:
-            try:
-                self.loading_overlay.close()
-            except Exception:
-                pass
-
         set_status_message(
             f"Catalog indexed via DuckDB: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups across A–E sections.")
+        update_progress(1.0)
+        stop_progress()
 
     def apply_filter(self):
         self.refresh_current_view()
