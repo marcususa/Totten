@@ -10,12 +10,7 @@ import duckdb
 
 import gui.app_state as state
 import chess
-# Updated import to include progress controls
-from gui.statusbar import set_status_message, start_progress, update_progress, stop_progress
-
-from gui.sidebar import start_progress, update_progress, stop_progress
-from gui.statusbar import set_status_message
-
+from gui.sidebar import set_status_message, start_progress, update_progress, stop_progress
 
 STANDARD_TAG_BANK = {
     "essential": {"ECO", "Opening", "Variation", "Games"},
@@ -27,8 +22,11 @@ STANDARD_TAG_BANK = {
 
 
 class SearchCatalogWorkspace(ctk.CTkFrame):
-    def __init__(self, master, app_state=None):
-        super().__init__(master, fg_color="#344268", corner_radius=0)
+    def __init__(self, master, app_state=None, *args, **kwargs):
+        # Pop custom app_state or extra kwargs if passed to prevent CustomTkinter errors
+        kwargs.pop("app_state", None)
+        kwargs.pop("filename", None)
+        super().__init__(master, fg_color="#344268", corner_radius=0, *args, **kwargs)
         self.app_state = app_state or state
 
         self.json_path = Path("personal_catalog.json")
@@ -178,24 +176,27 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
     def get_first_n_moves_str(self, game_obj, n=10):
         if not game_obj:
             return ""
-        board = game_obj.board()
-        moves_san = []
-        for node in game_obj.mainline():
-            if len(moves_san) >= n * 2:
-                break
-            moves_san.append(board.san(node.move))
-            board.push(node.move)
+        try:
+            board = game_obj.board()
+            moves_san = []
+            for node in game_obj.mainline():
+                if len(moves_san) >= n * 2:
+                    break
+                moves_san.append(board.san(node.move))
+                board.push(node.move)
 
-        formatted_moves = []
-        for i in range(0, len(moves_san), 2):
-            move_num = (i // 2) + 1
-            white_move = moves_san[i]
-            black_move = moves_san[i + 1] if i + 1 < len(moves_san) else ""
-            if black_move:
-                formatted_moves.append(f"{move_num}. {white_move} {black_move}")
-            else:
-                formatted_moves.append(f"{move_num}. {white_move}")
-        return "  ".join(formatted_moves)
+            formatted_moves = []
+            for i in range(0, len(moves_san), 2):
+                move_num = (i // 2) + 1
+                white_move = moves_san[i]
+                black_move = moves_san[i + 1] if i + 1 < len(moves_san) else ""
+                if black_move:
+                    formatted_moves.append(f"{move_num}. {white_move} {black_move}")
+                else:
+                    formatted_moves.append(f"{move_num}. {white_move}")
+            return "  ".join(formatted_moves)
+        except Exception:
+            return ""
 
     def open_all_tags_dialog(self):
         dialog = ctk.CTkToplevel(self)
@@ -358,9 +359,6 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         for cat in ["A", "B", "C", "D", "E"]:
             items = eco_sections[cat]
-            if not items:
-                continue
-
             theme = eco_theme_config[cat]
             is_eco_expanded = cat in self.expanded_eco_sections
 
@@ -386,9 +384,6 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                         item_copy["instances"] = matching_instances
                         item_copy["count"] = len(matching_instances)
                         filtered_items.append((item_copy, matching_instances))
-
-            if not filtered_items:
-                continue
 
             unique_openings = sorted(list(
                 {item["opening"] for item, _ in filtered_items if item["opening"] and item["opening"] != "Unknown"}))
@@ -430,6 +425,15 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                 content_container = ctk.CTkFrame(group_frame, fg_color="transparent")
                 content_container.pack(fill="x", padx=4, pady=(0, 4))
                 content_container.grid_columnconfigure(0, weight=1)
+
+                if not filtered_items:
+                    lbl_empty = ctk.CTkLabel(
+                        content_container,
+                        text="   No games or entries found for this section.",
+                        font=("Arial", 11, "italic"),
+                        text_color="#94a3b8"
+                    )
+                    lbl_empty.pack(anchor="w", padx=8, pady=4)
 
                 for item_data, instances in filtered_items:
                     eco = item_data["eco"]
@@ -526,22 +530,24 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                     if inst.get("game_object") is None:
                         unloaded_count += 1
 
-        if unloaded_count == 0:
+        if unloaded_count == 0 and any(item["eco"].startswith(cat) for item in self.aggregated_games_data):
             return
 
-        set_status_message(f"Loading games for ECO {cat} ({unloaded_count} games)...")
-        # Start progress bar for lazy section parsing
+        set_status_message(f"Loading games for ECO {cat}...")
         start_progress(indeterminate=False)
         update_progress(0.0)
 
         threading.Thread(target=self._background_load_eco_section_worker, args=(cat,), daemon=True).start()
 
     def _background_load_eco_section_worker(self, target_cat):
-        if not self.pgn_path.exists():
+        eco_pgn = self.eco_files.get(target_cat)
+        source_pgn = eco_pgn if (eco_pgn and eco_pgn.exists()) else self.pgn_path
+
+        if not source_pgn.exists():
             self.after(0, stop_progress)
             return
 
-        file_size = self.pgn_path.stat().st_size if self.pgn_path.exists() else 1
+        file_size = source_pgn.stat().st_size if source_pgn.exists() else 1
         if file_size == 0:
             file_size = 1
 
@@ -549,7 +555,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         processed_count = 0
 
         try:
-            with open(self.pgn_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(source_pgn, "r", encoding="utf-8", errors="replace") as f:
                 while True:
                     game = chess.pgn.read_game(f)
                     if game is None:
@@ -572,8 +578,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                         })
                         processed_count += 1
 
-                        # Periodically update progress safely on main UI thread
-                        if processed_count % 15 == 0:
+                        if processed_count % 10 == 0:
                             current_pos = f.tell()
                             fraction = min(0.95, current_pos / file_size)
                             self.after(0, lambda p=fraction: update_progress(p))
@@ -584,18 +589,31 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.after(0, lambda: self._merge_lazy_eco_section(target_cat, updated_items))
 
     def _merge_lazy_eco_section(self, target_cat, updated_items):
+        existing_keys = set()
         for item in self.aggregated_games_data:
             eco = item["eco"]
             eco_base = eco[0].upper() if eco else "A"
             if eco_base == target_cat:
                 key = (eco, item["opening"], item["variation"])
+                existing_keys.add(key)
                 if key in updated_items:
                     item["instances"] = updated_items[key]
+                    item["count"] = len(updated_items[key])
+
+        for key, instances in updated_items.items():
+            if key not in existing_keys:
+                eco, opening, variation = key
+                self.aggregated_games_data.append({
+                    "eco": eco,
+                    "opening": opening,
+                    "variation": variation,
+                    "count": len(instances),
+                    "instances": instances
+                })
 
         self.refresh_current_view()
         set_status_message(f"ECO {target_cat} loaded.")
         update_progress(1.0)
-        stop_progress()
 
     def toggle_group_expansion(self, group_key):
         if group_key in self.expanded_groups:
@@ -607,21 +625,51 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
     def on_game_click(self, game_data):
         if not game_data:
             return
-        game_obj = game_data.get("game_object")
+
         headers = game_data.get("headers", {})
         white = self.get_header(headers, "White", "Unknown")
         black = self.get_header(headers, "Black", "Unknown")
-
         set_status_message(f"Loading analysis: {white} vs {black}")
 
-        if game_obj:
-            if hasattr(self.app_state, "set_active_analysis_game"):
-                self.app_state.set_active_analysis_game(game_obj)
-            elif hasattr(self.app_state, "load_analysis_game"):
-                self.app_state.load_analysis_game(game_obj)
+        game_obj = game_data.get("game_object")
+        if not game_obj:
+            eco = self.get_header(headers, "ECO", "A00")
+            cat = eco[0].upper() if eco else "A"
+            eco_pgn = self.eco_files.get(cat)
+            source_pgn = eco_pgn if (eco_pgn and eco_pgn.exists()) else self.pgn_path
 
-            if hasattr(self.app_state, "show_analysis_workspace") and self.app_state.show_analysis_workspace:
-                self.app_state.show_analysis_workspace()
+            if source_pgn.exists():
+                try:
+                    with open(source_pgn, "r", encoding="utf-8", errors="replace") as f:
+                        while True:
+                            parsed_game = chess.pgn.read_game(f)
+                            if parsed_game is None:
+                                break
+
+                            p_white = parsed_game.headers.get("White", "")
+                            p_black = parsed_game.headers.get("Black", "")
+                            if p_white == white and p_black == black:
+                                game_obj = parsed_game
+                                game_data["game_object"] = parsed_game
+                                break
+                except Exception as err:
+                    print(f"Error reading game on click: {err}")
+
+        if not game_obj:
+            set_status_message("Error: Could not load game data.")
+            return
+
+        try:
+            from gui.catalog_workspace import load_game_from_catalog
+            load_game_from_catalog(game_obj, target_workspace="analysis")
+        except Exception as e:
+            print(f"Error calling load_game_from_catalog: {e}")
+            ws = getattr(self.app_state, "workspace", None) or getattr(state, "workspace", None)
+            if ws and hasattr(ws, "load_game_and_switch"):
+                ws.load_game_and_switch(game_obj, target_workspace="analysis")
+            elif ws and hasattr(ws, "show_workspace"):
+                setattr(self.app_state, "active_analysis_game", game_obj)
+                ws.show_workspace("analysis")
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
@@ -634,6 +682,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             self.refresh_current_view()
 
     def load_catalog(self):
+        self.pack_propagate(True)
         set_status_message("Loading catalog via DuckDB...")
         start_progress(indeterminate=False)
         update_progress(0.1)
@@ -658,68 +707,64 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         total_raw_games = 0
 
         try:
-            con = duckdb.connect(str(self.db_path))
+            if self.db_path.exists():
+                con = duckdb.connect(str(self.db_path))
 
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS catalog_headers (
-                    game_index INTEGER,
-                    eco VARCHAR,
-                    opening VARCHAR,
-                    variation VARCHAR,
-                    white VARCHAR,
-                    black VARCHAR,
-                    headers_json VARCHAR
-                )
-            """)
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS catalog_headers (
+                        game_index INTEGER,
+                        eco VARCHAR,
+                        opening VARCHAR,
+                        variation VARCHAR,
+                        white VARCHAR,
+                        black VARCHAR,
+                        headers_json VARCHAR
+                    )
+                """)
 
-            existing_count = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
-            print(f"[Catalog Import] Existing games in DuckDB: {existing_count}")
+                self.after(0, lambda: update_progress(0.5))
 
-            self.after(0, lambda: update_progress(0.5))
+                query_res = con.execute("""
+                    SELECT eco, opening, variation, COUNT(*), json_group_array(headers_json)
+                    FROM catalog_headers
+                    GROUP BY eco, opening, variation
+                """).fetchall()
 
-            query_res = con.execute("""
-                SELECT eco, opening, variation, COUNT(*), json_group_array(headers_json)
-                FROM catalog_headers
-                GROUP BY eco, opening, variation
-            """).fetchall()
+                total_raw_games = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
+                con.close()
 
-            total_raw_games = con.execute("SELECT COUNT(*) FROM catalog_headers").fetchone()[0]
-            con.close()
+                self.after(0, lambda: update_progress(0.75))
 
-            self.after(0, lambda: update_progress(0.75))
+                total_rows = len(query_res)
+                for idx, row in enumerate(query_res):
+                    eco, opening, variation, count, headers_json_list = row
+                    key = (eco, opening, variation)
 
-            print(f"[Catalog Import] Total catalog size: {total_raw_games} games across {len(query_res)} variation groups.")
+                    instances = []
+                    try:
+                        parsed_list = json.loads(headers_json_list)
+                        for h_dict in parsed_list:
+                            instances.append({
+                                "headers": h_dict,
+                                "game_object": None
+                            })
+                    except Exception:
+                        pass
 
-            total_rows = len(query_res)
-            for idx, row in enumerate(query_res):
-                eco, opening, variation, count, headers_json_list = row
-                key = (eco, opening, variation)
+                    grouped_variations[key] = {
+                        "eco": eco,
+                        "opening": opening,
+                        "variation": variation,
+                        "count": count,
+                        "instances": instances
+                    }
 
-                instances = []
-                try:
-                    parsed_list = json.loads(headers_json_list)
-                    for h_dict in parsed_list:
-                        instances.append({
-                            "headers": h_dict,
-                            "game_object": None
-                        })
-                except Exception:
-                    pass
-
-                grouped_variations[key] = {
-                    "eco": eco,
-                    "opening": opening,
-                    "variation": variation,
-                    "count": count,
-                    "instances": instances
-                }
-
-                if idx % 50 == 0 and total_rows > 0:
-                    frac = 0.75 + 0.20 * (idx / total_rows)
-                    self.after(0, lambda p=frac: update_progress(p))
+                    if idx % 50 == 0 and total_rows > 0:
+                        frac = 0.75 + 0.20 * (idx / total_rows)
+                        self.after(0, lambda p=frac: update_progress(p))
 
         except Exception as e:
-            print(f"Error indexing catalog with DuckDB: {e}")
+            print(f"Error indexing catalog withDuckDB: {e}")
 
         final_headers_data = list(grouped_variations.values())
         self.after(0, lambda: self._finalize_catalog_load(final_headers_data, catalog_data, total_raw_games))
@@ -729,12 +774,15 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.catalog = catalog_data
 
         self.session_representative_cache.clear()
+
+        self.pack_propagate(True)
+        self.update_idletasks()
+
         self.refresh_current_view()
 
         set_status_message(
-            f"Catalog indexed via DuckDB: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups across A–E sections.")
+            f"Catalog indexed: {total_raw_games} games structured into {len(self.aggregated_games_data)} variation groups across A–E sections.")
         update_progress(1.0)
-        stop_progress()
 
     def apply_filter(self):
         self.refresh_current_view()

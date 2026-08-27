@@ -1,5 +1,4 @@
 import tkinter as tk
-import webbrowser
 import customtkinter as ctk
 import gui.app_state as state
 from pgn.importer import import_pgn, import_fen, reset_importer_state
@@ -8,41 +7,29 @@ from gui.sidebar import toggle_sidebar
 from .splash import LoadingOverlay
 
 
+def get_workspace_parent():
+    """Safely resolves the correct master container for workspace frames."""
+    if hasattr(state, "workspace") and state.workspace and getattr(state.workspace, "master", None):
+        return state.workspace.master
+    if hasattr(state, "left_frame") and state.left_frame and getattr(state.left_frame, "master", None):
+        return state.left_frame.master
+    return getattr(state, "app_root", None)
+
+
 def handle_clear_catalog():
     """
     1. Clears backend catalog JSON/DB state.
     2. Resets in-memory import lists & sidebar tracking.
-    3. Archives/rotates active 'personal_catalog.pgn' and resets active PGN workspaces.
+    3. Archives/rotates active 'personal_catalog.pgn' and resets active PGN views.
     4. Clears treeview UI state to show 0 games.
     """
     clear_catalog()
     reset_importer_state()
 
-    if hasattr(state, "workspaces"):
-        for key in ["pgn_games", "edit"]:
-            if key in state.workspaces:
-                workspace_obj = state.workspaces[key]
-                if hasattr(workspace_obj, "clear_and_reset_catalog"):
-                    workspace_obj.clear_and_reset_catalog()
-                elif hasattr(workspace_obj, "clear_table"):
-                    workspace_obj.clear_table()
-                elif hasattr(workspace_obj, "load_games"):
-                    workspace_obj.load_games("personal_catalog.pgn")
-
-    if hasattr(state, "workspaces"):
-        for key in ["catalog", "search_catalog", "search"]:
-            if key in state.workspaces:
-                workspace_obj = state.workspaces[key]
-                if hasattr(workspace_obj, "load_catalog"):
-                    workspace_obj.load_catalog()
-                elif hasattr(workspace_obj, "load_data"):
-                    workspace_obj.load_data()
-
 
 def handle_import_pgn():
     """Ingests PGN directly into catalog with immediate overlay feedback, then jumps to Search Catalog."""
-    # Find active window/root to attach pre-loader overlay
-    root_window = state.workspaces.get("catalog") or state.app_root if hasattr(state, "app_root") else None
+    root_window = getattr(state, "app_root", None)
 
     overlay = None
     if root_window:
@@ -65,82 +52,69 @@ def handle_import_pgn():
 
 
 def handle_import_fen():
-    """Ingests FEN directly, then jumps straight to Search Catalog Workspace."""
+    """Ingests FEN directly, then jumps straight to Search Catalog."""
     import_fen()
     show_catalog()
 
 
 def show_catalog():
-    """Switches to the Search Catalog Workspace and reloads latest data."""
-    from gui.workspace import show_workspace
-
-    target_key = "catalog"
-    if hasattr(state, "workspaces"):
-        for key in ["catalog", "search_catalog", "search"]:
-            if key in state.workspaces:
-                target_key = key
-                break
-
-    show_workspace(target_key)
-
-    if hasattr(state, "workspaces") and target_key in state.workspaces:
-        workspace_obj = state.workspaces[target_key]
-        if hasattr(workspace_obj, "load_catalog"):
-            workspace_obj.load_catalog()
-        elif hasattr(workspace_obj, "load_data"):
-            workspace_obj.load_data()
+    """Refreshes and brings the Search Catalog view to focus."""
+    parent = get_workspace_parent()
+    if parent:
+        if not hasattr(state, "catalog_workspace") or not state.catalog_workspace:
+            from gui.search_catalog_workspace import SearchCatalogWorkspace
+            state.catalog_workspace = SearchCatalogWorkspace(parent, filename="personal_catalog.pgn")
+            state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        state.catalog_workspace.tkraise()
+        state.workspace = state.catalog_workspace
 
 
 def show_edit_workspace():
-    """Switches to the Edit Workspace for playlists, FEN overrides, and tag curation."""
-    from gui.workspace import show_workspace
-
-    target_key = "edit"
-    if hasattr(state, "workspaces"):
-        for key in ["edit", "edit_workspace"]:
-            if key in state.workspaces:
-                target_key = key
-                break
-
-    show_workspace(target_key)
-
-    if hasattr(state, "workspaces") and target_key in state.workspaces:
-        workspace_obj = state.workspaces[target_key]
-        if hasattr(workspace_obj, "refresh_view"):
-            workspace_obj.refresh_view()
+    """Switches to the Edit view for playlists, FEN overrides, and tag curation."""
+    parent = get_workspace_parent()
+    if parent:
+        if not hasattr(state, "edit_workspace") or not state.edit_workspace:
+            from gui.edit_workspace import EditWorkspace
+            state.edit_workspace = EditWorkspace(parent)
+            state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        state.edit_workspace.tkraise()
+        state.workspace = state.edit_workspace
 
 
 def show_analysis():
-    """Switches to the Analysis Workspace."""
-    from gui.workspace import show_workspace
-
-    target_key = "analysis"
-    if hasattr(state, "workspaces"):
-        for key in ["analysis", "pgn_games", "games"]:
-            if key in state.workspaces:
-                target_key = key
-                break
-
-    show_workspace(target_key)
-
-    if hasattr(state, "workspaces") and target_key in state.workspaces:
-        workspace_obj = state.workspaces[target_key]
-        if hasattr(workspace_obj, "refresh_view"):
-            workspace_obj.refresh_view()
-        elif hasattr(workspace_obj, "load_games"):
-            workspace_obj.load_games()
+    """Switches to the Analysis view."""
+    parent = get_workspace_parent()
+    if parent:
+        if not hasattr(state, "analysis_workspace") or not state.analysis_workspace:
+            from gui.analysis_workspace import AnalysisWorkspace
+            state.analysis_workspace = AnalysisWorkspace(parent)
+            state.analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        state.analysis_workspace.tkraise()
+        state.workspace = state.analysis_workspace
 
 
 def show_patterns():
-    """Switches to the Patterns Workspace."""
-    from gui.workspace import show_workspace
-    show_workspace("patterns")
+    """Switches to the Patterns view."""
+    parent = get_workspace_parent()
+    if parent:
+        if not hasattr(state, "patterns_workspace") or not state.patterns_workspace:
+            from gui.patterns_workspace import PatternsWorkspace
+            state.patterns_workspace = PatternsWorkspace(parent)
+            state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        state.patterns_workspace.tkraise()
+        state.workspace = state.patterns_workspace
 
 
 def show_calendar():
-    """Switches to the Calendar Workspace."""
-    from gui.workspace import show_workspace
-    show_workspace("calendar")
+    """Switches to the Calendar view."""
+    parent = get_workspace_parent()
+    if parent:
+        if not hasattr(state, "calendar_workspace") or not state.calendar_workspace:
+            from gui.calendar_workspace import CalendarWorkspace
+            state.calendar_workspace = CalendarWorkspace(parent)
+            state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        state.calendar_workspace.tkraise()
+        state.workspace = state.calendar_workspace
 
 
 def show_about_dialog():

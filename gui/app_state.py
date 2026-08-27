@@ -1,76 +1,201 @@
-# gui/app_state.py
+import sys
+import inspect
+import importlib.util
+from pathlib import Path
+import chess.pgn
+import gui.app_state as state
+from tkinter import filedialog
+from gui.statusbar import set_status_message, start_progress, update_progress, stop_progress
 
-app = None
-left_frame = None
-workspace = None
-status = None
-sidebar = None
-pgn_node = None
-pgn_games_node = None
-mixed_collections_node = None
-catalog_node = None
-notes_node = None
+# Resolve path to catalog_builder.py in cousin folder /catalog/
+CATALOG_BUILDER_PATH = Path(__file__).resolve().parent.parent / "catalog" / "catalog_builder.py"
 
-loaded_games = {}
-pgn_lookup = {}
-pgn_item_lookup = {}
-pgn_games_lookup = {}
-game_data_vars = {}
-other_data_vars = {}
-tag_corrections = {}
-depth_menu = None
-rating_filter = None
-
-imported_files = []
-cataloged_files = []
-sidebar_visible = True
-
-# Global analysis tracking
-active_analysis_game = None
-current_analysis_node = None
-_analysis_callbacks = []
+spec = importlib.util.spec_from_file_location("catalog_builder", CATALOG_BUILDER_PATH)
+catalog_builder = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(catalog_builder)
 
 
-def register_analysis_callback(callback):
-    """Register a function to be called when an analysis game is selected."""
-    if callback not in _analysis_callbacks:
-        _analysis_callbacks.append(callback)
+def reset_importer_state():
+    """Resets in-memory tracking lists and removes imported nodes from the sidebar tree."""
+    state.imported_files = []
+    state.pgn_games_lookup = {}
+    state.pgn_lookup = {}
+    state.current_filename = None
+
+    tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
+    pgn_item_lookup = getattr(state, 'pgn_item_lookup', {})
+
+    if tree_widget and hasattr(tree_widget, 'delete'):
+        for item_id in pgn_item_lookup.values():
+            try:
+                tree_widget.delete(item_id)
+            except Exception:
+                pass
+        state.pgn_item_lookup = {}
 
 
-def set_active_analysis_game(game_node):
-    """Stores the active game node globally and notifies all registered listeners."""
-    global active_analysis_game, current_analysis_node
-    active_analysis_game = game_node
-    current_analysis_node = game_node
+def force_search_catalog_view():
+    """Placeholder for maintaining view stability during imports."""
+    pass
 
-    for callback in _analysis_callbacks:
+
+def import_pgn():
+    print("1 - import_pgn started")
+
+    filename = filedialog.askopenfilename(
+        title="Import PGN",
+        filetypes=[("PGN Files", "*.pgn"), ("All Files", "*.*")]
+    )
+
+    if not filename:
+        return
+
+    root_window = getattr(state, "app_root", None)
+
+    if root_window:
         try:
-            callback(game_node)
-        except Exception as e:
-            print(f"Error updating analysis callback: {e}")
+            root_window.update()
+        except Exception:
+            pass
+
+    print(f"2 - Selected: {filename}")
+    short_name = Path(filename).name
+
+    if not hasattr(state, 'imported_files'):
+        state.imported_files = []
+    if not hasattr(state, 'pgn_games_lookup'):
+        state.pgn_games_lookup = {}
+    if not hasattr(state, 'pgn_lookup'):
+        state.pgn_lookup = {}
+
+    # Check duplicate in memory
+    if filename in state.imported_files:
+        set_status_message(f"{short_name} is already imported.")
+        return
+
+    # Start progress bar for Phase 1 (Reading file)
+    start_progress(indeterminate=False)
+    set_status_message(f"Reading {short_name}...")
+
+    # Smoothly climb from 0% to 48% while reading
+    def start_phase_1_ticker():
+        def tick(val=0.0):
+            if val < 0.48:
+                new_val = val + 0.02
+                update_progress(new_val)
+                if root_window and hasattr(root_window, "after"):
+                    root_window.after(200, lambda: tick(new_val))
+
+        tick(0.0)
+
+    start_phase_1_ticker()
+
+    # --- 1. Parse PGN Games into memory ---
+    games = []
+    try:
+        with open(filename, "r", encoding="utf-8", errors="replace") as pgn_file:
+            while True:
+                game = chess.pgn.read_game(pgn_file)
+                if game is None:
+                    break
+                games.append(game)
+    except Exception as e:
+        print(f"Error reading PGN file: {e}")
+        stop_progress()
+        set_status_message(f"Failed to read {short_name}")
+        return
+
+    state.pgn_games_lookup[filename] = games
+    state.imported_files.insert(0, filename)
+    state.pgn_lookup[short_name] = filename
+    state.current_filename = filename
+
+    print(f"3 - Successfully loaded {len(games)} games from {short_name}")
+
+    # --- 2. Handle progress animation events from background thread ---
+    def handle_catalog_progress(event_type):
+        if event_type == "phase_1_complete":
+            update_progress(0.5)
+            set_status_message("Saving to database...")
+
+            # Smoothly climb from 50% to 95% while DuckDB saves
+            def tick_db(val=0.5):
+                if val < 0.95:
+                    new_val = val + 0.02
+                    update_progress(new_val)
+                    if root_window and hasattr(root_window, "after"):
+                        root_window.after(300, lambda: tick_db(new_val))
+
+            tick_db(0.5)
+
+        elif event_type == "phase_2_complete":
+            update_progress(1.0)
+
+    def on_catalog_complete(added_count):
+        print(f"Catalog builder processed {added_count} new games.")
+        update_progress(1.0)
+        stop_progress()
+
+        # Update Sidebar Tree
+        tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
+        parent_node = getattr(state, 'pgn_games_node', '')
+
+        if tree_widget and hasattr(tree_widget, 'insert'):
+            pgn_item = tree_widget.insert(
+                parent_node,
+                0,
+                text=short_name,
+                open=True
+            )
+            if not hasattr(state, 'pgn_item_lookup'):
+                state.pgn_item_lookup = {}
+            state.pgn_item_lookup[filename] = pgn_item
+
+            tree_widget.insert(pgn_item, "end", text="Game Data")
+
+        set_status_message(f"Added {short_name} ({len(games)} games) to catalog.")
+
+    # --- 3. Kick off database building in the background thread ---
+    try:
+        if hasattr(catalog_builder, "run_import_in_background"):
+            catalog_builder.run_import_in_background(
+                filename,
+                tk_root=root_window,
+                on_complete_callback=on_catalog_complete,
+                progress_callback=handle_catalog_progress
+            )
+        else:
+            added_count = catalog_builder.catalog_pgns(filename)
+            on_catalog_complete(added_count)
+    except Exception as err:
+        print(f"Warning: background cataloging failed: {err}")
+        stop_progress()
 
 
-# Alias to support any existing calls to load_analysis_game
-def load_analysis_game(game_node):
-    set_active_analysis_game(game_node)
+def import_fen():
+    print("Import FEN selected")
 
 
-def reset_state():
-    """Wipes all in-memory game data, lookups, and imported file tracking."""
-    global loaded_games, pgn_lookup, pgn_item_lookup, pgn_games_lookup
-    global game_data_vars, other_data_vars, tag_corrections
-    global imported_files, cataloged_files
-    global active_analysis_game, current_analysis_node
+# --- Added Catalog -> Analysis Linking Bridges ---
 
-    loaded_games.clear()
-    pgn_lookup.clear()
-    pgn_item_lookup.clear()
-    pgn_games_lookup.clear()
-    game_data_vars.clear()
-    other_data_vars.clear()
-    tag_corrections.clear()
+def set_active_analysis_game(game_obj):
+    """
+    Directly routes a game selected in Search Catalog to the Analysis view.
+    """
+    state.active_game = game_obj
+    analysis_ws = getattr(state, 'analysis_workspace', None)
 
-    imported_files.clear()
-    cataloged_files.clear()
-    active_analysis_game = None
-    current_analysis_node = None
+    if analysis_ws:
+        if hasattr(analysis_ws, 'load_game'):
+            analysis_ws.load_game(game_obj)
+        elif hasattr(analysis_ws, 'set_game'):
+            analysis_ws.set_game(game_obj)
+        elif hasattr(analysis_ws, 'set_active_game'):
+            analysis_ws.set_active_game(game_obj)
+
+
+def show_analysis_workspace():
+    """
+    Switches the UI view directly to Analysis.
+    """
+    pass

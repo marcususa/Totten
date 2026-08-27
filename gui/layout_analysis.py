@@ -9,7 +9,6 @@ from gui.statusbar import set_status_message
 from core.constants import CONFIG_FILE
 from gui.chess_board import ChessBoardWidget
 
-# File 1 module titled "layout_analysis.py"
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -58,87 +57,68 @@ class LayoutAnalysisMixin:
     def __init__(self, parent, filename=None):
         pass
 
+    def pop_out_board(self, *args, **kwargs):
+        """Alias for popout_board to maintain compatibility across workspaces."""
+        if hasattr(self, "popout_board_window"):
+            return self.popout_board_window(*args, **kwargs)
+        elif hasattr(self, "popout_board"):
+            return self.popout_board(*args, **kwargs)
+
+    def load_game(self, game_node, category_source=None):
+        """Universal entry point. Delegates to specialized hardwired methods if available."""
+        if hasattr(self, "load_game_hardwired"):
+            return self.load_game_hardwired(game_node, category_source=category_source)
+        return self.load_game_from_state(game_node, category_source=category_source)
+
     def load_game_from_state(self, game_node, category_source=None):
-        """Called automatically when a game is clicked in the Catalog or Mixed Collections."""
+        """Base UI updater for board, text pane, and move traversal."""
+        if game_node is None:
+            return
+
         self.active_game = game_node
         self.root_game_node = game_node
         self.current_node = game_node
 
-        # Fallback to app_state if category_source wasn't passed directly
-        if category_source is None and hasattr(state, "active_category_source"):
-            category_source = state.active_category_source
-
-        # 1. Update the main chessboard widget using its required FEN bridge
+        # 1. Update main chessboard
         if hasattr(self, "board_widget") and self.board_widget:
-            fen_str = game_node.board().fen()
-            self.board_widget.set_position_fen(fen_str)
+            try:
+                fen_str = game_node.board().fen()
+                self.board_widget.set_position_fen(fen_str)
+            except Exception:
+                pass
 
-        # 1b. If the board is currently popped out, update that window too!
+        # 1b. Update popped-out board if active
         if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-            fen_str = game_node.board().fen()
-            self.popout_board.set_position_fen(fen_str)
+            try:
+                fen_str = game_node.board().fen()
+                self.popout_board.set_position_fen(fen_str)
+            except Exception:
+                pass
 
-        # 2. Display the full .pgn of the selected game
+        # 2. Display full PGN text
         if hasattr(self, "pgn_data_text") and self.pgn_data_text:
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
-            pgn_text_export = game_node.accept(exporter)
+            try:
+                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
+                pgn_text_export = game_node.accept(exporter)
 
-            self.pgn_data_text.configure(state="normal")
-            self.pgn_data_text.delete("1.0", "end")
-            self.pgn_data_text.insert("end", pgn_text_export)
-            self.pgn_data_text.configure(state="disabled")
+                self.pgn_data_text.configure(state="normal")
+                self.pgn_data_text.delete("1.0", "end")
+                self.pgn_data_text.insert("end", pgn_text_export)
+                self.pgn_data_text.configure(state="disabled")
+            except Exception:
+                pass
 
-        # 3. Handle Tree View population conditionally (Catalog vs Mixed List)
-        if hasattr(self, "pgn_tree") and hasattr(self, "preview_lookup"):
-            self.pgn_tree.delete(*self.pgn_tree.get_children())
-            self.preview_lookup.clear()
-
-            # CONDITIONAL: If category_source is a list of game objects (Mixed Collection)
-            if isinstance(category_source, list):
-                if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-                    self.lbl_empty_state.pack_forget()
-
-                for idx, g in enumerate(category_source, start=1):
-                    headers = g.headers
-                    white = headers.get("White", "Unknown")
-                    black = headers.get("Black", "Unknown")
-                    result = headers.get("Result", "*")
-
-                    item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
-                    self.preview_lookup[item_id] = g
-
-                    # Highlight the active game if it matches
-                    if g == game_node:
-                        self.pgn_tree.selection_set(item_id)
-                        self.pgn_tree.see(item_id)
-            elif isinstance(category_source, str) and hasattr(self, "load_games"):
-                # ONLY load from disk if category_source is explicitly a file path string
-                self.load_games(filename=category_source)
-
-                for item_id, g in self.preview_lookup.items():
-                    if g == game_node:
-                        self.pgn_tree.selection_set(item_id)
-                        self.pgn_tree.see(item_id)
-                        break
-            else:
-                # Fallback safety: Just display the single active game in the tree without touching disk
-                headers = game_node.headers
-                white = headers.get("White", "Unknown")
-                black = headers.get("Black", "Unknown")
-                result = headers.get("Result", "*")
-
-                item_id = self.pgn_tree.insert("", "end", values=(1, white, black, result))
-                self.preview_lookup[item_id] = game_node
-                self.pgn_tree.selection_set(item_id)
-
-        # 4. Load plain game moves into analysis view immediately so navigation & text window work
+        # 3. Load move list for analysis view navigation
         if hasattr(self, "_load_plain_game_moves"):
-            self._load_plain_game_moves(game_node)
-
+            try:
+                self._load_plain_game_moves(game_node)
+            except Exception:
+                pass
 
     def init_layout(self):
-        # Register the callback right when the layout builds so it's 100% active
-        state.register_analysis_callback(self.load_game_from_state)
+        # Register the callback right when the layout builds
+        if hasattr(state, "register_analysis_callback"):
+            state.register_analysis_callback(self.load_game)
 
         self.preview_lookup = {}
         self.active_game = None
@@ -150,17 +130,16 @@ class LayoutAnalysisMixin:
         self.popout_container = None
         self.is_board_popped_out = False
 
-        # --- ROOT CONTAINER (Using Grid for precise column sizing) ---
+        # --- ROOT CONTAINER ---
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Give the left column more proportional width (weight 3 vs 2)
         self.main_container.grid_columnconfigure(0, weight=3)
         self.main_container.grid_columnconfigure(1, weight=2)
         self.main_container.grid_rowconfigure(0, weight=1)
 
         # =========================================================================
-        # LEFT PANE CONTAINER (Chessboard on top, Auto-loaded Catalog Tree underneath)
+        # LEFT PANE CONTAINER (Chessboard on top, Hardwired Tree underneath)
         # =========================================================================
         self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
@@ -180,7 +159,6 @@ class LayoutAnalysisMixin:
             self.board_holder, text="[ Board Popped Out ]", text_color="#94a3b8"
         )
 
-        # Single row for all controls (Prev, Pop Out, Next) to save vertical space
         self.board_controls = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
         self.board_controls.pack(side="top", fill="x", padx=10, pady=(2, 10))
 
@@ -220,14 +198,14 @@ class LayoutAnalysisMixin:
         )
         self.btn_next.pack(side="left", padx=(4, 0))
 
-        # 2. Auto-loaded Catalog Panel (Directly beneath board)
+        # 2. Hardwired Tree Panel (Directly beneath board)
         self.top_catalog_panel = ctk.CTkFrame(self.left_pane_container, fg_color="#0f172a", corner_radius=8,
                                               border_width=1, border_color="#334155")
         self.top_catalog_panel.pack(side="top", fill="both", expand=True, padx=0, pady=0)
 
         self.lbl_empty_state = ctk.CTkLabel(
             self.top_catalog_panel,
-            text="No PGN games loaded in memory.",
+            text="No games loaded in memory.",
             font=ctk.CTkFont(size=11),
             text_color="gray70",
             wraplength=250
@@ -292,15 +270,26 @@ class LayoutAnalysisMixin:
         self.pgn_tree.column("black", width=145, anchor="w")
         self.pgn_tree.column("result", width=45, anchor="center")
 
+        def _on_tree_selection(event):
+            selected_items = self.pgn_tree.selection()
+            if not selected_items:
+                return
+            item_id = selected_items[0]
+            if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
+                game = self.preview_lookup[item_id]
+                if hasattr(self, "on_hardwired_tree_select"):
+                    self.on_hardwired_tree_select(game)
+                else:
+                    self.load_game_from_state(game)
+
+        self.pgn_tree.bind("<<TreeviewSelect>>", _on_tree_selection)
+
         self.pgn_scrollbar = ttk.Scrollbar(
             self.tree_frame,
             orient="vertical",
             command=self.pgn_tree.yview
         )
         self.pgn_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
-
-        self.pgn_tree.update_idletasks()
-
         self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
         self.pgn_scrollbar.pack(side="right", fill="y", padx=0, pady=0)
 
@@ -310,9 +299,9 @@ class LayoutAnalysisMixin:
         self.right_analysis_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.right_analysis_panel.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
 
-        self.right_analysis_panel.rowconfigure(0, weight=1)  # Analysis Frame
-        self.right_analysis_panel.rowconfigure(1, weight=1)  # Game Details (.PGN Data)
-        self.right_analysis_panel.rowconfigure(2, weight=0)  # Engine Controls Panel
+        self.right_analysis_panel.rowconfigure(0, weight=1)
+        self.right_analysis_panel.rowconfigure(1, weight=1)
+        self.right_analysis_panel.rowconfigure(2, weight=0)
         self.right_analysis_panel.columnconfigure(0, weight=1)
 
         # 1. Analysis Frame (Top Right)
@@ -341,14 +330,11 @@ class LayoutAnalysisMixin:
         )
         self.moves_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
 
-        # Text color tags
         self.moves_textbox.tag_config("red", foreground="#FF4444")
         self.moves_textbox.tag_config("orange", foreground="#FFA500")
         self.moves_textbox.tag_config("green", foreground="#00C851")
         self.moves_textbox.tag_config("light_blue", foreground="#33b5e5")
         self.moves_textbox.tag_config("default", foreground="#f8fafc")
-
-        # Active move badge tag with background color
         self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
 
         self.moves_textbox.pack(fill="both", expand=True, padx=0, pady=0)
@@ -371,7 +357,6 @@ class LayoutAnalysisMixin:
         self.candidates_textbox.tag_config("green", foreground="#00C851")
         self.candidates_textbox.tag_config("light_blue", foreground="#33b5e5")
         self.candidates_textbox.tag_config("default", foreground="#f8fafc")
-
         self.candidates_textbox.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
         # 2. Game Details Panel (Middle Right)
@@ -395,9 +380,9 @@ class LayoutAnalysisMixin:
         )
         self.pgn_data_text._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
         self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.pgn_data_text.insert("end", "[No game selected. Click a game from the catalog to load its PGN moves...]\n")
+        self.pgn_data_text.insert("end", "[No game selected. Click a game to load its PGN moves...]\n")
 
-        # 3. Engine Modes Frame (Bottom Right - Engines 1, 2, 3)
+        # 3. Engine Modes Frame (Bottom Right)
         self.controls_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color="#0f172a", corner_radius=8,
                                            border_width=1, border_color="#334155")
         self.controls_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)

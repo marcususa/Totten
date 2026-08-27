@@ -1,35 +1,22 @@
+# File titled "patterns_analysis.py"
+
 from pathlib import Path
 import chess.pgn
 from tkinter import ttk
 from gui.statusbar import set_status_message
 
-# Base PGN directory structure
-BASE_PGN_DIR = Path(__file__).resolve().parent.parent / "pgn"
-
-# Category folder mapping (matches edit_workspace.py)
-CATEGORY_FOLDER_MAP = {
-    "Open Events": ("open", "open_events.pgn"),
-    "Women's Events": ("women", "womens_events.pgn"),
-    "Tournaments": ("tournaments", "tournaments.pgn"),
-    "Matches": ("matches", "matches.pgn"),
-    "Championships": ("championships", "championships.pgn"),
-    "Openings": ("openings", "openings.pgn"),
-    "Middlegames": ("middlegames", "middlegames.pgn"),
-    "Endgames": ("endgames", "endgames.pgn"),
-    "Time Periods / Eras": ("era", "era.pgn"),
-    "Notable People / Players": ("players", "players.pgn"),
-}
+PATTERNS_ANALYSIS_FILE = Path(__file__).resolve().parent.parent / "pgn" / "patterns_analysis.pgn"
 
 
-class MixedAnalysisMixin:
+class PatternsAnalysisMixin:
     def __init__(self, parent=None, filename=None):
         self.filename = filename
         self.preview_lookup = {}
         self._apply_tree_styles()
-        self._bind_analysis_events()
+        self._bind_pattern_events()
 
     def _apply_tree_styles(self):
-        """Applies dark-theme styling to the analysis treeview."""
+        """Applies dark-theme styling to the treeview."""
         style = ttk.Style()
         try:
             style.theme_use("clam")
@@ -37,7 +24,7 @@ class MixedAnalysisMixin:
             pass
 
         style.configure(
-            "MixedAnalysis.Treeview",
+            "Analysis.Treeview",
             background="#172134",
             foreground="#f8fafc",
             fieldbackground="#172134",
@@ -47,15 +34,15 @@ class MixedAnalysisMixin:
             relief="flat",
         )
         style.map(
-            "MixedAnalysis.Treeview",
+            "Analysis.Treeview",
             background=[("selected", "#2e4a8c")],
             foreground=[("selected", "#ffffff")]
         )
 
         if hasattr(self, "pgn_tree") and self.pgn_tree:
-            self.pgn_tree.configure(style="MixedAnalysis.Treeview")
+            self.pgn_tree.configure(style="Analysis.Treeview")
 
-    def _bind_analysis_events(self):
+    def _bind_pattern_events(self):
         """Binds selection events so clicking a game updates the analysis board."""
         if hasattr(self, "pgn_tree") and self.pgn_tree:
             self.pgn_tree.bind("<<TreeviewSelect>>", self._on_game_selected)
@@ -75,23 +62,14 @@ class MixedAnalysisMixin:
             if hasattr(self, "load_game_on_board"):
                 self.load_game_on_board(game)
 
-    def load_mixed_collection(self, games_list, category=None, target_game=None):
-        """Writes a list of collection games to the correct category subfolder, populates the tree view, and syncs the board."""
-        target_dir = BASE_PGN_DIR
-        file_name = "mixed_analysis.pgn"
-
-        if category and category in CATEGORY_FOLDER_MAP:
-            subfolder, default_filename = CATEGORY_FOLDER_MAP[category]
-            target_dir = BASE_PGN_DIR / subfolder
-            file_name = default_filename
-
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_file_path = target_dir / file_name
+    def load_patterns_collection(self, games_list, target_game=None):
+        """Writes a list of pattern collection games to disk, populates the tree view, and forces a UI refresh."""
+        PATTERNS_ANALYSIS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
         extracted_games = []
         for item in games_list:
             if isinstance(item, dict):
-                g_obj = item.get("game_object") or item.get("game")
+                g_obj = item.get("game_object")
                 if g_obj:
                     extracted_games.append(g_obj)
             elif isinstance(item, chess.pgn.Game):
@@ -100,39 +78,38 @@ class MixedAnalysisMixin:
         if not target_game and extracted_games:
             target_game = extracted_games[0]
         elif isinstance(target_game, dict):
-            target_game = target_game.get("game_object") or target_game.get("game", target_game)
+            target_game = target_game.get("game_object", target_game)
 
         try:
-            with open(target_file_path, "w", encoding="utf-8") as f:
+            with open(PATTERNS_ANALYSIS_FILE, "w", encoding="utf-8") as f:
                 exporter = chess.pgn.FileExporter(f)
                 for g in extracted_games:
                     g.accept(exporter)
                     f.write("\n")
         except Exception as e:
-            set_status_message(f"Error saving collection to PGN path: {e}")
+            set_status_message(f"Error saving patterns collection: {e}")
             return
 
-        self.filename = target_file_path
-        self.load_games(filename=target_file_path)
+        self.filename = PATTERNS_ANALYSIS_FILE
+        self.load_games(filename=PATTERNS_ANALYSIS_FILE)
 
-        if target_game:
-            self.load_game_from_state(target_game, category_source=target_file_path)
+        self.load_game_from_state(target_game, category_source=PATTERNS_ANALYSIS_FILE)
 
-        if hasattr(self, "update_idletasks"):
-            self.update_idletasks()
+        self.update_idletasks()
         if hasattr(self, "pgn_tree") and self.pgn_tree:
             self.pgn_tree.update()
 
     def load_games(self, filename=None):
-        """Loads games from the specified PGN file path into the analysis tree view."""
+        """Loads games from the patterns analysis file into the tree view by cycling through the file contents."""
         if filename:
             self.filename = filename
 
-        active_load_file = self.filename if self.filename else (BASE_PGN_DIR / "mixed_analysis.pgn")
+        active_load_file = self.filename if self.filename else PATTERNS_ANALYSIS_FILE
+        print(f"[DEBUG load_games] Loading from file: {active_load_file}")
 
         if hasattr(self, "pgn_tree") and self.pgn_tree:
             try:
-                self.pgn_tree.configure(style="MixedAnalysis.Treeview")
+                self.pgn_tree.configure(style="Analysis.Treeview")
             except Exception:
                 pass
             self.pgn_tree.delete(*self.pgn_tree.get_children())
@@ -149,7 +126,9 @@ class MixedAnalysisMixin:
                             break
                         game_list.append(game)
             except Exception as e:
-                set_status_message(f"Error loading PGN file: {e}")
+                set_status_message(f"Error loading patterns PGN file: {e}")
+
+        print(f" -> Successfully parsed {len(game_list)} games from disk.")
 
         if hasattr(self, "pgn_tree") and self.pgn_tree:
             for idx, game in enumerate(game_list, start=1):
@@ -162,13 +141,14 @@ class MixedAnalysisMixin:
                 self.preview_lookup[item_id] = game
 
         if not game_list and hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-            self.lbl_empty_state.configure(text="No games loaded in analysis view.")
+            self.lbl_empty_state.configure(text="No pattern games loaded in memory.")
             self.lbl_empty_state.pack(padx=20, pady=20)
         elif hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
             self.lbl_empty_state.pack_forget()
 
+
     def load_game_from_state(self, target_game, category_file=None, category_source=None):
-        """Matches target_game in the tree view and loads it onto the analysis board."""
+        """Matches target_game in the already loaded tree view without wiping it."""
         active_file = category_source if category_source else category_file
         if active_file and active_file != self.filename:
             self.load_games(filename=active_file)
@@ -186,8 +166,8 @@ class MixedAnalysisMixin:
             for item_id, game in self.preview_lookup.items():
                 if target_white and target_black:
                     if (
-                        game.headers.get("White", "").strip() == target_white
-                        and game.headers.get("Black", "").strip() == target_black
+                            game.headers.get("White", "").strip() == target_white
+                            and game.headers.get("Black", "").strip() == target_black
                     ):
                         matched_item = item_id
                         break

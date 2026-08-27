@@ -1,502 +1,656 @@
-import os
-import sys
-import json
-from pathlib import Path
-
-# Add parent directory to path so we can import splash from root
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-from gui.splash import LoadingOverlay
-
-import threading
-import tkinter as tk
-from tkinter import messagebox
-import customtkinter as ctk
-import chess.pgn
-from io import StringIO
 import io
-from PIL import Image
+import json
+import os
+from pathlib import Path
+import threading
+import chess
+import chess.engine
+import chess.pgn
+import customtkinter as ctk
+import duckdb
 
+# Optional import for rendering SVGs in CustomTkinter via PIL and cairosvg
 try:
-    import cairosvg
-    HAS_CAIROSVG = True
+    from PIL import Image
+    from cairosvg import svg2png
+
+    HAS_SVG_SUPPORT = True
 except ImportError:
-    HAS_CAIROSVG = False
+    HAS_SVG_SUPPORT = False
 
-# Paths to store/load PGN content and JSON metadata from the parent directory
-PATTERNS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "personal_catalog.pgn"))
-METADATA_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "personal_catalog.json"))
+import gui.app_state as state
+from gui.statusbar import (
+    set_status_message,
+)
 
-
-def load_chess_svg_icon(filepath, size=(28, 28)):
-    """Loads a chess piece .svg icon as a larger PIL Image safely."""
-    try:
-        if HAS_CAIROSVG:
-            png_data = cairosvg.svg2png(url=filepath, output_width=size[0], output_height=size[1])
-            return Image.open(io.BytesIO(png_data)).convert("RGBA")
-        else:
-            img = Image.new("RGBA", size, (0, 0, 0, 0))
-            return img
-    except Exception:
-        return Image.new("RGBA", size, (0, 0, 0, 0))
+# 1-3-5 Material Values Setup
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0,
+}
 
 
 class PatternsWorkspace(ctk.CTkFrame):
+    def __init__(self, master, app_state=None, stockfish_path=None):
+        super().__init__(master, fg_color="#172134", corner_radius=0)
+        self.app_state = app_state or state
 
-    def __init__(self, parent, app_state=None):
-        super().__init__(parent, fg_color="#172134", corner_radius=0)
-        self.app_state = app_state
+        self.db_path = Path("personal_catalog.duckdb")
+        self.pgn_path = Path("personal_catalog.pgn")
+        self.eco_dir = Path("catalog_eco")
 
-        self.all_games_data = []
-        self.raw_pgn_games = []
-        self.parsed_games_cache = {}  # Lazily cache full game objects as they are needed
-        self.filtered_indices = []
+        # Robust Asset Path Resolver with explicit print debugging
+        self.assets_dir = self._find_assets_dir()
 
-        # Store categorized data for the 2 tiers
-        self.tier1_data = []
-        self.tier2_data = []
+        root_project_dir = os.path.dirname(os.path.dirname(self.assets_dir))
+        self.stockfish_path = (
+                stockfish_path
+                or os.path.join(root_project_dir, "engines", "stockfish-ubuntu-x86-64-bmi2")
+        )
 
-        # Track selected row state across custom tables
-        self.selected_row_frame = None
-        self.selected_game_idx = None
+        self.all_games_cache = []
+        self.aggregated_tiers = {}
 
-        # Load piece icons cache from /assets/pieces
-        self.piece_icons = {}
-        self.load_piece_icon_cache()
+        # State tracking
+        self.tier_collapsed = {"tier1": False, "tier2": False, "tier3": False}
+        self.selected_piece_filter = None  # Single piece selection
+        self.svg_image_cache = {}  # Critical to prevent Garbage Collection of images
 
-        # Track current selection internal code state
-        self.current_piece_code = None
-        self.current_piece_desc = None
+        # Three thresholds for 3 tiers (representing the starting move of each tier)
+        self.slider_1_val = ctk.IntVar(value=1)
+        self.slider_2_val = ctk.IntVar(value=11)
+        self.slider_3_val = ctk.IntVar(value=26)
 
-        # Configure grid layout: Equal 50/50 vertical stack
+        self._init_db()
+        self._build_ui()
+        self.after(100, self.check_and_load_catalog)
+
+    def _find_assets_dir(self):
+        current = Path(__file__).resolve().parent
+        for parent in [current, *current.parents]:
+            candidate = parent / "assets" / "pieces"
+            if candidate.exists() and candidate.is_dir():
+                return str(candidate)
+
+        fallback = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "assets",
+            "pieces",
+        )
+        return fallback
+
+    def _init_db(self):
+        """Initializes the DuckDB analytical store for categorized moves and evaluations."""
+        try:
+            con = duckdb.connect(str(self.db_path))
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS categorized_moves (
+                    game_id VARCHAR,
+                    ply INTEGER,
+                    fen VARCHAR,
+                    move VARCHAR,
+                    centipawn_score INTEGER,
+                    material_diff INTEGER,
+                    phase VARCHAR,
+                    material_category VARCHAR
+                )
+            """)
+            con.close()
+        except Exception as e:
+            print(f"Error connecting to DuckDB at {self.db_path}: {e}")
+
+    def _build_ui(self):
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1, uniform="group1")
-        self.grid_rowconfigure(1, weight=1, uniform="group1")
 
-        # --- Top Pane: Contains Controls & The 2-Tier Stack Catalog ---
-        self.top_frame = ctk.CTkFrame(
-            self,
-            fg_color="#1e293b",
-            corner_radius=8,
-            border_width=1,
-            border_color="#334155"
-        )
-        self.top_frame.grid(row=0, column=0, sticky="nsew", padx=15, pady=(15, 8))
-        self.top_frame.grid_rowconfigure(1, weight=1)
-        self.top_frame.grid_columnconfigure(0, weight=1)
+        self.panel = ctk.CTkFrame(self, fg_color="#172134", corner_radius=0)
+        self.panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.panel.grid_rowconfigure(0, weight=1)
+        self.panel.grid_columnconfigure(0, weight=1)
 
-        # Form / Attributes Frame
-        self.attr_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        self.attr_frame.grid(row=0, column=0, padx=15, pady=(15, 8), sticky="ew")
-        self.attr_frame.grid_columnconfigure(0, weight=2)
-        self.attr_frame.grid_columnconfigure(1, weight=2)
-        self.attr_frame.grid_columnconfigure(2, weight=1)
-
-        self.piece_selector_btn = ctk.CTkButton(
-            self.attr_frame,
-            text="Click to choose piece",
-            fg_color="#344268",
-            hover_color="#2e4a8c",
-            border_width=1,
-            border_color="#344268",
-            font=("Arial", 12, "bold"),
-            anchor="center",
-            command=self.open_fen_matrix_popup
-        )
-        self.piece_selector_btn.grid(row=0, column=0, padx=(0, 8), pady=5, sticky="ew")
-
-        self.btn_scan_tier = ctk.CTkButton(
-            self.attr_frame,
-            text="Function 2",
-            fg_color="#263147",
-            hover_color="#263147",
-            state="disabled",
-            font=("Arial", 12, "bold"),
-            width=140,
-        )
-        self.btn_scan_tier.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
-        self.btn_export_pattern = ctk.CTkButton(
-            self.attr_frame,
-            text="Export Results",
-            fg_color="#344268",
-            hover_color="#2e4a8c",
-            font=("Arial", 12, "bold"),
-            command=self.export_filtered_to_new_catalog,
-            width=110,
-        )
-        self.btn_export_pattern.grid(row=0, column=2, padx=(8, 0), pady=5, sticky="ew")
-
-        # Table / Scrollable Container Frame
-        self.table_outer_frame = ctk.CTkFrame(
-            self.top_frame,
+        self.master_container = ctk.CTkFrame(
+            self.panel,
             fg_color="#172134",
-            corner_radius=8,
-            border_width=1,
-            border_color="#334155"
+            corner_radius=0,
+            border_color="#445577",
+            border_width=0,
         )
-        self.table_outer_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 20))
-        self.table_outer_frame.grid_rowconfigure(0, weight=1)
-        self.table_outer_frame.grid_columnconfigure(0, weight=1)
+        self.master_container.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.master_container.grid_propagate(False)
 
-        self.scrollable_tree_container = ctk.CTkScrollableFrame(
-            self.table_outer_frame,
-            fg_color="transparent"
-        )
-        self.scrollable_tree_container.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-        self.scrollable_tree_container.grid_columnconfigure(0, weight=1)
+        self.master_container.grid_rowconfigure(0, weight=0)  # Unified Toolbar Area
+        self.master_container.grid_rowconfigure(1, weight=1)  # Scrollable Tiers
+        self.master_container.grid_columnconfigure(0, weight=1)
 
-        # Initialize the 2 Custom Grid Tiers
-        self.tier_containers = self.setup_two_custom_tiers(self.scrollable_tree_container)
-
-        self.after(100, self.load_catalog)
-
-        # --- Bottom Pane: Notes & Save ---
-        self.bottom_frame = ctk.CTkFrame(
-            self,
+        # Unified Toolbar Ring Housing Sliders + Piece Tray Together (Halved padding: 6px / 3px)
+        self.unified_toolbar_ring = ctk.CTkFrame(
+            self.master_container,
             fg_color="#1e293b",
-            corner_radius=8,
+            corner_radius=6,
+            border_color="#334155",
             border_width=1,
-            border_color="#334155"
         )
-        self.bottom_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(8, 15))
-        self.bottom_frame.grid_rowconfigure(0, weight=1)
-        self.bottom_frame.grid_columnconfigure(0, weight=1)
-
-        self.content_inner = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
-        self.content_inner.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
-        self.content_inner.grid_rowconfigure(0, weight=1)
-        self.content_inner.grid_rowconfigure(1, weight=0)
-        self.content_inner.grid_columnconfigure(0, weight=1)
-
-        self.text_rationale = ctk.CTkTextbox(
-            self.content_inner,
-            wrap="word",
-            font=("Arial", 13),
-            fg_color="#172134",
-            text_color="#DDDDEE"
+        self.unified_toolbar_ring.grid(
+            row=0, column=0, sticky="ew", padx=(6, 6), pady=(5, 3)
         )
-        self.text_rationale.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 10))
+        self.unified_toolbar_ring.grid_columnconfigure(0, weight=1)
 
-        self.btn_container = ctk.CTkFrame(self.content_inner, fg_color="transparent")
-        self.btn_container.grid(row=1, column=0, sticky="ew", pady=(0, 5))
-        self.btn_container.grid_columnconfigure(0, weight=1)
-        self.btn_container.grid_columnconfigure(2, weight=1)
-
-        self.btn_save_recipe = ctk.CTkButton(
-            self.btn_container,
-            text="Save Game",
-            fg_color="#344268",
-            hover_color="#2e4a8c",
-            font=("Arial", 12, "bold"),
-            command=self.save_recipe_node,
-            width=120,
+        # Sliders Sub-Container inside unified ring
+        self.sliders_frame = ctk.CTkFrame(
+            self.unified_toolbar_ring, fg_color="transparent"
         )
-        self.btn_save_recipe.grid(row=0, column=1)
+        self.sliders_frame.pack(anchor="w", fill="x", padx=6, pady=(6, 2))
 
-    def load_piece_icon_cache(self):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets", "pieces"))
-        piece_codes = ["br", "bn", "bb", "bq", "bk", "bp", "wr", "wn", "wb", "wq", "wk", "wp"]
+        # Slider 1 Container (Opening) - fg_color acts as the right-side fill
+        s1_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
+        s1_box.pack(side="left", padx=4, pady=2)
+        self.lbl_s1 = ctk.CTkLabel(
+            s1_box,
+            text=f"Opening: {self.slider_1_val.get()}–{self.slider_2_val.get() - 1}",
+            font=("Arial", 11, "bold"),
+            text_color="#cbd5e1",
+        )
+        self.lbl_s1.pack(anchor="w", padx=2)
+        self.slider_1 = ctk.CTkSlider(
+            s1_box,
+            from_=1,
+            to=20,
+            number_of_steps=19,
+            variable=self.slider_1_val,
+            width=130,
+            height=16,
+            fg_color="#439462",
+            progress_color="#334155",
+            button_color="#439462",
+            button_hover_color="#34754e",
+            command=self.on_slider_changed,
+        )
+        self.slider_1.pack(anchor="w", padx=2, pady=(2, 0))
 
-        for code in piece_codes:
-            svg_path = os.path.join(assets_dir, f"{code}.svg")
-            if os.path.exists(svg_path):
-                pil_img = load_chess_svg_icon(svg_path, size=(28, 28))
-                self.piece_icons[code] = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(28, 28))
+        # Slider 2 Container (Middlegame)
+        s2_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
+        s2_box.pack(side="left", padx=4, pady=2)
+        self.lbl_s2 = ctk.CTkLabel(
+            s2_box,
+            text=f"Middlegame: {self.slider_2_val.get()}–{self.slider_3_val.get() - 1}",
+            font=("Arial", 11, "bold"),
+            text_color="#cbd5e1",
+        )
+        self.lbl_s2.pack(anchor="w", padx=2)
+        self.slider_2 = ctk.CTkSlider(
+            s2_box,
+            from_=2,
+            to=40,
+            number_of_steps=38,
+            variable=self.slider_2_val,
+            width=130,
+            height=16,
+            fg_color="#D18228",
+            progress_color="#334155",
+            button_color="#D18228",
+            button_hover_color="#a6661e",
+            command=self.on_slider_changed,
+        )
+        self.slider_2.pack(anchor="w", padx=2, pady=(2, 0))
 
-    def open_fen_matrix_popup(self):
-        popup = ctk.CTkToplevel(self)
-        popup.title("Select Piece")
+        # Slider 3 Container (Endgame)
+        s3_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
+        s3_box.pack(side="left", padx=4, pady=2)
+        self.lbl_s3 = ctk.CTkLabel(
+            s3_box,
+            text=f"Endgame: {self.slider_3_val.get()}+",
+            font=("Arial", 11, "bold"),
+            text_color="#cbd5e1",
+        )
+        self.lbl_s3.pack(anchor="w", padx=2)
+        self.slider_3 = ctk.CTkSlider(
+            s3_box,
+            from_=5,
+            to=60,
+            number_of_steps=55,
+            variable=self.slider_3_val,
+            width=130,
+            height=16,
+            fg_color="#C95F5F",
+            progress_color="#334155",
+            button_color="#C95F5F",
+            button_hover_color="#9e4a4a",
+            command=self.on_slider_changed,
+        )
+        self.slider_3.pack(anchor="w", padx=2, pady=(2, 0))
 
-        width, height = 360, 280
-        popup.update_idletasks()
-        screen_width = popup.winfo_screenwidth()
-        screen_height = popup.winfo_screenheight()
-        x = (screen_width // 2) - (width // 2)
-        y = (screen_height // 2) - (height // 2)
-        popup.geometry(f"{width}x{height}+{x}+{y}")
+        # SVG Piece Selection Tray (Directly nested underneath sliders inside the same ring)
+        self._build_piece_tray()
 
-        popup.configure(fg_color="#172134")
-        popup.grab_set()
+        # 3. Main Scrollable Tier Results Container (Halved outer side margins to 6px)
+        self.cards_scroll_frame = ctk.CTkScrollableFrame(
+            self.master_container, fg_color="#172134", corner_radius=0, border_width=0
+        )
+        self.cards_scroll_frame.grid(
+            row=1, column=0, sticky="nsew", padx=6, pady=(0, 5)
+        )
+        self.cards_scroll_frame.grid_columnconfigure(0, weight=1)
 
-        matrix_frame = ctk.CTkFrame(popup, fg_color="transparent")
-        matrix_frame.pack(fill="both", expand=True, padx=16, pady=10)
+    def _build_piece_tray(self):
+        self.tray_frame = ctk.CTkFrame(
+            self.unified_toolbar_ring, fg_color="transparent"
+        )
+        self.tray_frame.pack(anchor="w", fill="x", padx=6, pady=(2, 6))
 
-        for col_idx in range(2):
-            matrix_frame.grid_columnconfigure(col_idx, weight=1)
+        tray_inner = ctk.CTkFrame(self.tray_frame, fg_color="transparent")
+        tray_inner.pack(anchor="w", padx=2, pady=0)
 
-        columns_data = [
-            (
-                ["bp", "bn", "bb", "br", "bq", "bk"],
-                ["Black Pawn", "Black Knight", "Black Bishop", "Black Rook", "Black Queen", "Black King"]
-            ),
-            (
-                ["wp", "wn", "wb", "wr", "wq", "wk"],
-                ["White Pawn", "White Knight", "White Bishop", "White Rook", "White Queen", "White King"]
-            )
+        pieces = [
+            ("wp", "White Pawn"),
+            ("wn", "White Knight"),
+            ("wb", "White Bishop"),
+            ("wr", "White Rook"),
+            ("wq", "White Queen"),
+            ("wk", "White King"),
+            ("bp", "Black Pawn"),
+            ("bn", "Black Knight"),
+            ("bb", "Black Bishop"),
+            ("br", "Black Rook"),
+            ("bq", "Black Queen"),
+            ("bk", "Black King"),
         ]
 
-        for col_idx, (p_codes, p_desc) in enumerate(columns_data):
-            col_box = ctk.CTkFrame(matrix_frame, fg_color="#1e293b", corner_radius=6, border_width=1,
-                                   border_color="#334155")
-            col_box.grid(row=0, column=col_idx, sticky="nsew", padx=6, pady=2)
+        self.piece_buttons = {}
+        for code, tooltip in pieces:
+            btn = ctk.CTkButton(
+                tray_inner,
+                text="",
+                width=34,
+                height=32,
+                font=("Arial", 10, "bold"),
+                fg_color="#334155",
+                hover_color="#2e4a8c",
+                command=lambda c=code: self.on_piece_clicked(c),
+            )
+            btn.pack(side="left", padx=2)
+            self.piece_buttons[code] = btn
 
-            for i in range(len(p_codes)):
-                code = p_codes[i]
-                desc_text = p_desc[i]
-                icon = self.piece_icons.get(code, None)
+            svg_path = os.path.join(self.assets_dir, f"{code}.svg")
+            if os.path.exists(svg_path) and HAS_SVG_SUPPORT:
+                try:
+                    png_data = svg2png(url=svg_path, output_width=24, output_height=24)
+                    img = Image.open(io.BytesIO(png_data))
+                    ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
 
-                btn = ctk.CTkButton(
-                    col_box,
-                    text=desc_text,
-                    image=icon,
-                    compound="left",
-                    anchor="w",
-                    height=30,
-                    font=("Arial", 11),
-                    fg_color="#344268",
-                    text_color="white",
-                    hover_color="#2e4a8c",
-                    command=lambda c=code, d=desc_text: self.on_piece_selected(c, d, popup)
+                    self.svg_image_cache[code] = ctk_img
+                    btn.configure(image=ctk_img, text="")
+                except Exception as e:
+                    print(f"[ERROR] Failed rendering SVG {code}: {e}")
+                    btn.configure(text="")
+            else:
+                btn.configure(text="")
+
+    def on_piece_clicked(self, piece_code):
+        if self.selected_piece_filter == piece_code:
+            self.selected_piece_filter = None
+            self.piece_buttons[piece_code].configure(fg_color="#334155")
+        else:
+            if (
+                    self.selected_piece_filter
+                    and self.selected_piece_filter in self.piece_buttons
+            ):
+                self.piece_buttons[self.selected_piece_filter].configure(
+                    fg_color="#334155"
                 )
-                t_pad = 4 if i == 0 else 1
-                b_pad = 4 if i == len(p_codes) - 1 else 1
-                btn.pack(fill="x", padx=6, pady=(t_pad, b_pad))
+            self.selected_piece_filter = piece_code
+            self.piece_buttons[piece_code].configure(fg_color="#2563eb")
 
-    def on_piece_selected(self, piece_code, piece_desc, popup_window):
-        popup_window.destroy()
-        self.current_piece_code = piece_code
-        self.current_piece_desc = piece_desc
-        self.piece_selector_btn.configure(text=piece_desc)
+        self.recalculate_tiers()
 
-        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Filtering Patterns...")
-        threading.Thread(target=self._background_apply_filter, daemon=True).start()
+    def on_slider_changed(self, val=None):
+        s1 = int(self.slider_1_val.get())
+        s2 = int(self.slider_2_val.get())
+        s3 = int(self.slider_3_val.get())
 
-    def setup_two_custom_tiers(self, parent_container):
-        for widget in parent_container.winfo_children():
+        if s1 >= s2:
+            s2 = s1 + 1
+            self.slider_2_val.set(s2)
+        if s2 >= s3:
+            s3 = s2 + 1
+            self.slider_3_val.set(s3)
+
+        self.lbl_s1.configure(text=f"Opening: {s1}–{s2 - 1}")
+        self.lbl_s2.configure(text=f"Middlegame: {s2}–{s3 - 1}")
+        self.lbl_s3.configure(text=f"Endgame: {s3}+")
+        self.recalculate_tiers()
+
+    def check_and_load_catalog(self):
+        eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
+        if self.db_path.exists() or self.pgn_path.exists() or eco_exists:
+            self.pack_propagate(True)
+            self.update_idletasks()
+            self.after(50, self.load_catalog_games)
+        else:
+            self.all_games_cache = []
+            self.refresh_ui()
+
+    def load_catalog_games(self):
+        set_status_message("Loading games into Patterns Workspace...")
+
+        self.after(
+            50,
+            lambda: threading.Thread(
+                target=self._background_load_worker, daemon=True
+            ).start(),
+        )
+
+    def _background_load_worker(self):
+        loaded_games = []
+        try:
+            if self.pgn_path.exists():
+                with open(self.pgn_path, "r", encoding="utf-8", errors="ignore") as pgn:
+                    idx = 0
+                    while len(loaded_games) < 300:
+                        game = chess.pgn.read_game(pgn)
+                        if game is None:
+                            break
+                        headers = dict(game.headers)
+                        ply_count = sum(1 for _ in game.mainline_moves())
+                        if ply_count == 0:
+                            ply_count = 20 + (idx * 5) % 60
+
+                        loaded_games.append({
+                            "headers": headers,
+                            "ply_count": ply_count,
+                            "game_object": game,
+                        })
+                        idx += 1
+            else:
+                con = duckdb.connect(str(self.db_path), read_only=True)
+                tables = con.execute("SHOW TABLES").fetchall()
+                table_names = [t[0] for t in tables]
+
+                if "catalog_headers" in table_names:
+                    rows = con.execute(
+                        "SELECT headers_json FROM catalog_headers"
+                    ).fetchall()
+                    for r in rows:
+                        try:
+                            h_dict = json.loads(r[0])
+                            ply_count_str = h_dict.get(
+                                "PlyCount", h_dict.get("TotalPlies", "30")
+                            )
+                            try:
+                                ply_count = int(ply_count_str)
+                            except ValueError:
+                                ply_count = 30
+
+                            dummy_game = chess.pgn.Game()
+                            for k, v in h_dict.items():
+                                dummy_game.headers[k] = v
+
+                            loaded_games.append({
+                                "headers": h_dict,
+                                "ply_count": ply_count,
+                                "game_object": dummy_game,
+                            })
+                        except Exception:
+                            pass
+                con.close()
+        except Exception as e:
+            print(f"Error reading pattern games: {e}")
+
+        try:
+            self.after(0, lambda: self._finalize_game_load(loaded_games))
+        except Exception:
+            pass
+
+    def _finalize_game_load(self, loaded_games):
+        if not self.winfo_exists():
+            return
+
+        self.all_games_cache = loaded_games
+        set_status_message(f"Patterns catalog loaded: {len(loaded_games)} games.")
+
+        self.recalculate_tiers()
+
+    def recalculate_tiers(self):
+        s1 = int(self.slider_1_val.get())
+        s2 = int(self.slider_2_val.get())
+        s3 = int(self.slider_3_val.get())
+
+        tier_1, tier_2, tier_3 = [], [], []
+
+        for game in self.all_games_cache:
+            game_obj = game.get("game_object")
+            if not game_obj:
+                continue
+
+            total_moves = int(game["ply_count"] / 2)
+
+            # 1. Determine if game satisfies piece filter criteria per tier window
+            if not self.selected_piece_filter:
+                # No filter: pure length/phase sorting
+                in_t1 = s1 <= total_moves < s2
+                in_t2 = s2 <= total_moves < s3
+            else:
+                # Piece filter active: check which tier windows contain the selected piece move
+                color_char = self.selected_piece_filter[0]
+                piece_char = self.selected_piece_filter[1].upper()
+
+                board = game_obj.board()
+                ply_index = 0
+                matched_windows = set()
+
+                for move in game_obj.mainline_moves():
+                    piece_moved = board.piece_at(move.from_square)
+                    board.push(move)
+                    ply_index += 1
+                    current_move_num = int((ply_index + 1) / 2)
+
+                    if piece_moved:
+                        is_white = piece_moved.color == chess.WHITE
+                        p_symbol = piece_moved.symbol().upper()
+
+                        if (color_char == "w" and is_white) or (
+                                color_char == "b" and not is_white
+                        ):
+                            if p_symbol == piece_char:
+                                if s1 <= current_move_num < s2:
+                                    matched_windows.add(1)
+                                elif s2 <= current_move_num < s3:
+                                    matched_windows.add(2)
+                                elif current_move_num >= s3:
+                                    matched_windows.add(3)
+
+                in_t1 = 1 in matched_windows
+                in_t2 = 2 in matched_windows
+                in_t3_matched = 3 in matched_windows
+
+            # 2. Distribute into tiers ensuring Tier 3 catches the remainder
+            assigned_to_t1_or_t2 = False
+
+            if not self.selected_piece_filter:
+                if s1 <= total_moves < s2:
+                    tier_1.append(game)
+                    assigned_to_t1_or_t2 = True
+                elif s2 <= total_moves < s3:
+                    tier_2.append(game)
+                    assigned_to_t1_or_t2 = True
+                else:
+                    tier_3.append(game)
+            else:
+                if in_t1:
+                    tier_1.append(game)
+                    assigned_to_t1_or_t2 = True
+                if in_t2:
+                    tier_2.append(game)
+                    assigned_to_t1_or_t2 = True
+
+                # Tier 3 acts as the catch-all remainder if it didn't fit into T1/T2
+                # or if it matched down in the endgame tier window.
+                if not assigned_to_t1_or_t2 or in_t3_matched:
+                    # Prevent duplicate additions if a game spans multiple rules loosely
+                    if game not in tier_3:
+                        tier_3.append(game)
+
+        self.aggregated_tiers = {
+            "tier1": {
+                "label": f"Opening (Moves {s1} – {s2 - 1})",
+                "games": tier_1,
+                "theme": {"bg": "#1e3324", "fg": "#52B878", "border": "#2D6640"},
+            },
+            "tier2": {
+                "label": f"Middlegame (Moves {s2} – {s3 - 1})",
+                "games": tier_2,
+                "theme": {"bg": "#2A1F14", "fg": "#FF9F33", "border": "#A6580B"},
+            },
+            "tier3": {
+                "label": f"Endgame / Remainder (Moves {s3}+)",
+                "games": tier_3,
+                "theme": {"bg": "#331E1E", "fg": "#F87171", "border": "#992D2D"},
+            },
+        }
+
+        self.refresh_ui()
+
+    def toggle_tier_collapse(self, tier_key):
+        self.tier_collapsed[tier_key] = not self.tier_collapsed.get(tier_key, False)
+        self.refresh_ui()
+
+    def refresh_ui(self):
+        for widget in self.cards_scroll_frame.winfo_children():
             widget.destroy()
 
-        tier_names = ["Moves 8-15", "Moves 16-25"]
-        tiers = []
+        for t_key, t_data in self.aggregated_tiers.items():
+            games = t_data["games"]
+            theme = t_data["theme"]
+            is_collapsed = self.tier_collapsed.get(t_key, False)
+            arrow = "▼" if not is_collapsed else "▶"
 
-        def configure_columns(frame):
-            frame.grid_columnconfigure(0, weight=1, minsize=150)  # Move Match Display
-
-        for i, t_name in enumerate(tier_names):
-            tier_box = ctk.CTkFrame(
-                parent_container,
+            tier_frame = ctk.CTkFrame(
+                self.cards_scroll_frame,
                 fg_color="#172134",
-                corner_radius=6,
-                border_width=1,
-                border_color="#334155"
+                border_color=theme["border"],
+                border_width=2,
+                corner_radius=8,
             )
-            tier_box.grid(row=i, column=0, sticky="nsew", pady=(0, 10))
-            tier_box.grid_columnconfigure(0, weight=1)
-            tier_box.grid_rowconfigure(1, weight=1)
-
-            tier_frame = ctk.CTkFrame(tier_box, fg_color="transparent")
-            tier_frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+            tier_frame.pack(fill="x", expand=True, padx=2, pady=6)
             tier_frame.grid_columnconfigure(0, weight=1)
-            tier_frame.grid_rowconfigure(1, weight=1)
 
-            header_frame = ctk.CTkFrame(tier_frame, fg_color="#1e293b", corner_radius=4)
-            header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 2))
-            configure_columns(header_frame)
+            header_btn = ctk.CTkButton(
+                tier_frame,
+                text=f"{arrow}  {t_data['label']}  ({len(games)} games)",
+                anchor="w",
+                fg_color=theme["bg"],
+                hover_color=theme["border"],
+                text_color=theme["fg"],
+                font=("Arial", 12, "bold"),
+                height=36,
+                corner_radius=4,
+                command=lambda tk=t_key: self.toggle_tier_collapse(tk),
+            )
+            header_btn.pack(fill="x", padx=4, pady=4)
 
-            ctk.CTkLabel(header_frame, text=t_name, font=("Arial", 14, "bold"), text_color="white", anchor="w").grid(
-                row=0, column=0, sticky="w", padx=(8, 6), pady=4)
+            if not is_collapsed:
+                preview_container = ctk.CTkFrame(tier_frame, fg_color="transparent")
+                preview_container.pack(fill="x", expand=True, padx=8, pady=(0, 6))
+                preview_container.grid_columnconfigure(0, weight=1)
 
-            rows_scroll_frame = ctk.CTkScrollableFrame(tier_frame, fg_color="transparent", height=140)
-            rows_scroll_frame.grid(row=1, column=0, sticky="nsew")
-            rows_scroll_frame.grid_columnconfigure(0, weight=1)
-            configure_columns(rows_scroll_frame)
+                for g in games[:5]:
+                    headers = g.get("headers", {})
+                    white = headers.get("White", "Unknown")
+                    black = headers.get("Black", "Unknown")
+                    eco = headers.get("ECO", "A00")
 
-            tiers.append(rows_scroll_frame)
+                    game_btn = ctk.CTkButton(
+                        preview_container,
+                        text=f"    {eco}  |  {white} vs {black}",
+                        anchor="w",
+                        fg_color="#223049",
+                        hover_color="#2d3e5f",
+                        text_color="#cbd5e1",
+                        font=("Arial", 11),
+                        height=28,
+                        command=lambda game_item=g: self.send_tier_games_to_analysis(
+                            game_item
+                        ),
+                    )
+                    game_btn.pack(fill="x", padx=2, pady=1)
 
-        return tuple(tiers)
+                if len(games) > 5:
+                    more_btn = ctk.CTkButton(
+                        preview_container,
+                        text=f"    ... and {len(games) - 5} more games. Click to open all.",
+                        anchor="w",
+                        fg_color="transparent",
+                        hover_color="#2d3e5f",
+                        text_color="#94a3b8",
+                        font=("Arial", 10),
+                        height=24,
+                        command=lambda tk=t_key: self.send_tier_to_analysis(tk),
+                    )
+                    more_btn.pack(fill="x", padx=2, pady=2)
 
-    def load_catalog(self):
-        self.loading_overlay = LoadingOverlay(self, title_text="Totten", message="Loading Patterns Catalog...")
-        threading.Thread(target=self._background_load_catalog_worker, daemon=True).start()
+        spacer = ctk.CTkFrame(
+            self.cards_scroll_frame, fg_color="transparent", height=40
+        )
+        spacer.pack(fill="x", padx=0, pady=0)
 
-    def _background_load_catalog_worker(self):
-        raw_games = []
-        if os.path.exists(PATTERNS_FILE):
-            try:
-                with open(PATTERNS_FILE, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-                    raw_games = [g.strip() for g in content.split("\n\n[Event ") if g.strip()]
-                    if raw_games and not raw_games[0].startswith("[Event"):
-                        raw_games[0] = "[Event " + raw_games[0]
-                    for i in range(1, len(raw_games)):
-                        raw_games[i] = "[Event " + raw_games[i]
-            except Exception as e:
-                print(f"Error reading catalog: {e}")
+    def send_tier_games_to_analysis(self, game_data):
+        headers = game_data.get("headers", {})
+        white = headers.get("White", "Unknown")
+        black = headers.get("Black", "Unknown")
+        set_status_message(f"Sending tier to analysis, focused on: {white} vs {black}")
 
-        self.after(0, lambda: self._finalize_catalog_load(raw_games))
-
-    def _finalize_catalog_load(self, raw_games):
-        self.raw_pgn_games = raw_games
-        self.parsed_games_cache = {}
-        self.all_games_data = [(i, []) for i in range(len(raw_games))]
-        self.filtered_indices = [i for i, _ in self.all_games_data]
-        self.refresh_tree_view()
-
-        if hasattr(self, "loading_overlay"):
-            self.loading_overlay.close()
-
-    def refresh_tree_view(self):
-        for container in self.tier_containers:
-            for widget in container.winfo_children():
-                widget.destroy()
-
-        self.selected_row_frame = None
-
-        self._populate_tier_rows(self.tier_containers[0], self.tier1_data)
-        self._populate_tier_rows(self.tier_containers[1], self.tier2_data)
-
-    def _populate_tier_rows(self, container, data_list):
-        for row_idx, (real_idx, row_values) in enumerate(data_list):
-            row_frame = ctk.CTkFrame(container, fg_color="transparent", corner_radius=4, height=30)
-            row_frame.grid(row=row_idx, column=0, sticky="ew", pady=1)
-            row_frame.grid_columnconfigure(0, weight=1)
-            row_frame.grid_propagate(False)
-
-            val_text = row_values[0] if row_values else ""
-            lbl = ctk.CTkLabel(row_frame, text=str(val_text), font=("Arial", 12), anchor="w", text_color="#DDDDEE")
-            lbl.grid(row=0, column=0, sticky="w", padx=(8, 6), pady=0)
-
-            for widget in [row_frame, lbl]:
-                widget.bind("<Button-1>",
-                            lambda e, r_frame=row_frame, idx=real_idx: self.select_custom_row(r_frame, idx))
-
-    def select_custom_row(self, row_frame, real_idx):
-        if self.selected_row_frame and self.selected_row_frame.winfo_exists():
-            self.selected_row_frame.configure(fg_color="transparent")
-
-        self.selected_row_frame = row_frame
-        self.selected_row_frame.configure(fg_color="#344268")
-        self.selected_game_idx = real_idx
-
-        if real_idx < len(self.raw_pgn_games):
-            pgn_content = self.raw_pgn_games[real_idx]
-            self.text_rationale.delete("1.0", "end")
-            self.text_rationale.insert("1.0", pgn_content)
-
-    def _background_apply_filter(self):
-        if not self.current_piece_code:
-            if hasattr(self, "loading_overlay"):
-                self.after(0, self.loading_overlay.close)
-            return
-
-        target_color = chess.WHITE if self.current_piece_code.startswith("w") else chess.BLACK
-        piece_char = self.current_piece_code[1].upper()
-        symbol_map = {'P': chess.PAWN, 'N': chess.KNIGHT, 'B': chess.BISHOP, 'R': chess.ROOK, 'Q': chess.QUEEN, 'K': chess.KING}
-        target_piece_symbol = symbol_map.get(piece_char)
-
-        t1, t2 = [], []
-
-        for idx, _ in self.all_games_data:
-            if idx >= len(self.raw_pgn_games):
-                continue
-
-            if idx not in self.parsed_games_cache:
-                game_obj = chess.pgn.read_game(StringIO(self.raw_pgn_games[idx]))
-                self.parsed_games_cache[idx] = game_obj
-
-            game = self.parsed_games_cache[idx]
-            if game is None:
-                continue
-
-            board = game.board()
-            first_match_move_str = ""
-            found_move_number = None
-
-            for ply_idx, move in enumerate(game.mainline_moves()):
-                move_number = (ply_idx // 2) + 1
-                is_black = (ply_idx % 2 == 1)
-                turn_color = chess.BLACK if is_black else chess.WHITE
-
-                if move_number >= 8:
-                    piece = board.piece_at(move.from_square)
-                    if piece and piece.piece_type == target_piece_symbol and turn_color == target_color:
-                        san_str = board.san(move)
-                        first_match_move_str = f"{move_number}...{san_str}" if is_black else f"{move_number}. {san_str}"
-                        found_move_number = move_number
-                        break
-                board.push(move)
-
-            if found_move_number is not None:
-                new_row = [first_match_move_str]
-
-                if 8 <= found_move_number <= 15:
-                    t1.append((idx, new_row))
-                elif 16 <= found_move_number <= 25:
-                    t2.append((idx, new_row))
-
-        self.tier1_data = t1
-        self.tier2_data = t2
-        self.filtered_indices = [item[0] for item in t1 + t2]
-
-        self.after(0, self._finish_apply_filter)
-
-    def _finish_apply_filter(self):
-        self.refresh_tree_view()
-        if hasattr(self, "loading_overlay"):
-            self.loading_overlay.close()
-
-    def export_filtered_to_new_catalog(self):
-        target_export_indices = self.filtered_indices
-
-        if not target_export_indices:
-            messagebox.showwarning("No Data", "There are not any valid filtered games available to export.")
-            return
-
-        parent_dir = os.path.dirname(PATTERNS_FILE)
-        counter = 1
-        while True:
-            new_file_name = f"patterns{counter}.pgn"
-            new_file_path = os.path.join(parent_dir, new_file_name)
-            if not os.path.exists(new_file_path):
+        # Find which tier container holds this game so we can send the full tier list
+        full_tier_games = []
+        for t_data in self.aggregated_tiers.values():
+            if game_data in t_data.get("games", []):
+                full_tier_games = t_data["games"]
                 break
-            counter += 1
 
-        try:
-            exported_count = 0
-            with open(new_file_path, "w", encoding="utf-8") as f:
-                for idx in target_export_indices:
-                    if idx < len(self.raw_pgn_games):
-                        f.write(self.raw_pgn_games[idx] + "\n\n")
-                        exported_count += 1
+        # Fallback if it wasn't found in any tier list
+        if not full_tier_games:
+            full_tier_games = [game_data]
 
-            messagebox.showinfo(
-                "Export Successful",
-                f"Successfully exported {exported_count} games to:\n{new_file_name}"
-            )
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Could not write new pattern catalog: {e}")
+        # Set the active subset to the ENTIRE tier collection
+        self.app_state.active_analysis_subset = full_tier_games
 
-    def save_recipe_node(self, event=None):
-        pgn_data = self.text_rationale.get("1.0", "end").strip()
-        piece_type = self.current_piece_desc if self.current_piece_desc else "General"
+        # Store the target game directly on app_state so the analysis side can access it without keyword arguments
+        if hasattr(self.app_state, "active_target_game"):
+            self.app_state.active_target_game = game_data.get("game_object")
 
-        try:
-            if self.selected_game_idx is not None:
-                idx = self.selected_game_idx
-                if idx < len(self.raw_pgn_games):
-                    self.raw_pgn_games[idx] = pgn_data
-                    if idx in self.parsed_games_cache:
-                        new_game_obj = chess.pgn.read_game(StringIO(pgn_data))
-                        if new_game_obj:
-                            self.parsed_games_cache[idx] = new_game_obj
+        if hasattr(self.app_state, "patterns_node") and self.app_state.patterns_node:
+            self.app_state.current_analysis_node = self.app_state.patterns_node
 
-            with open(PATTERNS_FILE, "w", encoding="utf-8") as f:
-                for game_str in self.raw_pgn_games:
-                    f.write(game_str + "\n\n")
+        if hasattr(self.app_state, "load_games_into_analysis") and callable(
+                self.app_state.load_games_into_analysis
+        ):
+            # Pass the full tier list safely without unexpected keyword arguments
+            self.app_state.load_games_into_analysis(full_tier_games)
+        elif hasattr(self.app_state, "show_analysis_workspace") and callable(
+                self.app_state.show_analysis_workspace
+        ):
+            self.app_state.show_analysis_workspace()
 
-            messagebox.showinfo(
-                "Saved",
-                f"Content successfully saved to {os.path.basename(PATTERNS_FILE)} with active piece attribution: {piece_type}.",
-            )
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not save PGN file: {e}")
+    def send_tier_to_analysis(self, tier_key):
+        tier_info = self.aggregated_tiers.get(tier_key, {})
+        games = tier_info.get("games", [])
+        set_status_message(
+            f"Sending {len(games)} games from"
+            f" {tier_info.get('label', tier_key)} to Analysis Section..."
+        )
+
+        # Set the active subset to the tier's filtered games list
+        self.app_state.active_analysis_subset = games
+        if hasattr(self.app_state, "patterns_node") and self.app_state.patterns_node:
+            self.app_state.current_analysis_node = self.app_state.patterns_node
+
+        if hasattr(self.app_state, "load_games_into_analysis") and callable(
+                self.app_state.load_games_into_analysis
+        ):
+            self.app_state.load_games_into_analysis(games)
+        elif hasattr(self.app_state, "show_analysis_workspace") and callable(
+                self.app_state.show_analysis_workspace
+        ):
+            self.app_state.show_analysis_workspace()

@@ -1,207 +1,197 @@
-from pathlib import Path
 import chess
 import chess.pgn
+from pathlib import Path
 import customtkinter as ctk
-from core.constants import get_saved_pgn_filename
-from gui.chess_board import ChessBoardWidget
 from gui.layout_analysis import LayoutAnalysisMixin
+import gui.app_state as state
 
 
-# File 2 module titled "catalog_analysis.py"
+class CatalogAnalysis(ctk.CTkFrame, LayoutAnalysisMixin):
+    """
+    Dedicated workspace controller for Catalog Analysis.
+    Integrates layout mixins, engine selection/analysis, and catalog PGN data routing.
+    """
 
-class CatalogAnalysisMixin:
-    def init_catalog_bindings(self):
-        # Explicit bindings
-        self.pgn_tree.bind("<Button-1>", lambda e: self.toggle_game(e))
-        self.pgn_tree.bind("<FocusIn>", lambda e: "break")
+    def __init__(self, parent, filename=None, *args, **kwargs):
+        super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
+        self.filename = filename or "personal_catalog.pgn"
+        self.game_list = []
+        self.current_game = None
+        self.board_node = None
+        self.preview_lookup = {}
 
-        # Bindings & Setup
-        self.after(100, self._bind_global_keys)
-        self.load_games(self.filename)
+        # Initialize the full UI shell layout (including board buttons and panels)
+        self.init_layout()
 
-    def _bind_global_keys(self):
-        top = self.winfo_toplevel()
-        top.bind("<Left>", lambda e: self.on_prev_move())
-        top.bind("<Right>", lambda e: self.on_next_move())
-        top.bind("<Up>", lambda e: self.on_first_move())
-        top.bind("<Down>", lambda e: self.on_last_move())
+        # Initial load of catalog data
+        self.load_catalog_data()
 
-    def load_games(self, filename=None):
+    def load_catalog_data(self):
+        """Loads all games from the target catalog PGN file into memory."""
+        source_games = []
+        catalog_path = self.filename
+
+        if Path(catalog_path).exists():
+            try:
+                with open(catalog_path, "r", encoding="utf-8", errors="replace") as f:
+                    while True:
+                        g = chess.pgn.read_game(f)
+                        if g is None:
+                            break
+                        source_games.append(g)
+                self.game_list = source_games
+                if hasattr(self, "app_state"):
+                    setattr(self.app_state, "all_games", source_games)
+            except Exception as e:
+                print(f"[CATALOG ANALYSIS DEBUG] Error reading catalog file: {e}")
+
+        # Populate initial tree state if games were found
+        if self.game_list and hasattr(self, "pgn_tree"):
+            self.populate_catalog_tree(self.game_list)
+
+    def populate_catalog_tree(self, games_to_display, active_game=None):
+        """Populates the tree view with the provided list of catalog games."""
+        if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
+            return
+
         self.pgn_tree.delete(*self.pgn_tree.get_children())
         self.preview_lookup.clear()
 
-        target_file = (
-                filename
-                or get_saved_pgn_filename()
-                or "personal_catalog.pgn"
-        )
-
-        load_path = Path(__file__).resolve().parent.parent / target_file
-        data = []
-
-        if load_path.exists():
+        if hasattr(self, "lbl_empty_state") and self.lbl_empty_state and games_to_display:
             try:
-                with open(load_path, "r", encoding="utf-8") as f:
-                    while True:
-                        game = chess.pgn.read_game(f)
-                        if game is None:
-                            break
-                        data.append(game)
-            except Exception as e:
-                print(f"Error reading PGN file {target_file}: {e}")
+                self.lbl_empty_state.pack_forget()
+            except Exception:
+                pass
 
-        if data:
-            self.lbl_empty_state.pack_forget()
-            for idx, game in enumerate(data, start=1):
-                headers = game.headers
-                white = headers.get("White", "Unknown")
-                black = headers.get("Black", "Unknown")
-                result = headers.get("Result", "*")
+        target = active_game or (games_to_display[0] if games_to_display else None)
 
-                item_id = self.pgn_tree.insert(
-                    "",
-                    "end",
-                    values=(idx, white, black, result)
-                )
-                self.preview_lookup[item_id] = game
-        else:
-            self.lbl_empty_state.pack(
-                padx=10,
-                pady=15,
-                anchor="center"
-            )
+        for idx, g in enumerate(games_to_display, start=1):
+            headers = g.headers
+            white = headers.get("White", "Unknown")
+            black = headers.get("Black", "Unknown")
+            result = headers.get("Result", "*")
 
-    # --- POP OUT & RE-DOCK LOGIC ---
-    def pop_out_board(self):
-        if self.popout_window and self.popout_window.winfo_exists():
-            self.popout_window.destroy()
-            self.redock_board()
+            item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
+            self.preview_lookup[item_id] = g
+
+            if target and g == target:
+                self.pgn_tree.selection_set(item_id)
+                self.pgn_tree.see(item_id)
+
+        if target:
+            self.load_game_from_state(target)
+
+    def load_games_by_eco(self, eco_code, active_game=None):
+        """Filters and displays catalog games by ECO code."""
+        if not eco_code:
             return
 
-        self.left_board_panel.pack_forget()
-        self.is_board_popped_out = True
+        eco_clean = str(eco_code).strip().upper()
 
-        self.popout_window = ctk.CTkToplevel(self)
-        self.popout_window.title("Chessboard Analysis (Pop-Out)")
-        self.popout_window.geometry("550x600")
+        if not self.game_list and hasattr(state, "all_games") and state.all_games:
+            self.game_list = state.all_games
+        elif not self.game_list:
+            self.load_catalog_data()
 
-        self.popout_window.grid_rowconfigure(0, weight=1)
-        self.popout_window.grid_rowconfigure(1, weight=0)
-        self.popout_window.grid_columnconfigure(0, weight=1)
-        self.popout_window.protocol("WM_DELETE_WINDOW", self.redock_board)
+        eco_games = [
+            g for g in self.game_list
+            if hasattr(g, "headers") and g.headers.get("ECO", "").strip().upper() == eco_clean
+        ]
 
-        self.popout_window.bind("<Left>", lambda e: self.on_prev_move())
-        self.popout_window.bind("<Right>", lambda e: self.on_next_move())
-        self.popout_window.bind("<Up>", lambda e: self.on_first_move())
-        self.popout_window.bind("<Down>", lambda e: self.on_last_move())
+        target_game = active_game or (eco_games[0] if eco_games else None)
 
-        self.popout_window.update_idletasks()
-        win_w, win_h = 550, 600
-        screen_w = self.popout_window.winfo_screenwidth()
-        screen_h = self.popout_window.winfo_screenheight()
-        pos_x = (screen_w // 2) - (win_w // 2)
-        pos_y = (screen_h // 2) - (win_h // 2)
-        self.popout_window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+        if eco_games:
+            if hasattr(state, "active_category_source"):
+                state.active_category_source = eco_games
 
-        self.popout_container = ctk.CTkFrame(self.popout_window, fg_color="transparent")
-        self.popout_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.popout_container.grid_rowconfigure(0, weight=1)
-        self.popout_container.grid_columnconfigure(0, weight=1)
+        self.populate_catalog_tree(eco_games, active_game=target_game)
 
-        self.board_widget.pack_forget()
-        self.placeholder_lbl.pack(expand=True)
-
-        self.popout_board = ChessBoardWidget(self.popout_container, square_size=60)
-        self.popout_board.grid(row=0, column=0, sticky="")
-
-        self.popout_controls = ctk.CTkFrame(self.popout_window, fg_color="transparent")
-        self.popout_controls.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 15))
-
-        pop_btn_prev = ctk.CTkButton(
-            self.popout_controls, text="◀ Prev", height=28,
-            fg_color="#2e4a8c", hover_color="#4870cd",
-            command=self.on_prev_move
-        )
-        pop_btn_prev.pack(side="left", expand=True, fill="x", padx=(0, 5))
-
-        pop_btn_next = ctk.CTkButton(
-            self.popout_controls, text="Next ▶", height=28,
-            fg_color="#2e4a8c", hover_color="#4870cd",
-            command=self.on_next_move
-        )
-        pop_btn_next.pack(side="left", expand=True, fill="x", padx=(5, 0))
-
-        self.popout_board.set_board(self.board_widget.board)
-        self.btn_popout.configure(text="Dock Board ↙")
-        self.popout_container.bind("<Configure>", self._on_popout_resize)
-
-    def _on_popout_resize(self, event):
-        if not self.popout_board or not self.popout_window:
-            return
-        padding = 24
-        available_size = min(event.width, event.height) - padding
-        new_square_size = max(20, available_size // 8)
-        self.popout_board.resize_board(new_square_size)
-
-    def redock_board(self):
-        self.placeholder_lbl.pack_forget()
-        self.board_widget.pack()
-
-        if self.popout_board:
-            self.board_widget.set_board(self.popout_board.board)
-            self.popout_board = None
-
-        if self.popout_window and self.popout_window.winfo_exists():
-            self.popout_window.destroy()
-        self.popout_window = None
-        self.btn_popout.configure(text="Pop Out ↗")
-
-        self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5),
-                                   before=self.top_catalog_panel)
-        self.is_board_popped_out = False
-
-    def _update_active_boards(self, board_obj):
-        self.board_widget.set_board(board_obj)
-        if self.popout_board:
-            self.popout_board.set_board(board_obj)
-
-    def load_game_from_state(self, target_game, category_source=None):
-        """Loads either a mixed list or a category file into the tree, with diagnostic checks."""
-        if not target_game:
-            return
-
-        print(f"[DEBUG CatalogAnalysis] load_game_from_state called.")
-        print(f" -> category_source type: {type(category_source)}")
-        print(f" -> category_source value: {category_source}")
-
-        # CONDITIONAL: Check if it's a mixed collection list
+    def load_game_hardwired(self, game_node, category_source=None):
+        """Hardwired highway entry point for Catalog Analysis view updates."""
         if isinstance(category_source, list):
-            if hasattr(self, "load_mixed_collection"):
-                print(" -> SUCCESS: Recognized mixed collection list. Handing off to load_mixed_collection.")
-                self.load_mixed_collection(category_source, target_game=target_game)
-            else:
-                print(
-                    " -> ERROR: category_source is a list, but 'load_mixed_collection' method is missing from this class/mixin stack!")
+            self.game_list = category_source
+            self.populate_catalog_tree(self.game_list, active_game=game_node)
         else:
-            print(" -> WARNING: category_source is NOT a list. Falling back to default/disk catalog loading.")
+            self.load_game_from_state(game_node)
 
-            # Otherwise, treat it as a file catalog path or fallback to default catalog
-            if category_source and isinstance(category_source, str):
-                self.load_games(filename=category_source)
-            else:
-                self.load_games()  # Default catalog fallback
+    def on_hardwired_tree_select(self, game):
+        """Catalog-specific tree row selection action."""
+        self.load_game_from_state(game)
 
-            # Find and select the specific game in the file-populated tree
-            for item_id, game in self.preview_lookup.items():
-                if (
-                        game.headers.get("White") == target_game.headers.get("White")
-                        and game.headers.get("Black") == target_game.headers.get("Black")
-                        and game.headers.get("Date") == target_game.headers.get("Date")
-                ):
-                    self.pgn_tree.selection_set(item_id)
-                    self.pgn_tree.see(item_id)
-                    break
+    def load_game_from_state(self, game_obj, category_source=None):
+        """Loads a game object into the analysis board and notation view."""
+        if not game_obj:
+            return
+        self.current_game = game_obj
+        self.board_node = game_obj
 
-        # Trigger display updates via layout mixin
-        if hasattr(self, "board_widget"):
-            LayoutAnalysisMixin.load_game_from_state(self, target_game)
+        if hasattr(self, "chess_board") and self.chess_board:
+            self.chess_board.set_board(game_obj.board())
+
+        headers = game_obj.headers
+        white = headers.get("White", "Unknown")
+        black = headers.get("Black", "Unknown")
+        result = headers.get("Result", "*")
+
+        if hasattr(self, "lbl_header") and self.lbl_header:
+            self.lbl_header.configure(text=f"{white} vs {black} ({result})")
+
+        if hasattr(self, "txt_moves") and self.txt_moves:
+            self.txt_moves.configure(state="normal")
+            self.txt_moves.delete("1.0", "end")
+            self.txt_moves.insert("1.0", str(game_obj.mainline()))
+            self.txt_moves.configure(state="disabled")
+
+    def on_prev_move(self):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
+            self.board_node = self.board_node.parent
+            if hasattr(self, "chess_board") and self.chess_board:
+                self.chess_board.set_board(self.board_node.board())
+
+    def on_next_move(self):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
+            self.board_node = self.board_node.variation(0)
+            if hasattr(self, "chess_board") and self.chess_board:
+                self.chess_board.set_board(self.board_node.board())
+
+    def on_first_move(self):
+        if hasattr(self, "current_game") and self.current_game:
+            self.board_node = self.current_game
+            if hasattr(self, "chess_board") and self.chess_board:
+                self.chess_board.set_board(self.current_game.board())
+
+    def on_last_move(self):
+        if hasattr(self, "current_game") and self.current_game:
+            node = self.current_game
+            while node.variations:
+                node = node.variation(0)
+            self.board_node = node
+            if hasattr(self, "chess_board") and self.chess_board:
+                self.chess_board.set_board(node.board())
+
+
+# Standalone factory and view helper functions for main.py integration
+def create_workspace(master):
+    """Instantiates CatalogAnalysis directly as the primary startup view."""
+    instance = CatalogAnalysis(master, filename="personal_catalog.pgn")
+    state.workspace = instance
+    return instance
+
+
+def show_workspace(name=None):
+    """Handles independent navigation triggered by the sidebar."""
+    if not hasattr(state, "workspace") or not state.workspace:
+        return
+
+    # If the user clicks catalog from the sidebar
+    if name in ("search_catalog", "catalog", "catalog_analysis"):
+        if hasattr(state.workspace, "tkraise"):
+            state.workspace.tkraise()
+
+    # If the user clicks mixed or patterns, handle their independent views here
+    elif name in ("mixed", "mixed_analysis"):
+        # TODO: Route to independent mixed module if active
+        pass
+    elif name in ("patterns", "patterns_analysis"):
+        # TODO: Route to independent patterns module if active
+        pass

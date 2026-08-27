@@ -1,73 +1,93 @@
-# File module titled "mixed_analysis.py"
-
-import chess
-import chess.pgn
 import customtkinter as ctk
-from gui.chess_board import ChessBoardWidget
+import gui.app_state as state
+from gui.layout_analysis import LayoutAnalysisMixin
 
-class MixedAnalysisMixin:
-    def init_mixed_bindings(self):
-        """Explicit tree bindings for mixed collection analysis view."""
-        if hasattr(self, "pgn_tree") and self.pgn_tree:
-            self.pgn_tree.bind("<Button-1>", lambda e: self.toggle_game(e))
-            self.pgn_tree.bind("<FocusIn>", lambda e: "break")
 
-        self.after(100, self._bind_global_keys)
+class AnalysisWorkspace(ctk.CTkFrame, LayoutAnalysisMixin):
+    """
+    Core analysis workspace view for Totten, inheriting layout geometry from LayoutAnalysisMixin
+    and providing game state management, move navigation, and engine interaction.
+    """
 
-    def _bind_global_keys(self):
+    def __init__(self, master, app_state=None, *args, **kwargs):
+        kwargs.pop("app_state", None)
+        super().__init__(master, fg_color="#172134", corner_radius=0, *args, **kwargs)
+        self.app_state = app_state or state
+
+        # Initialize layout elements from mixin
+        self.init_layout()
+        self._bind_keys()
+
+    def _bind_keys(self):
         top = self.winfo_toplevel()
         top.bind("<Left>", lambda e: self.on_prev_move())
         top.bind("<Right>", lambda e: self.on_next_move())
         top.bind("<Up>", lambda e: self.on_first_move())
         top.bind("<Down>", lambda e: self.on_last_move())
 
-    def load_mixed_collection(self, games_list, target_game=None):
-        """Populates the tree view with a dynamic list of game objects for mixed collections."""
-        if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
+    def on_prev_move(self):
+        if hasattr(self, "current_node") and self.current_node and self.current_node.parent:
+            self.current_node = self.current_node.parent
+            self.load_game_from_state(self.current_node)
+
+    def on_next_move(self):
+        if hasattr(self, "current_node") and self.current_node and self.current_node.variations:
+            self.current_node = self.current_node.variation(0)
+            self.load_game_from_state(self.current_node)
+
+    def on_first_move(self):
+        if hasattr(self, "root_game_node") and self.root_game_node:
+            self.current_node = self.root_game_node
+            self.load_game_from_state(self.current_node)
+
+    def on_last_move(self):
+        if hasattr(self, "root_game_node") and self.root_game_node:
+            node = self.root_game_node
+            while node.variations:
+                node = node.variation(0)
+            self.current_node = node
+            self.load_game_from_state(self.current_node)
+
+    def load_game(self, game_node, category_source=None):
+        """Standardized entry point called when loading a game into analysis."""
+        if not game_node:
             return
+        self.load_game_from_state(game_node, category_source=category_source)
 
-        self.pgn_tree.delete(*self.pgn_tree.get_children())
-        self.preview_lookup.clear()
+    def trigger_engine_mode(self, mode):
+        """Handles switching between engine analysis views (review, candidates, standard)."""
+        self.active_engine_mode = mode
 
-        if games_list:
-            if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-                self.lbl_empty_state.pack_forget()
+        # Update button visual states if buttons exist
+        btns = {
+            "review": getattr(self, "btn_review", None),
+            "candidates": getattr(self, "btn_candidates", None),
+            "standard": getattr(self, "btn_standard", None)
+        }
 
-            for idx, game in enumerate(games_list, start=1):
-                headers = game.headers
-                white = headers.get("White", "Unknown")
-                black = headers.get("Black", "Unknown")
-                result = headers.get("Result", "*")
+        for m, btn in btns.items():
+            if btn:
+                if m == mode:
+                    btn.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+                else:
+                    btn.configure(fg_color="#1e293b", hover_color="#334155")
 
-                item_id = self.pgn_tree.insert(
-                    "",
-                    "end",
-                    values=(idx, white, black, result)
-                )
-                self.preview_lookup[item_id] = game
+        # Toggle textbox displays based on mode
+        if hasattr(self, "review_container") and hasattr(self, "candidates_container"):
+            if mode == "review":
+                self.candidates_container.pack_forget()
+                self.review_container.pack(fill="both", expand=True)
+            elif mode == "candidates":
+                self.review_container.pack_forget()
+                self.candidates_container.pack(fill="both", expand=True)
+            else:
+                self.candidates_container.pack_forget()
+                self.review_container.pack(fill="both", expand=True)
 
-                # Auto-select the target game if it matches
-                if target_game and (
-                    game.headers.get("White") == target_game.headers.get("White")
-                    and game.headers.get("Black") == target_game.headers.get("Black")
-                    and game.headers.get("Date") == target_game.headers.get("Date")
-                ):
-                    self.pgn_tree.selection_set(item_id)
-                    self.pgn_tree.see(item_id)
-        else:
-            if hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-                self.lbl_empty_state.pack(padx=10, pady=15, anchor="center")
 
-    def toggle_game(self, event):
-        """Handles clicking a game inside the sidebar tree view."""
-        item_id = self.pgn_tree.identify_row(event.y)
-        if not item_id or item_id not in self.preview_lookup:
-            return
-
-        game = self.preview_lookup[item_id]
-
-        # Grab the full list of games currently loaded in the tree view to keep as the active source
-        current_games_list = list(self.preview_lookup.values())
-
-        if hasattr(self, "load_game_from_state"):
-            self.load_game_from_state(game, category_source=current_games_list)
+def create_workspace(master):
+    """Instantiates the AnalysisWorkspace and registers it in application state."""
+    instance = AnalysisWorkspace(master)
+    state.workspace = instance
+    state.analysis_workspace = instance
+    return instance

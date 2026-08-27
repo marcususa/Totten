@@ -351,6 +351,8 @@ class EditWorkspace(ctk.CTkFrame):
         self.selected_files = []
         self.active_expanded_category = None
         self.expanded_files = set()
+        self.game_lookup = {}
+        self.file_lookup = {}
 
         self._configure_styles()
         self._build_ui()
@@ -392,7 +394,6 @@ class EditWorkspace(ctk.CTkFrame):
             foreground=[("selected", "white"), ("active", "white")]
         )
 
-        # Completely hide the native built-in indicator column/element to disable hollow arrows
         self.style.layout("Treeview.Item", [
             ('Treeitem.padding', {'sticky': 'nswe', 'children': [
                 ('Treeitem.image', {'side': 'left', 'sticky': ''}),
@@ -420,7 +421,9 @@ class EditWorkspace(ctk.CTkFrame):
         self.col_tree.heading("#0", text="Categories, Collections & Games", anchor="w")
         self.col_tree.column("#0", width=400, anchor="w")
 
-        self.col_tree.bind("<Button-1>", self._on_tree_click)
+        # Direct bindings for selection and double-clicks
+        self.col_tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self.col_tree.bind("<Double-1>", self._on_tree_double_click)
 
         col_scroll = ttk.Scrollbar(left_box, orient="vertical", command=self.col_tree.yview)
         self.col_tree.configure(yscrollcommand=col_scroll.set)
@@ -462,7 +465,6 @@ class EditWorkspace(ctk.CTkFrame):
             command=self._add_category
         ).pack(side="right")
 
-        # --- SECTION 1: ADDING & ORDERING ---
         move_row = ctk.CTkFrame(right_box, fg_color="transparent")
         move_row.pack(fill="x", padx=10, pady=(5, 2))
         move_row.grid_columnconfigure((0, 1), weight=1)
@@ -508,7 +510,6 @@ class EditWorkspace(ctk.CTkFrame):
             command=self._create_collection
         ).pack(side="left", padx=(3, 0))
 
-        # --- SECTION 2: DELETING ---
         separator1 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
         separator1.pack(fill="x", padx=10, pady=10)
 
@@ -535,7 +536,6 @@ class EditWorkspace(ctk.CTkFrame):
             command=self._delete_selected_pgn_file
         ).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
-        # --- SECTION 3: ECO REPAIR & ENGINE SELECTION ---
         separator2 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
         separator2.pack(fill="x", padx=10, pady=10)
 
@@ -605,10 +605,6 @@ class EditWorkspace(ctk.CTkFrame):
         for item in self.col_tree.get_children():
             self.col_tree.delete(item)
 
-        if not hasattr(self, "game_lookup"):
-            self.game_lookup = {}
-        if not hasattr(self, "file_lookup"):
-            self.file_lookup = {}
         self.game_lookup.clear()
         self.file_lookup.clear()
 
@@ -618,7 +614,6 @@ class EditWorkspace(ctk.CTkFrame):
 
             total_games_in_cat = sum(len(rows) for rows in files_dict.values())
 
-            # Use custom explicit solid arrows for category headers
             arrow = "▼ " if is_cat_expanded else "▶ "
             cat_title = f"{arrow}{cat}  ({total_games_in_cat})"
 
@@ -659,19 +654,19 @@ class EditWorkspace(ctk.CTkFrame):
 
         self.col_tree.selection_remove(self.col_tree.selection())
 
-    def _on_tree_click(self, event):
-        item_id = self.col_tree.identify_row(event.y)
+    def _handle_item_selection(self, item_id):
         if not item_id:
-            return
+            return False
 
         if item_id in self.game_lookup:
             game, source_data = self.game_lookup[item_id]
 
-            state.active_analysis_game = game
-            state.active_category_source = source_data
+            # Update state in place and switch to analysis workspace
+            setattr(self.app_state, "active_analysis_game", game)
+            setattr(self.app_state, "active_category_source", source_data)
 
-            if hasattr(state, "analysis_callbacks"):
-                for cb in state.analysis_callbacks:
+            if hasattr(self.app_state, "analysis_callbacks"):
+                for cb in self.app_state.analysis_callbacks:
                     try:
                         cb(game, category_source=source_data)
                     except TypeError:
@@ -683,9 +678,13 @@ class EditWorkspace(ctk.CTkFrame):
                             except Exception:
                                 pass
 
-            if hasattr(state, "show_analysis_workspace"):
-                state.show_analysis_workspace()
-            return
+            # Switch view to analysis just like the sidebar does
+            if hasattr(self.app_state, "workspace") and hasattr(self.app_state.workspace, "show_workspace"):
+                self.app_state.workspace.show_workspace("analysis")
+            elif hasattr(state, "workspace") and hasattr(state.workspace, "show_workspace"):
+                state.workspace.show_workspace("analysis")
+
+            return True
 
         if item_id in self.file_lookup:
             node_type = self.file_lookup[item_id][0]
@@ -699,6 +698,7 @@ class EditWorkspace(ctk.CTkFrame):
                 else:
                     self.active_expanded_category = cat
                 self._refresh_treeview()
+                return True
             elif node_type == "file":
                 cat = self.file_lookup[item_id][1]
                 fpath_str = self.file_lookup[item_id][2]
@@ -711,6 +711,20 @@ class EditWorkspace(ctk.CTkFrame):
                 else:
                     self.expanded_files.add(fpath_str)
                 self._refresh_treeview()
+                return True
+
+        return False
+
+    def _on_tree_select(self, event):
+        selected_items = self.col_tree.selection()
+        if not selected_items:
+            return
+        self._handle_item_selection(selected_items[0])
+
+    def _on_tree_double_click(self, event):
+        item_id = self.col_tree.identify_row(event.y)
+        if item_id:
+            self._handle_item_selection(item_id)
 
     def _select_pgn_files(self):
         base_dir = Path(__file__).resolve().parent.parent / "pgn"
@@ -756,49 +770,51 @@ class EditWorkspace(ctk.CTkFrame):
 
         new_cat = dialog.category_name
         if new_cat in self.collection_categories:
-            set_status_message(f"Error: Category '{new_cat}' already exists.")
+            set_status_message(f"Category '{new_cat}' already exists.")
             return
 
-        safe_folder = new_cat.lower().replace(" ", "_").replace("/", "_")
-        filename = f"{safe_folder}.pgn"
-        CATEGORY_FOLDER_MAP[new_cat] = (safe_folder, filename)
-
         self.collection_categories.append(new_cat)
-        self.collection_files_map[new_cat] = {}
-        save_categories_config(self.collection_categories)
+        slug = "".join(c.lower() if c.isalnum() else "_" for c in new_cat).strip("_")
+        while "__" in slug:
+            slug = slug.replace("__", "_")
+        if not slug:
+            slug = "custom"
 
+        CATEGORY_FOLDER_MAP[new_cat] = (slug, f"{slug}.pgn")
+        self.collection_files_map[new_cat] = {}
+
+        save_categories_config(self.collection_categories)
         self.opt_category.configure(values=self.collection_categories)
         self.opt_category.set(new_cat)
         self._refresh_treeview()
-        set_status_message(f"Created new category: {new_cat}")
+        set_status_message(f"Category '{new_cat}' created successfully.")
 
     def _move_category(self, direction):
         current_cat = self.opt_category.get()
-        try:
-            idx = self.collection_categories.index(current_cat)
-        except ValueError:
+        if current_cat not in self.collection_categories:
             return
 
+        idx = self.collection_categories.index(current_cat)
         new_idx = idx + direction
+
         if 0 <= new_idx < len(self.collection_categories):
-            self.collection_categories[idx], self.collection_categories[new_idx] = (
-                self.collection_categories[new_idx],
-                self.collection_categories[idx],
-            )
+            self.collection_categories.pop(idx)
+            self.collection_categories.insert(new_idx, current_cat)
+
             save_categories_config(self.collection_categories)
             self.opt_category.configure(values=self.collection_categories)
             self.opt_category.set(current_cat)
             self._refresh_treeview()
+            set_status_message(f"Moved category '{current_cat}' position.")
 
     def _delete_category(self):
         current_cat = self.opt_category.get()
-        if current_cat in DEFAULT_COLLECTION_CATEGORIES:
-            set_status_message("Cannot delete default preset categories.")
+        if not current_cat:
             return
 
         dialog = ConfirmationDialog(
             self, "Delete Category",
-            f"Are you sure you want to delete category '{current_cat}' and all its collections?"
+            f"Are you sure you want to delete category '{current_cat}' and all its collections? This cannot be undone."
         )
         self.wait_window(dialog)
 
@@ -807,41 +823,56 @@ class EditWorkspace(ctk.CTkFrame):
 
         if current_cat in self.collection_categories:
             self.collection_categories.remove(current_cat)
+
+        if current_cat in CATEGORY_FOLDER_MAP:
+            subfolder, filename = CATEGORY_FOLDER_MAP[current_cat]
+            base_dir = Path(__file__).resolve().parent.parent / "pgn"
+            cat_dir = base_dir / subfolder if subfolder else base_dir
+
+            if cat_dir.exists():
+                try:
+                    for f in cat_dir.glob("*.pgn"):
+                        f.unlink()
+                    if cat_dir != base_dir:
+                        cat_dir.rmdir()
+                except Exception as e:
+                    print(f"Error removing category folder files: {e}")
+
+            del CATEGORY_FOLDER_MAP[current_cat]
+
         if current_cat in self.collection_files_map:
             del self.collection_files_map[current_cat]
-        if current_cat in CATEGORY_FOLDER_MAP:
-            del CATEGORY_FOLDER_MAP[current_cat]
 
         save_categories_config(self.collection_categories)
 
         if self.collection_categories:
+            next_cat = self.collection_categories[0]
             self.opt_category.configure(values=self.collection_categories)
-            self.opt_category.set(self.collection_categories[0])
+            self.opt_category.set(next_cat)
         else:
             self.opt_category.configure(values=[""])
             self.opt_category.set("")
 
         self._refresh_treeview()
-        set_status_message(f"Deleted category '{current_cat}'.")
+        set_status_message(f"Category '{current_cat}' deleted successfully.")
 
     def _delete_selected_pgn_file(self):
         selected_items = self.col_tree.selection()
         if not selected_items:
-            set_status_message("Please select a PGN collection file in the tree to delete.")
+            set_status_message("Please select a PGN file collection from the tree view to delete.")
             return
 
         item_id = selected_items[0]
         if item_id not in self.file_lookup or self.file_lookup[item_id][0] != "file":
-            set_status_message("Please select a specific PGN collection file (not a category header).")
+            set_status_message("Please select an individual PGN file node in the tree view to delete.")
             return
 
-        cat = self.file_lookup[item_id][1]
-        fpath_str = self.file_lookup[item_id][2]
+        cat, fpath_str = self.file_lookup[item_id][1], self.file_lookup[item_id][2]
         fpath = Path(fpath_str)
 
         dialog = ConfirmationDialog(
-            self, "Delete PGN File",
-            f"Are you sure you want to delete collection file '{fpath.name}'?"
+            self, "Delete PGN Collection File",
+            f"Are you sure you want to delete collection file '{fpath.name}'? This cannot be undone."
         )
         self.wait_window(dialog)
 
@@ -852,90 +883,120 @@ class EditWorkspace(ctk.CTkFrame):
             if fpath.exists():
                 fpath.unlink()
         except Exception as e:
-            set_status_message(f"Error deleting file from disk: {e}")
-            return
+            print(f"Error deleting file {fpath}: {e}")
 
-        if cat in self.collection_files_map and fpath_str in self.collection_files_map[cat]:
-            del self.collection_files_map[cat][fpath_str]
-
-        if fpath_str in self.expanded_files:
-            self.expanded_files.remove(fpath_str)
-
+        self._load_category_files(cat)
         self._refresh_treeview()
-        set_status_message(f"Deleted collection file '{fpath.name}'.")
-
-    def _repair_eco_tags(self):
-        set_status_message("ECO tag repair scan initiated...")
-
-    def _browse_engine(self):
-        filetypes = [("Executable Files", "*.exe"), ("All Files", "*.*")] if os.name == "nt" else [("All Files", "*")]
-        path = filedialog.askopenfilename(title="Select UCI Chess Engine", filetypes=filetypes)
-        if path:
-            set_status_message(f"Selected engine: {Path(path).name}")
-
-    def _save_engine_settings(self):
-        set_status_message("Engine settings saved successfully.")
+        set_status_message(f"Collection file '{fpath.name}' deleted successfully.")
 
     def _create_collection(self):
         if not self.selected_files:
             set_status_message("No PGN files selected to create a collection.")
             return
 
-        all_games = []
-        games_data = []
-        for fpath_str in self.selected_files:
-            try:
-                with open(fpath_str, "r", encoding="utf-8", errors="ignore") as f:
-                    while True:
-                        game = chess.pgn.read_game(f)
-                        if game is None:
-                            break
-                        all_games.append(game)
-                        games_data.append({
-                            "game": game,
-                            "auto_select": True,
-                            "white": game.headers.get("White", "?"),
-                            "black": game.headers.get("Black", "?"),
-                            "opening": game.headers.get("Opening", "Unknown"),
-                            "variation": game.headers.get("Variation", "")
-                        })
-            except Exception as e:
-                print(f"Error reading {fpath_str}: {e}")
-
-        if len(all_games) > 300:
-            CollectionLimitDialog(self, len(all_games))
-            return
-
-        dialog = GameSelectionDialog(self, games_data)
-        self.wait_window(dialog)
-
-        selected = dialog.selected_games
-        if not selected:
-            set_status_message("Collection creation cancelled (no games selected).")
-            return
-
         current_cat = self.opt_category.get()
-        base_dir = Path(__file__).resolve().parent.parent / "pgn"
-        subfolder = CATEGORY_FOLDER_MAP.get(current_cat, ("", ""))[0]
-        cat_dir = base_dir / subfolder if subfolder else base_dir
-        cat_dir.mkdir(parents=True, exist_ok=True)
-
-        new_filename = f"custom_collection_{os.urandom(4).hex()}.pgn"
-        dest_path = cat_dir / new_filename
-
-        try:
-            with open(dest_path, "w", encoding="utf-8") as out_f:
-                for game in selected:
-                    exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-                    out_f.write(str(game.accept(exporter)) + "\n\n")
-        except Exception as e:
-            set_status_message(f"Error saving collection: {e}")
+        if not current_cat:
+            set_status_message("Please select a valid category first.")
             return
 
-        self.selected_files.clear()
-        self.lbl_selected_files.configure(text="No PGN files selected.")
-        self.btn_undo_pgn.pack_forget()
+        overlay = LoadingOverlay(self, message="Scanning selected PGN files...")
 
-        self._load_category_files(current_cat)
-        self._refresh_treeview()
-        set_status_message(f"Successfully created collection with {len(selected)} games under '{current_cat}'.")
+        def background_parse():
+            all_games_data = []
+            try:
+                for fpath_str in self.selected_files:
+                    fpath = Path(fpath_str)
+                    if not fpath.exists():
+                        continue
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        while True:
+                            pos = f.tell()
+                            game = chess.pgn.read_game(f)
+                            if game is None:
+                                break
+                            white = game.headers.get("White", "?")
+                            black = game.headers.get("Black", "?")
+                            opening = game.headers.get("Opening", "Unknown")
+                            variation = game.headers.get("Variation", "")
+
+                            all_games_data.append({
+                                "game": game,
+                                "white": white,
+                                "black": black,
+                                "opening": opening,
+                                "variation": variation,
+                                "auto_select": True
+                            })
+            except Exception as e:
+                print(f"Error parsing PGNs for collection creation: {e}")
+
+            self.after(0, lambda: finalize_collection(all_games_data))
+
+        def finalize_collection(games_data):
+            overlay.close()
+
+            if not games_data:
+                set_status_message("No valid games found in the selected PGN files.")
+                return
+
+            if len(games_data) > 300:
+                limit_dialog = CollectionLimitDialog(self, len(games_data))
+                self.wait_window(limit_dialog)
+                return
+
+            dialog = GameSelectionDialog(self, games_data)
+            self.wait_window(dialog)
+
+            selected_games = dialog.selected_games
+            if not selected_games:
+                set_status_message("Collection creation cancelled or no games selected.")
+                return
+
+            base_dir = Path(__file__).resolve().parent.parent / "pgn"
+            subfolder = CATEGORY_FOLDER_MAP.get(current_cat, ("", ""))[0]
+            cat_dir = base_dir / subfolder if subfolder else base_dir
+            cat_dir.mkdir(parents=True, exist_ok=True)
+
+            first_filename = Path(self.selected_files[0]).name
+            target_path = cat_dir / first_filename
+
+            counter = 1
+            while target_path.exists():
+                stem = Path(self.selected_files[0]).stem
+                target_path = cat_dir / f"{stem}_{counter}.pgn"
+                counter += 1
+
+            try:
+                with open(target_path, "w", encoding="utf-8") as out_f:
+                    for idx, g in enumerate(selected_games):
+                        exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+                        pgn_string = g.accept(exporter)
+                        out_f.write(pgn_string + "\n\n")
+
+                self.selected_files.clear()
+                self.lbl_selected_files.configure(text="No PGN files selected.")
+                self.btn_undo_pgn.pack_forget()
+
+                self._load_category_files(current_cat)
+                self._refresh_treeview()
+                set_status_message(f"Collection '{target_path.name}' created with {len(selected_games)} games.")
+            except Exception as e:
+                set_status_message(f"Error saving collection file: {e}")
+
+        threading.Thread(target=background_parse, daemon=True).start()
+
+    def _repair_eco_tags(self):
+        set_status_message("ECO tag repair scan initiated...")
+        # Placeholder or existing logic for ECO repair if present
+
+    def _browse_engine(self):
+        engine_path = filedialog.askopenfilename(
+            title="Select Chess Engine Executable",
+            filetypes=[("Executables", "*.exe"), ("All Files", "*.*")]
+        )
+        if engine_path:
+            setattr(self.app_state, "engine_path", engine_path)
+            set_status_message(f"Engine selected: {Path(engine_path).name}")
+
+    def _save_engine_settings(self):
+        set_status_message("Engine settings saved successfully.")
