@@ -21,6 +21,8 @@ def reset_importer_state():
     state.pgn_games_lookup = {}
     state.pgn_lookup = {}
     state.current_filename = None
+    if hasattr(state, "is_importing"):
+        state.is_importing = False
 
     tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
     pgn_item_lookup = getattr(state, 'pgn_item_lookup', {})
@@ -45,11 +47,23 @@ def import_pgn():
     if not filename:
         return
 
-    root_window = state.workspaces.get("catalog") or getattr(state, "app_root", None)
+    # Set active importing flag for external menu tracking / pollers
+    state.is_importing = True
+
+    # WorkspaceManager safe lookup helper
+    ws_manager = getattr(state, "workspace", None)
+    root_window = None
+    if ws_manager:
+        root_window = getattr(ws_manager, "catalog", None) or getattr(ws_manager, "search_catalog", None)
+
     if not root_window:
-        for ws in state.workspaces.values():
-            root_window = ws
-            break
+        root_window = getattr(state, "app_root", None)
+
+    if not root_window and ws_manager and hasattr(ws_manager, "__dict__"):
+        for val in ws_manager.__dict__.values():
+            if val is not None:
+                root_window = val
+                break
 
     if root_window:
         try:
@@ -70,6 +84,7 @@ def import_pgn():
     # Check duplicate in memory
     if filename in state.imported_files:
         set_status_message(f"{short_name} is already imported.")
+        state.is_importing = False
         return
 
     # Start progress bar for Phase 1 (Reading file)
@@ -79,7 +94,7 @@ def import_pgn():
     # Smoothly climb from 0% to 48% while reading
     def start_phase_1_ticker():
         def tick(val=0.0):
-            if val < 0.48:
+            if getattr(state, "is_importing", False) and val < 0.48:
                 new_val = val + 0.02
                 update_progress(new_val)
                 if root_window and hasattr(root_window, "after"):
@@ -100,6 +115,7 @@ def import_pgn():
                 games.append(game)
     except Exception as e:
         print(f"Error reading PGN file: {e}")
+        state.is_importing = False
         stop_progress()
         set_status_message(f"Failed to read {short_name}")
         return
@@ -119,7 +135,7 @@ def import_pgn():
 
             # Smoothly climb from 50% to 95% while DuckDB saves
             def tick_db(val=0.5):
-                if val < 0.95:
+                if getattr(state, "is_importing", False) and val < 0.95:
                     new_val = val + 0.02
                     update_progress(new_val)
                     if root_window and hasattr(root_window, "after"):
@@ -128,11 +144,11 @@ def import_pgn():
             tick_db(0.5)
 
         elif event_type == "phase_2_complete":
-            update_progress(1.0)
+            pass
 
     def on_catalog_complete(added_count):
         print(f"Catalog builder processed {added_count} new games.")
-        update_progress(1.0)
+        state.is_importing = False
         stop_progress()
 
         # Update Sidebar Tree
@@ -152,26 +168,30 @@ def import_pgn():
 
             tree_widget.insert(pgn_item, "end", text="Game Data")
 
-        # Refresh Workspace Views
-        if hasattr(state, 'workspaces'):
-            pgn_ws = state.workspaces.get("pgn_games")
-            if pgn_ws and hasattr(pgn_ws, 'load_games'):
-                pgn_ws.load_games()
-
-            for cat_key in ["catalog", "search_catalog", "search"]:
-                cat_ws = state.workspaces.get(cat_key)
+        # Refresh Workspace Views safely using attribute checks
+        ws = getattr(state, 'workspace', None)
+        if ws:
+            for cat_key in ["catalog", "search_catalog", "search", "catalog_workspace"]:
+                cat_ws = getattr(ws, cat_key, None)
                 if cat_ws:
                     if hasattr(cat_ws, 'load_catalog'):
                         cat_ws.load_catalog()
                     elif hasattr(cat_ws, 'load_data'):
                         cat_ws.load_data()
 
-            imp_ws = state.workspaces.get("import")
+            imp_ws = getattr(ws, 'import_ws', getattr(ws, 'import', None))
             if imp_ws:
                 if hasattr(imp_ws, "filename"):
                     imp_ws.filename = filename
                 if hasattr(imp_ws, "refresh_view"):
                     imp_ws.refresh_view()
+
+            # Ensure we affirmatively land and stay on the search catalog workspace
+            if hasattr(ws, 'show_workspace'):
+                for key in ["search_catalog", "catalog_workspace", "catalog", "search"]:
+                    if hasattr(ws, key):
+                        ws.show_workspace(key)
+                        break
 
         set_status_message(f"Added {short_name} ({len(games)} games) to catalog.")
 
@@ -189,6 +209,7 @@ def import_pgn():
             on_catalog_complete(added_count)
     except Exception as err:
         print(f"Warning: background cataloging failed: {err}")
+        state.is_importing = False
         stop_progress()
 
 
