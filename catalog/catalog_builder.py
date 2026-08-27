@@ -120,8 +120,15 @@ def catalog_pgns(filename, progress_callback=None):
 
 def run_import_in_background(filename, tk_root=None, on_complete_callback=None, progress_callback=None):
     """
-    Runs catalog_pgns in a background daemon thread with smooth progress callbacks.
+    Runs catalog_pgns in a background daemon thread with smooth progress callbacks
+    after shifting the active view to the search catalog workspace.
     """
+    # Local import to prevent circular dependency on startup, checking the file you provided previously
+    try:
+        from gui.catalog_workspace import show_workspace
+        show_workspace("search_catalog")
+    except ImportError as e:
+        print(f"[Workspace router] Could not switch view before import: {e}")
 
     def worker():
         try:
