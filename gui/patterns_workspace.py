@@ -602,55 +602,36 @@ class PatternsWorkspace(ctk.CTkFrame):
         black = headers.get("Black", "Unknown")
         set_status_message(f"Sending tier to analysis, focused on: {white} vs {black}")
 
-        # Find which tier container holds this game so we can send the full tier list
+        # Find which tier container holds this game so we send the full tier list
         full_tier_games = []
         for t_data in self.aggregated_tiers.values():
             if game_data in t_data.get("games", []):
                 full_tier_games = t_data["games"]
                 break
 
-        # Fallback if it wasn't found in any tier list
         if not full_tier_games:
             full_tier_games = [game_data]
 
-        # Set the active subset to the ENTIRE tier collection
-        self.app_state.active_analysis_subset = full_tier_games
+        target_game = game_data.get("game_object")
 
-        # Store the target game directly on app_state so the analysis side can access it without keyword arguments
-        if hasattr(self.app_state, "active_target_game"):
-            self.app_state.active_target_game = game_data.get("game_object")
-
-        if hasattr(self.app_state, "patterns_node") and self.app_state.patterns_node:
-            self.app_state.current_analysis_node = self.app_state.patterns_node
-
-        if hasattr(self.app_state, "load_games_into_analysis") and callable(
-                self.app_state.load_games_into_analysis
-        ):
-            # Pass the full tier list safely without unexpected keyword arguments
-            self.app_state.load_games_into_analysis(full_tier_games)
-        elif hasattr(self.app_state, "show_analysis_workspace") and callable(
-                self.app_state.show_analysis_workspace
-        ):
-            self.app_state.show_analysis_workspace()
+        # Clean 1-line handoff to app_state
+        self.app_state.set_active_patterns_collection(full_tier_games, focused_game=target_game)
 
     def send_tier_to_analysis(self, tier_key):
         tier_info = self.aggregated_tiers.get(tier_key, {})
         games = tier_info.get("games", [])
         set_status_message(
-            f"Sending {len(games)} games from"
-            f" {tier_info.get('label', tier_key)} to Analysis Section..."
+            f"Sending {len(games)} games from "
+            f"{tier_info.get('label', tier_key)} to Analysis Section..."
         )
 
-        # Set the active subset to the tier's filtered games list
-        self.app_state.active_analysis_subset = games
-        if hasattr(self.app_state, "patterns_node") and self.app_state.patterns_node:
-            self.app_state.current_analysis_node = self.app_state.patterns_node
+        # Clean 1-line handoff to app_state
+        self.app_state.set_active_patterns_collection(games)
 
-        if hasattr(self.app_state, "load_games_into_analysis") and callable(
-                self.app_state.load_games_into_analysis
-        ):
-            self.app_state.load_games_into_analysis(games)
-        elif hasattr(self.app_state, "show_analysis_workspace") and callable(
-                self.app_state.show_analysis_workspace
-        ):
-            self.app_state.show_analysis_workspace()
+# --- WORKSPACE FACTORY FUNCTION ---
+
+def create_patterns_workspace(master, *args, **kwargs):
+    """Factory function to instantiate and grid the PatternsWorkspace."""
+    instance = PatternsWorkspace(master, *args, **kwargs)
+    instance.grid(row=0, column=0, sticky="nsew")
+    return instance

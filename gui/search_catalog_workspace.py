@@ -26,7 +26,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         # Pop custom app_state or extra kwargs if passed to prevent CustomTkinter errors
         kwargs.pop("app_state", None)
         kwargs.pop("filename", None)
-        super().__init__(master, fg_color="#344268", corner_radius=0, *args, **kwargs)
+        super().__init__(master, fg_color="#172134", corner_radius=0, *args, **kwargs)
         self.app_state = app_state or state
 
         self.json_path = Path("personal_catalog.json")
@@ -456,7 +456,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                         text_color="#e2e8f0",
                         font=("Arial", 12),
                         height=32,
-                        command=lambda gk=group_key: self.toggle_group_expansion(gk)
+                        command=lambda idata=item_data, gk=group_key: [
+                            self.toggle_group_expansion(gk),
+                            self.on_group_click(idata)
+                        ]
                     )
                     row_btn.pack(fill="x", padx=2, pady=2)
 
@@ -659,17 +662,87 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             set_status_message("Error: Could not load game data.")
             return
 
+        # Delegate workspace switching and game loading through app_state
         try:
-            from gui.catalog_workspace import load_game_from_catalog
-            load_game_from_catalog(game_obj, target_workspace="analysis")
-        except Exception as e:
-            print(f"Error calling load_game_from_catalog: {e}")
-            ws = getattr(self.app_state, "workspace", None) or getattr(state, "workspace", None)
-            if ws and hasattr(ws, "load_game_and_switch"):
-                ws.load_game_and_switch(game_obj, target_workspace="analysis")
-            elif ws and hasattr(ws, "show_workspace"):
+            if hasattr(self.app_state, "load_game_and_switch"):
+                self.app_state.load_game_and_switch(game_obj, target_workspace="analysis")
+            elif hasattr(state, "load_game_and_switch"):
+                state.load_game_and_switch(game_obj, target_workspace="analysis")
+            else:
                 setattr(self.app_state, "active_analysis_game", game_obj)
-                ws.show_workspace("analysis")
+                ws = getattr(self.app_state, "workspace", None) or getattr(state, "workspace", None)
+                if ws and hasattr(ws, "show_workspace"):
+                    ws.show_workspace("catalog_analysis")
+        except Exception as e:
+            print(f"Error routing game to analysis: {e}")
+
+    def on_group_click(self, item_data):
+        """Passes only the instances belonging to this specific ECO/variation group to analysis."""
+        if not item_data or not item_data.get("instances"):
+            return
+
+        instances = item_data["instances"]
+        opening = item_data.get("opening", "Unknown")
+        eco = item_data.get("eco", "A00")
+
+        set_status_message(f"Loading ECO group {eco}: {opening} ({len(instances)} games)")
+
+        game_list = []
+        for inst in instances:
+            g_obj = inst.get("game_object")
+            if not g_obj:
+                headers = inst.get("headers", {})
+                w = self.get_header(headers, "White", "")
+                b = self.get_header(headers, "Black", "")
+                cat = eco[0].upper() if eco else "A"
+                eco_pgn = self.eco_files.get(cat)
+                source_pgn = eco_pgn if (eco_pgn and eco_pgn.exists()) else self.pgn_path
+
+                if source_pgn.exists():
+                    try:
+                        with open(source_pgn, "r", encoding="utf-8", errors="replace") as f:
+                            while True:
+                                parsed = chess.pgn.read_game(f)
+                                if parsed is None:
+                                    break
+                                if parsed.headers.get("White") == w and parsed.headers.get("Black") == b:
+                                    g_obj = parsed
+                                    inst["game_object"] = parsed
+                                    break
+                    except Exception:
+                        pass
+            if g_obj:
+                game_list.append(g_obj)
+
+        if not game_list:
+            set_status_message("Error: No games could be loaded for this group.")
+            return
+
+        try:
+            if hasattr(self.app_state, "load_game_group_and_switch"):
+                self.app_state.load_game_group_and_switch(game_list, focused_game=game_list[0])
+            elif hasattr(state, "load_game_group_and_switch"):
+                state.load_game_group_and_switch(game_list, focused_game=game_list[0])
+        except Exception as e:
+            print(f"Error routing game group to analysis: {e}")
+
+        if not game_list:
+            set_status_message("Error: No games could be loaded for this group.")
+            return
+
+        # Route the filtered subset through app_state
+        try:
+            if hasattr(self.app_state, "load_game_group_and_switch"):
+                self.app_state.load_game_group_and_switch(game_list, focused_game=game_list[0])
+            elif hasattr(state, "load_game_group_and_switch"):
+                state.load_game_group_and_switch(game_list, focused_game=game_list[0])
+            else:
+                setattr(self.app_state, "active_analysis_game", game_list[0])
+                ws = getattr(self.app_state, "workspace", None) or getattr(state, "workspace", None)
+                if ws and hasattr(ws, "show_workspace"):
+                    ws.show_workspace("catalog_analysis")
+        except Exception as e:
+            print(f"Error routing game group to analysis: {e}")
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))

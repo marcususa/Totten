@@ -108,15 +108,23 @@ class Sidebar(ctk.CTkFrame):
         parent = self.master
 
         if target == "search_catalog":
-            if not hasattr(state, "catalog_workspace") or not state.catalog_workspace:
-                from gui.search_catalog_workspace import SearchCatalogWorkspace
-                state.catalog_workspace = SearchCatalogWorkspace(parent, filename="personal_catalog.pgn")
-                state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.catalog_workspace.tkraise()
+            # Clear any active subset flags so the catalog workspace opens clean
+            state.active_group_games = None
+            state.active_focus_game = None
+
+            # Always ensure a fresh SearchCatalogWorkspace or bring it to the front properly
+            from gui.search_catalog_workspace import SearchCatalogWorkspace
+            if hasattr(state,
+                       "catalog_workspace") and state.catalog_workspace and state.catalog_workspace.winfo_exists():
+                state.catalog_workspace.destroy()
+
+            state.catalog_workspace = SearchCatalogWorkspace(parent, filename="personal_catalog.pgn")
+            state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
             state.workspace = state.catalog_workspace
 
         elif target == "analysis":
-            if not hasattr(state, "analysis_workspace") or not state.analysis_workspace:
+            if not hasattr(state,
+                           "analysis_workspace") or not state.analysis_workspace or not state.analysis_workspace.winfo_exists():
                 from gui.analysis_workspace import AnalysisWorkspace
                 state.analysis_workspace = AnalysisWorkspace(parent)
                 state.analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
@@ -128,7 +136,8 @@ class Sidebar(ctk.CTkFrame):
                 state.active_analysis_game = None
 
         elif target == "patterns":
-            if not hasattr(state, "patterns_workspace") or not state.patterns_workspace:
+            if not hasattr(state,
+                           "patterns_workspace") or not state.patterns_workspace or not state.patterns_workspace.winfo_exists():
                 from gui.patterns_workspace import PatternsWorkspace
                 state.patterns_workspace = PatternsWorkspace(parent)
                 state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
@@ -136,7 +145,8 @@ class Sidebar(ctk.CTkFrame):
             state.workspace = state.patterns_workspace
 
         elif target == "mixed":
-            if not hasattr(state, "edit_workspace") or not state.edit_workspace:
+            if not hasattr(state,
+                           "edit_workspace") or not state.edit_workspace or not state.edit_workspace.winfo_exists():
                 from gui.edit_workspace import EditWorkspace
                 state.edit_workspace = EditWorkspace(parent)
                 state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
@@ -144,7 +154,8 @@ class Sidebar(ctk.CTkFrame):
             state.workspace = state.edit_workspace
 
         elif target == "calendar":
-            if not hasattr(state, "calendar_workspace") or not state.calendar_workspace:
+            if not hasattr(state,
+                           "calendar_workspace") or not state.calendar_workspace or not state.calendar_workspace.winfo_exists():
                 from gui.calendar_workspace import CalendarWorkspace
                 state.calendar_workspace = CalendarWorkspace(parent)
                 state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)

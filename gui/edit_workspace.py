@@ -162,12 +162,12 @@ class GameSelectionDialog(ctk.CTkToplevel):
         )
         lbl.pack(anchor="w", padx=15, pady=(15, 5))
 
-        container = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8)
+        container = ctk.CTkFrame(self, fg_color="#172134", corner_radius=8)
         container.pack(fill="both", expand=True, padx=15, pady=10)
 
-        canvas = ctk.CTkCanvas(container, bg="#1e293b", highlightthickness=0)
+        canvas = ctk.CTkCanvas(container, bg="transparent", highlightthickness=0)
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
-        self.scrollable_frame = ctk.CTkFrame(canvas, fg_color="#1e293b")
+        self.scrollable_frame = ctk.CTkFrame(canvas, fg_color="transparent")
 
         self.scrollable_frame.bind(
             "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
@@ -342,7 +342,7 @@ class AddCategoryDialog(ctk.CTkToplevel):
 class EditWorkspace(ctk.CTkFrame):
 
     def __init__(self, master, app_state=None, filename=None):
-        super().__init__(master, fg_color="#1e293b", corner_radius=0)
+        super().__init__(master, fg_color="#172134", corner_radius=0)
         self.app_state = app_state or state
         self.filename = filename or getattr(state, "current_filename", None)
 
@@ -409,7 +409,7 @@ class EditWorkspace(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=2)
         self.grid_columnconfigure(1, weight=3)
 
-        left_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#334155", border_width=1)
+        left_box = ctk.CTkFrame(self, fg_color="#172134", corner_radius=8, border_color="#334155", border_width=1)
         left_box.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         left_box.grid_rowconfigure(0, weight=1)
         left_box.grid_columnconfigure(0, weight=1)
@@ -661,10 +661,16 @@ class EditWorkspace(ctk.CTkFrame):
         if item_id in self.game_lookup:
             game, source_data = self.game_lookup[item_id]
 
-            # Update state in place and switch to analysis workspace
+            # 1. Update global/app state (keeping both app_state and state fallbacks)
             setattr(self.app_state, "active_analysis_game", game)
             setattr(self.app_state, "active_category_source", source_data)
 
+            if hasattr(self.app_state, "set_active_mixed_collection"):
+                self.app_state.set_active_mixed_collection(source_data, focused_game=game)
+            elif hasattr(state, "set_active_mixed_collection"):
+                state.set_active_mixed_collection(source_data, focused_game=game)
+
+            # 2. Trigger registered callbacks
             if hasattr(self.app_state, "analysis_callbacks"):
                 for cb in self.app_state.analysis_callbacks:
                     try:
@@ -678,11 +684,18 @@ class EditWorkspace(ctk.CTkFrame):
                             except Exception:
                                 pass
 
-            # Switch view to analysis just like the sidebar does
-            if hasattr(self.app_state, "workspace") and hasattr(self.app_state.workspace, "show_workspace"):
-                self.app_state.workspace.show_workspace("analysis")
-            elif hasattr(state, "workspace") and hasattr(state.workspace, "show_workspace"):
-                state.workspace.show_workspace("analysis")
+            # 3. Get reference to workspace container
+            ws = getattr(self.app_state, "workspace", getattr(state, "workspace", None))
+
+            if ws and hasattr(ws, "show_workspace"):
+                # Switch view to analysis first
+                ws.show_workspace("analysis")
+
+                # 4. Explicitly tell the analysis view to render the new collection
+                # (Replace 'analysis_view' or 'load_mixed_collection' with your 2nd workspace's exact method name if different)
+                target_analysis_view = getattr(ws, "analysis_view", None)
+                if target_analysis_view and hasattr(target_analysis_view, "load_mixed_collection"):
+                    target_analysis_view.load_mixed_collection(source_data, focused_game=game)
 
             return True
 
