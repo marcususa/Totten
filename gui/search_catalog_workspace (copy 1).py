@@ -21,14 +21,6 @@ STANDARD_TAG_BANK = {
 }
 
 
-def on_group_selected(self, chosen_games_list):
-    # Store the chosen subset in the isolated catalog bucket
-    state.catalog_state["active_games"] = chosen_games_list
-
-    # Trigger the switch to the catalog analysis workspace
-    if hasattr(state, "show_workspace"):
-        state.show_workspace("catalog")
-
 class SearchCatalogWorkspace(ctk.CTkFrame):
     def __init__(self, master, app_state=None, *args, **kwargs):
         # Pop custom app_state or extra kwargs if passed to prevent CustomTkinter errors
@@ -739,8 +731,8 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
 
         try:
             if hasattr(state, "show_workspace") and callable(state.show_workspace):
-                # Pass initial_games explicitly so it bypasses global state lookups
-                state.show_workspace("catalog_analysis", initial_games=game_list)
+                # Switch to catalog_analysis
+                state.show_workspace("catalog_analysis")
         except Exception as e:
             print(f"Error routing game group to catalog analysis: {e}")
 

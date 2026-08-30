@@ -8,7 +8,7 @@ import chess.pgn
 import gui.app_state as state
 from gui.statusbar import set_status_message
 from core.constants import CONFIG_FILE
-from gui.chess_board import ChessBoardWidget
+from .chess_board import ChessBoardWidget
 
 
 class ToolTip:
@@ -63,7 +63,12 @@ class CatalogAnalysis(ctk.CTkFrame):
     def __init__(self, parent, filename=None, initial_games=None, *args, **kwargs):
         super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
         self.filename = filename or "personal_catalog.pgn"
-        self.game_list = initial_games or []
+
+        # Pull from isolated state immediately if initial_games is empty
+        if not initial_games and hasattr(state, "catalog_state"):
+            initial_games = state.catalog_state.get("active_games")
+
+        self.game_list = list(initial_games) if initial_games else []
         self.current_game = None
         self.board_node = None
         self.preview_lookup = {}
@@ -74,41 +79,32 @@ class CatalogAnalysis(ctk.CTkFrame):
         self.current_node = None
         self.active_engine_mode = "standard"
 
-        # Pop-out Board Tracking
-        self.popout_window = None
-        self.popout_board = None
-        self.popout_container = None
-        self.is_board_popped_out = False
-
         # Initialize the full UI shell layout
         self.init_layout()
 
         # Initial load of catalog data (will skip file load if initial_games were provided)
         self.load_catalog_data()
 
-        def load_games_list(self, games_list, focused_game=None):
-            """Populates the analysis view with a filtered subset of games and loads the board."""
-            if not games_list:
-                return
+    def load_games_list(self, games_list, focused_game=None):
+        """Populates the analysis view with a filtered subset of games and loads the board."""
+        if not games_list:
+            return
 
-            self.game_list = games_list
+        self.game_list = games_list
 
-            # 1. Populate the sidebar game tree with the filtered list
-            if hasattr(self, "populate_catalog_tree"):
-                self.populate_catalog_tree(self.game_list)
+        # 1. Populate the sidebar game tree with the filtered list
+        if hasattr(self, "populate_catalog_tree"):
+            self.populate_catalog_tree(self.game_list)
 
-            # 2. Load the target game onto the active analysis board
-            target_game = focused_game if focused_game else games_list[0]
-            if hasattr(self, "load_game"):
-                self.load_game(target_game)
+        # 2. Load the target game onto the active analysis board
+        target_game = focused_game if focused_game else games_list[0]
+        if hasattr(self, "load_game"):
+            self.load_game(target_game)
 
     def pop_out_board(self, *args, **kwargs):
-        """Alias for popout_board to maintain compatibility across workspaces."""
-        if hasattr(self, "popout_board_window"):
-            return self.popout_board_window(*args, **kwargs)
-        elif hasattr(self, "popout_board") and callable(getattr(self, "popout_board", None)) and not isinstance(
-                self.popout_board, ChessBoardWidget):
-            return self.popout_board(*args, **kwargs)
+        """Triggers the built-in chessboard widget popout mechanism."""
+        if hasattr(self, "board_widget") and self.board_widget and hasattr(self.board_widget, "toggle_popout"):
+            self.board_widget.toggle_popout()
 
     def load_game(self, game_node, category_source=None):
         """Universal entry point. Delegates to specialized hardwired methods if available."""
@@ -116,8 +112,11 @@ class CatalogAnalysis(ctk.CTkFrame):
             return self.load_game_hardwired(game_node, category_source=category_source)
         return self.load_game_from_state(game_node, category_source=category_source)
 
+
     def load_catalog_data(self):
         """Loads games from the target catalog PGN file into memory silently if no subset is active."""
+        # ABSOLUTE GUARD: If self.game_list already contains games (like our 5-game subset),
+        # do not touch the hard drive or reload the master catalog under any circumstances.
         if self.game_list:
             if hasattr(self, "pgn_tree"):
                 self.populate_catalog_tree(self.game_list)
@@ -231,14 +230,6 @@ class CatalogAnalysis(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # 1b. Update popped-out board if active
-        if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-            try:
-                fen_str = game_obj.board().fen()
-                self.popout_board.set_position_fen(fen_str)
-            except Exception:
-                pass
-
         headers = game_obj.headers
         white = headers.get("White", "Unknown")
         black = headers.get("Black", "Unknown")
@@ -257,13 +248,37 @@ class CatalogAnalysis(ctk.CTkFrame):
             except Exception:
                 pass
 
-        # 3. Update main moves view textbox notation
+        # 3. Update main moves view textbox notation with clean movement tracking and interactive highlighting tags
         if hasattr(self, "moves_textbox") and self.moves_textbox:
             try:
                 self.moves_textbox.configure(state="normal")
                 self.moves_textbox.delete("1.0", "end")
-                self.moves_textbox.insert("1.0", str(game_obj.mainline()))
+
+                # Reconstruct mainline moves with explicit move numbers and insert them as separate tagged chunks
+                temp_node = game_obj
+                move_num = 1
+                while temp_node.variations:
+                    next_node = temp_node.variation(0)
+                    san_move = temp_node.board().san(next_node.move)
+
+                    if temp_node.board().turn == chess.WHITE:
+                        move_str = f"{move_num}. {san_move} "
+                    else:
+                        move_str = f"{san_move} "
+                        move_num += 1
+
+                    # Insert the move linked directly to its target node object via a unique tag name
+                    tag_name = id(next_node)
+                    self.moves_textbox.insert("end", move_str, ("default", str(tag_name)))
+
+                    # Bind click event on this specific move token's tag range
+                    self.moves_textbox.tag_bind(str(tag_name), "<Button-1>",
+                                                lambda e, n=next_node: self.jump_to_node(n))
+
+                    temp_node = next_node
+
                 self.moves_textbox.configure(state="disabled")
+                self.update_active_move_highlight()
             except Exception:
                 pass
 
@@ -274,29 +289,64 @@ class CatalogAnalysis(ctk.CTkFrame):
             except Exception:
                 pass
 
+    def jump_to_node(self, target_node):
+        """Jumps directly to a specific game node when clicked in the move list."""
+        self.board_node = target_node
+        if hasattr(self, "board_widget") and self.board_widget:
+            self.board_widget.set_position_fen(self.board_node.board().fen())
+        self.update_active_move_highlight()
+
+    def update_active_move_highlight(self):
+        """Updates the active background highlight in the moves textbox corresponding to self.board_node."""
+        if not hasattr(self, "moves_textbox") or not self.moves_textbox:
+            return
+
+        try:
+            self.moves_textbox.configure(state="normal")
+            # Clear previous highlights across all possible tags
+            temp_node = self.current_game
+            while temp_node:
+                for var in temp_node.variations:
+                    tag = str(id(var))
+                    self.moves_textbox.tag_remove("active_move", "1.0", "end")
+                    temp_node = var
+                    break
+                else:
+                    break
+
+            # If we are past the root, highlight the current board_node's tag
+            if self.board_node and self.board_node != self.current_game:
+                current_tag = str(id(self.board_node))
+                # Find ranges for this tag and apply active_move background
+                ranges = self.moves_textbox.tag_ranges(current_tag)
+                if ranges:
+                    self.moves_textbox.tag_add("active_move", ranges[0], ranges[1])
+                    self.moves_textbox.see(ranges[0])
+
+            self.moves_textbox.configure(state="disabled")
+        except Exception:
+            pass
+
     def on_prev_move(self):
         if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
             self.board_node = self.board_node.parent
-            if hasattr(self, "chess_board") and self.chess_board:
-                self.chess_board.set_board(self.board_node.board())
-            elif hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
+            self.update_active_move_highlight()
 
     def on_next_move(self):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
-            if hasattr(self, "chess_board") and self.chess_board:
-                self.chess_board.set_board(self.board_node.board())
-            elif hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
+            self.update_active_move_highlight()
 
     def on_first_move(self):
         if hasattr(self, "current_game") and self.current_game:
             self.board_node = self.current_game
-            if hasattr(self, "chess_board") and self.chess_board:
-                self.chess_board.set_board(self.current_game.board())
-            elif hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.current_game.board().fen())
+            self.update_active_move_highlight()
 
     def on_last_move(self):
         if hasattr(self, "current_game") and self.current_game:
@@ -304,10 +354,9 @@ class CatalogAnalysis(ctk.CTkFrame):
             while node.variations:
                 node = node.variation(0)
             self.board_node = node
-            if hasattr(self, "chess_board") and self.chess_board:
-                self.chess_board.set_board(node.board())
-            elif hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(node.board().fen())
+            self.update_active_move_highlight()
 
     def trigger_engine_mode(self, mode):
         self.active_engine_mode = mode
@@ -340,59 +389,22 @@ class CatalogAnalysis(ctk.CTkFrame):
         self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
 
-        # 1. Board Panel (Top Left)
+        # 1. Board Panel (Top Left) - maximizes board area directly with integrated ChessBoardWidget controls
         self.left_board_panel = ctk.CTkFrame(self.left_pane_container, fg_color="#0f172a", corner_radius=8,
                                              border_width=1, border_color="#334155")
         self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5))
 
-        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_holder.pack(side="top", padx=10, pady=(10, 2))
+        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="#172134", corner_radius=0)
+        self.board_holder.pack(side="top", fill="both", expand=True, padx=10, pady=10)
 
-        self.board_widget = ChessBoardWidget(self.board_holder, square_size=50)
-        self.board_widget.pack()
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=52)
+        self.board_widget.pack(fill="both", expand=True)
 
-        self.placeholder_lbl = ctk.CTkLabel(
-            self.board_holder, text="[ Board Popped Out ]", text_color="#94a3b8"
-        )
-
-        self.board_controls = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_controls.pack(side="top", fill="x", padx=10, pady=(2, 10))
-
-        self.row_controls_layout = ctk.CTkFrame(self.board_controls, fg_color="transparent")
-        self.row_controls_layout.pack(anchor="center")
-
-        self.btn_prev = ctk.CTkButton(
-            self.row_controls_layout,
-            text="◀ Prev",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_prev_move
-        )
-        self.btn_prev.pack(side="left", padx=(0, 4))
-
-        self.btn_popout = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Pop Out ↗",
-            width=85,
-            height=26,
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self.pop_out_board
-        )
-        self.btn_popout.pack(side="left", padx=4)
-
-        self.btn_next = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Next ▶",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_next_move
-        )
-        self.btn_next.pack(side="left", padx=(4, 0))
+        # Wire integrated widget callbacks to parent methods
+        self.board_widget.on_step_back = self.on_prev_move
+        self.board_widget.on_step_forward = self.on_next_move
+        self.board_widget.on_jump_start = self.on_first_move
+        self.board_widget.on_jump_end = self.on_last_move
 
         # 2. Hardwired Tree Panel (Directly beneath board)
         self.top_catalog_panel = ctk.CTkFrame(self.left_pane_container, fg_color="#0f172a", corner_radius=8,
@@ -634,43 +646,36 @@ class CatalogAnalysis(ctk.CTkFrame):
         ToolTip(self.btn_standard, "Standard")
 
 
-# Standalone factory and view helper functions for main.py integration
-def create_workspace(master):
-    """Instantiates CatalogAnalysis, utilizing filtered games only if an active group switch occurred."""
+def create_workspace(master, initial_games=None, **kwargs):
+    """Instantiates CatalogAnalysis, utilizing filtered games from search or group selection."""
     import gui.app_state as state_mod
 
-    initial = getattr(state_mod, "active_group_games", None)
+    # 1. Capture from state if not explicitly passed, checking all potential search/filter sources
+    if initial_games is None:
+        initial_games = (
+            getattr(state_mod, "active_group_games", None) or
+            getattr(state_mod, "active_search_results", None) or
+            getattr(state_mod, "active_category_source", None)
+        )
+
     focus = getattr(state_mod, "active_focus_game", None)
 
-    # Consume the flags so future sidebar clicks load the full catalog normally
+    # 2. Instantiate with the captured subset
+    instance = CatalogAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games)
+
+    # 3. Apply focus or initial selection
+    if focus and hasattr(instance, "load_game"):
+        instance.load_game(focus)
+    elif initial_games and hasattr(instance, "load_game"):
+        instance.load_game(initial_games[0])
+
+    # 4. Clear transient state variables after consumption
     if hasattr(state_mod, "active_group_games"):
         state_mod.active_group_games = None
+    if hasattr(state_mod, "active_search_results"):
+        state_mod.active_search_results = None
     if hasattr(state_mod, "active_focus_game"):
         state_mod.active_focus_game = None
 
-    # If initial games were passed, pass them; otherwise let it load silently from disk
-    instance = CatalogAnalysis(master, filename="personal_catalog.pgn", initial_games=initial)
-
-    if focus and hasattr(instance, "load_game"):
-        instance.load_game(focus)
-    elif initial and hasattr(instance, "load_game"):
-        instance.load_game(initial[0])
-
     state_mod.workspace = instance
     return instance
-
-
-def show_workspace(name=None):
-    """Handles independent navigation triggered by the sidebar."""
-    if not hasattr(state, "workspace") or not state.workspace:
-        return
-
-    # If the user clicks catalog from the sidebar
-    if name in ("search_catalog", "catalog", "catalog_analysis"):
-        if hasattr(state.workspace, "tkraise"):
-            state.workspace.tkraise()
-
-    elif name in ("mixed", "mixed_analysis"):
-        pass
-    elif name in ("patterns", "patterns_analysis"):
-        pass

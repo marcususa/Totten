@@ -53,6 +53,7 @@ class Sidebar(ctk.CTkFrame):
             command=lambda: self.on_navigate("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
+        state.show_workspace("search_catalog")
 
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
@@ -71,7 +72,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_mixed = ctk.CTkButton(
             self, text="Mixed Collections", anchor="w", fg_color="transparent",
             hover_color="#2e4a8c", text_color="white",
-            command=lambda: self.on_navigate("mixed")
+            command=lambda: state.show_workspace("mixed_search")
         )
         self.btn_mixed.pack(fill="x", padx=4, pady=5)
 
@@ -104,63 +105,71 @@ class Sidebar(ctk.CTkFrame):
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 6))
 
     def _default_navigate(self, target):
-        """Switchboard navigation router handling workspace switching directly inside the sidebar."""
-        parent = self.master
+        """Switchboard navigation router handling workspace switching directly via state."""
+        if hasattr(state, "show_workspace") and callable(state.show_workspace):
+            if target == "analysis":
+                state.show_workspace("catalog", initial_games=None)
+            elif target == "patterns":
+                state.show_workspace("patterns")
+            else:
+                state.show_workspace(target)
+        else:
+            # Fallback block...
+            parent = self.master
+            if target == "search_catalog":
+                state.active_group_games = None
+                state.active_focus_game = None
 
-        if target == "search_catalog":
-            # Clear any active subset flags so the catalog workspace opens clean
-            state.active_group_games = None
-            state.active_focus_game = None
+                if not hasattr(state,
+                               "search_catalog_workspace") or not state.search_catalog_workspace or not state.search_catalog_workspace.winfo_exists():
+                    from gui.search_catalog_workspace import SearchCatalogWorkspace
+                    state.search_catalog_workspace = SearchCatalogWorkspace(parent)
+                    state.search_catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-            # Always ensure a fresh SearchCatalogWorkspace or bring it to the front properly
-            from gui.search_catalog_workspace import SearchCatalogWorkspace
-            if hasattr(state,
-                       "catalog_workspace") and state.catalog_workspace and state.catalog_workspace.winfo_exists():
-                state.catalog_workspace.destroy()
+                state.search_catalog_workspace.tkraise()
+                state.workspace = state.search_catalog_workspace
+                if hasattr(state.search_catalog_workspace, "refresh_view"):
+                    state.search_catalog_workspace.refresh_view()
 
-            state.catalog_workspace = SearchCatalogWorkspace(parent, filename="personal_catalog.pgn")
-            state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.workspace = state.catalog_workspace
+            elif target == "analysis":
+                state.active_group_games = None
+                state.active_focus_game = None
 
-        elif target == "analysis":
-            if not hasattr(state,
-                           "analysis_workspace") or not state.analysis_workspace or not state.analysis_workspace.winfo_exists():
-                from gui.analysis_workspace import AnalysisWorkspace
-                state.analysis_workspace = AnalysisWorkspace(parent)
-                state.analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.analysis_workspace.tkraise()
-            state.workspace = state.analysis_workspace
+                if not hasattr(state,
+                               "catalog_workspace") or not state.catalog_workspace or not state.catalog_workspace.winfo_exists():
+                    from gui.catalog_analysis import create_workspace
+                    state.catalog_workspace = create_workspace(parent)
+                    state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-            if hasattr(state, "active_analysis_game") and state.active_analysis_game:
-                state.analysis_workspace.load_game(state.active_analysis_game)
-                state.active_analysis_game = None
+                state.catalog_workspace.tkraise()
+                state.workspace = state.catalog_workspace
+                if hasattr(state.catalog_workspace, "refresh_view"):
+                    state.catalog_workspace.refresh_view()
 
-        elif target == "patterns":
-            if not hasattr(state,
-                           "patterns_workspace") or not state.patterns_workspace or not state.patterns_workspace.winfo_exists():
-                from gui.patterns_workspace import PatternsWorkspace
-                state.patterns_workspace = PatternsWorkspace(parent)
-                state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.patterns_workspace.tkraise()
-            state.workspace = state.patterns_workspace
+            elif target == "patterns":
+                state.show_workspace("patterns")
 
-        elif target == "mixed":
-            if not hasattr(state,
-                           "edit_workspace") or not state.edit_workspace or not state.edit_workspace.winfo_exists():
-                from gui.edit_workspace import EditWorkspace
-                state.edit_workspace = EditWorkspace(parent)
-                state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.edit_workspace.tkraise()
-            state.workspace = state.edit_workspace
+            elif target == "mixed":
+                if not hasattr(state,
+                               "edit_workspace") or not state.edit_workspace or not state.edit_workspace.winfo_exists():
+                    from gui.edit_workspace import EditWorkspace
+                    state.edit_workspace = EditWorkspace(parent)
+                    state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+                state.edit_workspace.tkraise()
+                state.workspace = state.edit_workspace
+                if hasattr(state.edit_workspace, "refresh_view"):
+                    state.edit_workspace.refresh_view()
 
-        elif target == "calendar":
-            if not hasattr(state,
-                           "calendar_workspace") or not state.calendar_workspace or not state.calendar_workspace.winfo_exists():
-                from gui.calendar_workspace import CalendarWorkspace
-                state.calendar_workspace = CalendarWorkspace(parent)
-                state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.calendar_workspace.tkraise()
-            state.workspace = state.calendar_workspace
+            elif target == "calendar":
+                if not hasattr(state,
+                               "calendar_workspace") or not state.calendar_workspace or not state.calendar_workspace.winfo_exists():
+                    from gui.calendar_workspace import CalendarWorkspace
+                    state.calendar_workspace = CalendarWorkspace(parent)
+                    state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+                state.calendar_workspace.tkraise()
+                state.workspace = state.calendar_workspace
+                if hasattr(state.calendar_workspace, "refresh_view"):
+                    state.calendar_workspace.refresh_view()
 
     def _on_qeval_focus_in(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
@@ -179,8 +188,14 @@ class Sidebar(ctk.CTkFrame):
         if not raw_text or raw_text == self.placeholder_text:
             set_status_message("Error: Quick Evaluation box is empty.")
             return None
+
+        cleaned_lines = []
+        for line in raw_text.splitlines():
+            cleaned_lines.append(line.strip())
+        normalized_text = "\n".join(cleaned_lines)
+
         try:
-            pgn_io = io.StringIO(raw_text)
+            pgn_io = io.StringIO(normalized_text)
             game_node = chess.pgn.read_game(pgn_io)
             if not game_node:
                 set_status_message("Error: Invalid PGN format in Quick Evaluation.")

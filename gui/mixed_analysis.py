@@ -1,5 +1,3 @@
-# gui/mixed_analysis.py
-
 from pathlib import Path
 import json
 import chess.pgn
@@ -9,8 +7,9 @@ import chess
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
-from gui.chess_board import ChessBoardWidget
+from .chess_board import ChessBoardWidget
 from core.constants import CONFIG_FILE
+
 
 BASE_PGN_DIR = Path(__file__).resolve().parent.parent / "pgn"
 
@@ -72,7 +71,9 @@ def get_saved_pgn_filename():
 
 
 class MixedAnalysis(ctk.CTkFrame):
-    def __init__(self, parent, filename=None, *args, **kwargs):
+    def __init__(self, parent, filename=None, initial_games=None, *args, **kwargs):
+        if initial_games is not None:
+            kwargs["initial_games"] = initial_games
         super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
         self.filename = filename or (BASE_PGN_DIR / "mixed_analysis.pgn")
         self.game_list = []
@@ -84,7 +85,6 @@ class MixedAnalysis(ctk.CTkFrame):
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
-        self.active_engine_mode = "standard"
 
         self.popout_window = None
         self.popout_board = None
@@ -97,8 +97,12 @@ class MixedAnalysis(ctk.CTkFrame):
         self.init_layout()
         self._apply_tree_styles()
         self._bind_analysis_events()
+        self._bind_keyboard_events()
 
-        if hasattr(state, "active_category_source") and state.active_category_source:
+        # Handle data source loading cleanly
+        if "initial_games" in kwargs and kwargs["initial_games"]:
+            self.load_mixed_collection(kwargs["initial_games"])
+        elif hasattr(state, "active_category_source") and state.active_category_source:
             if isinstance(state.active_category_source, list):
                 self.load_mixed_collection(state.active_category_source)
             else:
@@ -111,7 +115,6 @@ class MixedAnalysis(ctk.CTkFrame):
             return self.popout_board_window(*args, **kwargs)
         elif hasattr(self, "popout_board") and callable(getattr(self, "popout_board", None)) and not isinstance(
                 self.popout_board, ctk.CTkFrame):
-            # If it's a method
             pass
 
         if self.is_board_popped_out:
@@ -122,13 +125,10 @@ class MixedAnalysis(ctk.CTkFrame):
         self.is_board_popped_out = True
 
         self.board_widget.pack_forget()
-        self.placeholder_lbl.pack(padx=10, pady=25)
-
-        if hasattr(self, "btn_popout"):
-            self.btn_popout.configure(text="Dock Board ↙", fg_color="#475569", hover_color="#64748b")
+        self.placeholder_lbl.pack(padx=10, pady=25, anchor="w")
 
         self.popout_window = ctk.CTkToplevel(self)
-        self.popout_window.title("Chess Board Analysis - Pop-out")
+        self.popout_window.title("Chess Board Analysis - Mixed Pop-out")
         self.popout_window.geometry("400x440")
         self.popout_window.configure(fg_color="#172134")
 
@@ -139,7 +139,7 @@ class MixedAnalysis(ctk.CTkFrame):
         popout_container.pack(fill="both", expand=True, padx=20, pady=20)
 
         self.popout_board = ChessBoardWidget(popout_container, square_size=55)
-        self.popout_board.pack(anchor="center", pady=(10, 10))
+        self.popout_board.pack(anchor="w", pady=(10, 10))
 
         fen_to_set = self.board_node.board().fen() if self.board_node else (
             self.current_game.board().fen() if self.current_game else chess.STARTING_FEN)
@@ -156,13 +156,10 @@ class MixedAnalysis(ctk.CTkFrame):
             self.popout_window = None
             self.popout_board = None
 
-        if hasattr(self, "btn_popout"):
-            self.btn_popout.configure(text="Pop Out ↗", fg_color="#334155", hover_color="#475569")
-
         if hasattr(self, "placeholder_lbl"):
             self.placeholder_lbl.pack_forget()
         if hasattr(self, "board_widget") and hasattr(self, "board_holder"):
-            self.board_widget.pack(in_=self.board_holder)
+            self.board_widget.pack(in_=self.board_holder, anchor="w")
 
         fen_to_set = self.board_node.board().fen() if self.board_node else (
             self.current_game.board().fen() if self.current_game else chess.STARTING_FEN)
@@ -172,6 +169,10 @@ class MixedAnalysis(ctk.CTkFrame):
         if hasattr(self, "load_game_hardwired"):
             return self.load_game_hardwired(game_node, category_source=category_source)
         return self.load_game_from_state(game_node, category_source=category_source)
+
+    def load_games_list(self, games_list):
+        """Directly updates and loads a new list of games into the mixed collection view."""
+        self.load_mixed_collection(games_list)
 
     def _apply_tree_styles(self):
         style = ttk.Style()
@@ -225,6 +226,28 @@ class MixedAnalysis(ctk.CTkFrame):
         if target:
             target.bind("<<TreeviewSelect>>", self._on_tree_select, add="+")
 
+    def _bind_keyboard_events(self):
+        """Binds arrow keys and 'f'/'F' keys safely, scoping execution to the active workspace."""
+        top_level = self.winfo_toplevel()
+
+        top_level.bind("<Left>", lambda e: self._safe_handle(self.on_prev_move, e))
+        top_level.bind("<Right>", lambda e: self._safe_handle(self.on_next_move, e))
+        top_level.bind("<Up>", lambda e: self._safe_handle(self.on_first_move, e))
+        top_level.bind("<Down>", lambda e: self._safe_handle(self.on_last_move, e))
+        top_level.bind("f", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
+        top_level.bind("F", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
+
+    def _safe_handle(self, callback, event):
+        """Ensures keyboard shortcuts only trigger if this workspace is currently visible/active."""
+        try:
+            if self.winfo_ismapped():
+                focused = self.winfo_toplevel().focus_get()
+                if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+                    return
+                callback()
+        except Exception:
+            pass
+
     def _on_tree_select(self, event):
         target = event.widget
         selected_items = target.selection()
@@ -249,7 +272,6 @@ class MixedAnalysis(ctk.CTkFrame):
 
             state.active_analysis_game = game
             state.active_category_source = source_data
-            # Pass False so load_game_from_state doesn't re-select the item in the tree
             self.load_game_from_state(game, category_source=source_data, update_tree_selection=False)
             return True
 
@@ -287,7 +309,7 @@ class MixedAnalysis(ctk.CTkFrame):
                     g.accept(exporter)
                     f.write("\n")
         except Exception as e:
-            set_status_message(f"Error saving collection to PGN path: {e}")
+            set_status_message(f"Error saving mixed collection to PGN path: {e}")
             return
 
         self.filename = target_file_path
@@ -323,7 +345,7 @@ class MixedAnalysis(ctk.CTkFrame):
                             break
                         game_list.append(game)
             except Exception as e:
-                set_status_message(f"Error loading PGN file: {e}")
+                set_status_message(f"Error loading mixed PGN file: {e}")
 
         self.game_list = game_list
 
@@ -338,9 +360,15 @@ class MixedAnalysis(ctk.CTkFrame):
                 self.preview_lookup[item_id] = game
                 self.game_lookup[item_id] = game
 
+            # Automatically select and load the first game if available
+            if game_list and target.get_children():
+                first_item = target.get_children()[0]
+                target.selection_set(first_item)
+                self.load_game_from_state(game_list[0], update_tree_selection=False)
+
         if not game_list and hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-            self.lbl_empty_state.configure(text="No games loaded in analysis view.")
-            self.lbl_empty_state.pack(padx=20, pady=20)
+            self.lbl_empty_state.configure(text="No games loaded in mixed analysis view.")
+            self.lbl_empty_state.pack(padx=20, pady=20, anchor="w")
         elif hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
             self.lbl_empty_state.pack_forget()
 
@@ -372,9 +400,6 @@ class MixedAnalysis(ctk.CTkFrame):
                 pass
 
         headers = game_obj.headers
-        white = headers.get("White", "Unknown")
-        black = headers.get("Black", "Unknown")
-        result = headers.get("Result", "*")
 
         if hasattr(self, "pgn_data_text") and self.pgn_data_text:
             try:
@@ -392,18 +417,31 @@ class MixedAnalysis(ctk.CTkFrame):
             try:
                 self.moves_textbox.configure(state="normal")
                 self.moves_textbox.delete("1.0", "end")
-                self.moves_textbox.insert("1.0", str(game_obj.mainline()))
+
+                temp_node = game_obj
+                move_num = 1
+                while temp_node.variations:
+                    next_node = temp_node.variation(0)
+                    san_move = temp_node.board().san(next_node.move)
+
+                    if temp_node.board().turn == chess.WHITE:
+                        move_str = f"{move_num}. {san_move} "
+                    else:
+                        move_str = f"{san_move} "
+                        move_num += 1
+
+                    tag_name = id(next_node)
+                    self.moves_textbox.insert("end", move_str, ("default", str(tag_name)))
+                    self.moves_textbox.tag_bind(str(tag_name), "<Button-1>",
+                                                lambda e, n=next_node: self.jump_to_node(n))
+
+                    temp_node = next_node
+
                 self.moves_textbox.configure(state="disabled")
+                self.update_active_move_highlight()
             except Exception:
                 pass
 
-        if hasattr(self, "_load_plain_game_moves"):
-            try:
-                self._load_plain_game_moves(game_obj)
-            except Exception:
-                pass
-
-        # Only update selection programmatically if called externally (not from clicking a row)
         if update_tree_selection:
             target = getattr(self, "col_tree", None) or getattr(self, "pgn_tree", None)
             lookup_dict = getattr(self, "game_lookup", None) or getattr(self, "preview_lookup", None)
@@ -414,34 +452,78 @@ class MixedAnalysis(ctk.CTkFrame):
                         target.see(item_id)
                         break
 
-    def on_prev_move(self):
+    def jump_to_node(self, target_node):
+        """Jumps directly to a specific game node when clicked in the move list."""
+        self.board_node = target_node
+        if hasattr(self, "board_widget") and self.board_widget:
+            self.board_widget.set_position_fen(self.board_node.board().fen())
+        if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
+            try:
+                self.popout_board.set_position_fen(self.board_node.board().fen())
+            except Exception:
+                pass
+        self.update_active_move_highlight()
+
+    def update_active_move_highlight(self):
+        """Updates the active background highlight in the moves textbox corresponding to self.board_node."""
+        if not hasattr(self, "moves_textbox") or not self.moves_textbox:
+            return
+
+        try:
+            self.moves_textbox.configure(state="normal")
+            self.moves_textbox.tag_remove("active_move", "1.0", "end")
+
+            if self.board_node and self.board_node != self.current_game:
+                current_tag = str(id(self.board_node))
+                ranges = self.moves_textbox.tag_ranges(current_tag)
+                if ranges:
+                    self.moves_textbox.tag_add("active_move", ranges[0], ranges[1])
+                    self.moves_textbox.see(ranges[0])
+
+            self.moves_textbox.configure(state="disabled")
+        except Exception:
+            pass
+
+    def on_prev_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
             self.board_node = self.board_node.parent
             fen = self.board_node.board().fen()
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(fen)
             if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
+                try:
+                    self.popout_board.set_position_fen(fen)
+                except Exception:
+                    pass
+            self.update_active_move_highlight()
 
-    def on_next_move(self):
+    def on_next_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
             fen = self.board_node.board().fen()
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(fen)
             if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
+                try:
+                    self.popout_board.set_position_fen(fen)
+                except Exception:
+                    pass
+            self.update_active_move_highlight()
 
-    def on_first_move(self):
+    def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
             self.board_node = self.current_game
             fen = self.current_game.board().fen()
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(fen)
             if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
+                try:
+                    self.popout_board.set_position_fen(fen)
+                except Exception:
+                    pass
+            self.update_active_move_highlight()
 
-    def on_last_move(self):
+    def on_last_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
             node = self.current_game
             while node.variations:
@@ -451,19 +533,11 @@ class MixedAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(fen)
             if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
-
-    def trigger_engine_mode(self, mode):
-        self.active_engine_mode = mode
-        if hasattr(self, "btn_review") and hasattr(self, "btn_candidates") and hasattr(self, "btn_standard"):
-            for b in (self.btn_review, self.btn_candidates, self.btn_standard):
-                b.configure(fg_color="#1e293b", hover_color="#334155")
-            if mode == "review":
-                self.btn_review.configure(fg_color="#2e4a8c", hover_color="#4870cd")
-            elif mode == "candidates":
-                self.btn_candidates.configure(fg_color="#2e4a8c", hover_color="#4870cd")
-            elif mode == "standard":
-                self.btn_standard.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+                try:
+                    self.popout_board.set_position_fen(fen)
+                except Exception:
+                    pass
+            self.update_active_move_highlight()
 
     def init_layout(self):
         if hasattr(state, "register_analysis_callback"):
@@ -472,7 +546,6 @@ class MixedAnalysis(ctk.CTkFrame):
         self.preview_lookup = {}
         self.game_lookup = {}
         self.active_game = None
-        self.active_engine_mode = "standard"
 
         self.popout_window = None
         self.popout_board = None
@@ -499,53 +572,20 @@ class MixedAnalysis(ctk.CTkFrame):
         self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5))
 
         self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_holder.pack(side="top", padx=10, pady=(10, 2))
+        self.board_holder.pack(side="top", fill="x", padx=10, pady=(10, 10))
 
         self.board_widget = ChessBoardWidget(self.board_holder, square_size=50)
-        self.board_widget.pack()
+        self.board_widget.pack(anchor="w")
+
+        # Wire integrated widget callbacks to parent methods
+        self.board_widget.on_step_back = self.on_prev_move
+        self.board_widget.on_step_forward = self.on_next_move
+        self.board_widget.on_jump_start = self.on_first_move
+        self.board_widget.on_jump_end = self.on_last_move
 
         self.placeholder_lbl = ctk.CTkLabel(
             self.board_holder, text="[ Board Popped Out ]", text_color="#94a3b8"
         )
-
-        self.board_controls = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_controls.pack(side="top", fill="x", padx=10, pady=(2, 10))
-
-        self.row_controls_layout = ctk.CTkFrame(self.board_controls, fg_color="transparent")
-        self.row_controls_layout.pack(anchor="center")
-
-        self.btn_prev = ctk.CTkButton(
-            self.row_controls_layout,
-            text="◀ Prev",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_prev_move
-        )
-        self.btn_prev.pack(side="left", padx=(0, 4))
-
-        self.btn_popout = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Pop Out ↗",
-            width=85,
-            height=26,
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self.pop_out_board
-        )
-        self.btn_popout.pack(side="left", padx=4)
-
-        self.btn_next = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Next ▶",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_next_move
-        )
-        self.btn_next.pack(side="left", padx=(4, 0))
 
         self.top_catalog_panel = ctk.CTkFrame(
             self.left_pane_container,
@@ -602,7 +642,6 @@ class MixedAnalysis(ctk.CTkFrame):
 
         self.right_analysis_panel.rowconfigure(0, weight=1)
         self.right_analysis_panel.rowconfigure(1, weight=1)
-        self.right_analysis_panel.rowconfigure(2, weight=0)
         self.right_analysis_panel.columnconfigure(0, weight=1)
 
         self.analysis_container_frame = ctk.CTkFrame(
@@ -645,25 +684,6 @@ class MixedAnalysis(ctk.CTkFrame):
         self.moves_textbox.pack(fill="both", expand=True, padx=0, pady=0)
         self.review_container.pack(fill="both", expand=True)
 
-        self.candidates_container = ctk.CTkFrame(self.analysis_inner_wrapper, fg_color="transparent")
-
-        self.candidates_textbox = ctk.CTkTextbox(
-            self.candidates_container,
-            fg_color="#1e293b",
-            text_color="#f8fafc",
-            font=ctk.CTkFont(family="Arial", size=11),
-            height=80,
-            wrap="none"
-        )
-        self.candidates_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
-
-        self.candidates_textbox.tag_config("red", foreground="#FF4444")
-        self.candidates_textbox.tag_config("orange", foreground="#FFA500")
-        self.candidates_textbox.tag_config("green", foreground="#00C851")
-        self.candidates_textbox.tag_config("light_blue", foreground="#33b5e5")
-        self.candidates_textbox.tag_config("default", foreground="#f8fafc")
-        self.candidates_textbox.pack(side="left", fill="both", expand=True, padx=0, pady=0)
-
         self.pgn_data_panel = ctk.CTkFrame(
             self.right_analysis_panel,
             fg_color="#0f172a",
@@ -671,12 +691,13 @@ class MixedAnalysis(ctk.CTkFrame):
             border_width=1,
             border_color="#334155"
         )
-        self.pgn_data_panel.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
+        self.pgn_data_panel.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
 
         self.lbl_pgn_data_title = ctk.CTkLabel(
             self.pgn_data_panel, text="Game Details", font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#94a3b8"
         )
+        self.lbl_data_title = self.lbl_pgn_data_title
         self.lbl_pgn_data_title.pack(anchor="w", padx=10, pady=(6, 2))
 
         self.pgn_data_text = ctk.CTkTextbox(
@@ -691,69 +712,47 @@ class MixedAnalysis(ctk.CTkFrame):
         self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.pgn_data_text.insert("end", "[No game selected. Click a game to load its PGN moves...]\n")
 
-        self.controls_panel = ctk.CTkFrame(
-            self.right_analysis_panel,
-            fg_color="#0f172a",
-            corner_radius=8,
-            border_width=1,
-            border_color="#334155"
-        )
-        self.controls_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
-        self.analysis_mode_content = ctk.CTkFrame(self.controls_panel, fg_color="transparent")
-        self.analysis_mode_content.pack(fill="x", expand=True, padx=10, pady=10)
-
-        self.row_analysis_layout = ctk.CTkFrame(self.analysis_mode_content, fg_color="transparent")
-        self.row_analysis_layout.pack(anchor="center")
-
-        self.lbl_engine_title = ctk.CTkLabel(
-            self.row_analysis_layout, text="Engine", font=ctk.CTkFont(size=11), text_color="#94a3b8"
-        )
-        self.lbl_engine_title.pack(side="left", padx=(0, 8))
-
-        self.row_analysis_btns = ctk.CTkFrame(self.row_analysis_layout, fg_color="transparent")
-        self.row_analysis_btns.pack(side="left")
-
-        self.btn_review = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="1",
-            width=24,
-            height=24,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=lambda: self.trigger_engine_mode("review")
-        )
-        self.btn_review.pack(side="left", padx=2)
-        ToolTip(self.btn_review, "Game Review")
-
-        self.btn_candidates = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="2",
-            width=24,
-            height=24,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("candidates")
-        )
-        self.btn_candidates.pack(side="left", padx=2)
-        ToolTip(self.btn_candidates, "Candidate Moves")
-
-        self.btn_standard = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="3",
-            width=24,
-            height=24,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("standard")
-        )
-        self.btn_standard.pack(side="left", padx=2)
-        ToolTip(self.btn_standard, "Standard")
-
-
-def create_mixed_workspace(master, filename=None):
-    instance = MixedAnalysis(master, filename=filename)
+def create_mixed_workspace(master, filename=None, initial_games=None):
+    instance = MixedAnalysis(master, filename=filename, initial_games=initial_games)
     instance.grid(row=0, column=0, sticky="nsew")
     state.workspace = instance
     state.analysis_workspace = instance
     return instance
+
+
+def open_mixed_analysis_view(self, games_subset):
+    """Transitions from edit workspace to mixed analysis with the selected games."""
+    parent = self.master
+
+    state.active_category_source = games_subset
+
+    if not hasattr(state, "mixed_workspace") or not state.mixed_workspace or not state.mixed_workspace.winfo_exists():
+        state.mixed_workspace = MixedAnalysis(parent, initial_games=games_subset)
+        state.mixed_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+    else:
+        if hasattr(state.mixed_workspace, "load_games_list"):
+            state.mixed_workspace.load_games_list(games_subset)
+
+    state.mixed_workspace.tkraise()
+    state.workspace = state.mixed_workspace
+    state.analysis_workspace = state.mixed_workspace
+
+
+def show_workspace(target):
+    """Global switchboard method to route workspace views dynamically from any active frame."""
+    app = getattr(state, "app_root", None)
+    if not app:
+        return
+
+    if target == "mixed" or target == "mixed_analysis":
+        try:
+            if not hasattr(state, "mixed_workspace") or not state.mixed_workspace or not state.mixed_workspace.winfo_exists():
+                state.mixed_workspace = MixedAnalysis(app)
+                state.mixed_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+            state.mixed_workspace.tkraise()
+            state.workspace = state.mixed_workspace
+            state.analysis_workspace = state.mixed_workspace
+        except Exception:
+            pass

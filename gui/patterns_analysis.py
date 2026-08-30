@@ -1,11 +1,10 @@
-# gui/patterns_analysis.py
-
 from pathlib import Path
 import chess
 import chess.pgn
 from tkinter import ttk
 import customtkinter as ctk
 
+import gui.app_state as state
 from gui.statusbar import set_status_message
 from gui.chess_board import ChessBoardWidget
 
@@ -103,6 +102,57 @@ class PatternsAnalysisMixin:
         if target:
             target.bind("<<TreeviewSelect>>", self._on_pattern_tree_select, add="+")
 
+    def _bind_keyboard_events(self):
+        """Binds arrow keys and 'f'/'F' keys safely, scoping execution to the active workspace."""
+        top_level = self.winfo_toplevel()
+
+        # Use helper handlers that check if this workspace is currently mapped/active
+        top_level.bind("<Left>", lambda e: self._safe_handle(self.on_prev_move, e))
+        top_level.bind("<Right>", lambda e: self._safe_handle(self.on_next_move, e))
+        top_level.bind("<Up>", lambda e: self._safe_handle(self.on_first_move, e))
+        top_level.bind("<Down>", lambda e: self._safe_handle(self.on_last_move, e))
+        top_level.bind("f", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
+        top_level.bind("F", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
+
+    def _safe_handle(self, callback, event):
+        """Ensures keyboard shortcuts only trigger if this workspace is currently visible/active."""
+        try:
+            if self.winfo_ismapped():
+                # Prevent stealing focus if user is typing in an entry or textbox elsewhere
+                focused = self.winfo_toplevel().focus_get()
+                if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+                    return
+                callback()
+        except Exception:
+            pass
+
+    def on_prev_move(self, event=None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
+            self.board_node = self.board_node.parent
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.set_position_fen(self.board_node.board().fen())
+
+    def on_next_move(self, event=None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
+            self.board_node = self.board_node.variation(0)
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.set_position_fen(self.board_node.board().fen())
+
+    def on_first_move(self, event=None):
+        if hasattr(self, "current_game") and self.current_game:
+            self.board_node = self.current_game
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.set_position_fen(self.current_game.board().fen())
+
+    def on_last_move(self, event=None):
+        if hasattr(self, "current_game") and self.current_game:
+            node = self.current_game
+            while node.variations:
+                node = node.variation(0)
+            self.board_node = node
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.set_position_fen(node.board().fen())
+
     def _on_pattern_tree_select(self, event):
         target = event.widget
         selected_items = target.selection()
@@ -124,13 +174,6 @@ class PatternsAnalysisMixin:
             try:
                 fen_str = game.board().fen()
                 self.board_widget.set_position_fen(fen_str)
-            except Exception:
-                pass
-
-        if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-            try:
-                fen_str = game.board().fen()
-                self.popout_board.set_position_fen(fen_str)
             except Exception:
                 pass
 
@@ -156,76 +199,6 @@ class PatternsAnalysisMixin:
                 self.moves_textbox.configure(state="disabled")
             except Exception:
                 pass
-
-    def on_prev_move(self):
-        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
-            self.board_node = self.board_node.parent
-            fen = self.board_node.board().fen()
-            if hasattr(self, "board_widget") and self.board_widget:
-                self.board_widget.set_position_fen(fen)
-            if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
-
-    def on_next_move(self):
-        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
-            self.board_node = self.board_node.variation(0)
-            fen = self.board_node.board().fen()
-            if hasattr(self, "board_widget") and self.board_widget:
-                self.board_widget.set_position_fen(fen)
-            if getattr(self, "is_board_popped_out", False) and hasattr(self, "popout_board") and self.popout_board:
-                self.popout_board.set_position_fen(fen)
-
-    def pop_out_board(self, *args, **kwargs):
-        if self.is_board_popped_out:
-            if self.popout_window:
-                self.popout_window.focus()
-            return
-
-        self.is_board_popped_out = True
-        self.board_widget.pack_forget()
-        self.placeholder_lbl.pack(padx=10, pady=25)
-
-        if hasattr(self, "btn_popout"):
-            self.btn_popout.configure(text="Dock Board ↙", fg_color="#475569", hover_color="#64748b")
-
-        self.popout_window = ctk.CTkToplevel(self)
-        self.popout_window.title("Pattern Analysis - Pop-out Board")
-        self.popout_window.geometry("400x440")
-        self.popout_window.configure(fg_color="#172134")
-        self.popout_window.attributes("-topmost", True)
-        self.popout_window.protocol("WM_DELETE_WINDOW", self.restore_popped_board)
-
-        popout_container = ctk.CTkFrame(self.popout_window, fg_color="transparent")
-        popout_container.pack(fill="both", expand=True, padx=20, pady=20)
-
-        self.popout_board = ChessBoardWidget(popout_container, square_size=55)
-        self.popout_board.pack(anchor="center", pady=(10, 10))
-
-        fen_to_set = self.board_node.board().fen() if self.board_node else (
-            self.current_game.board().fen() if self.current_game else chess.STARTING_FEN)
-        self.popout_board.set_position_fen(fen_to_set)
-
-    def restore_popped_board(self):
-        self.is_board_popped_out = False
-        if self.popout_window:
-            try:
-                self.popout_window.destroy()
-            except Exception:
-                pass
-            self.popout_window = None
-            self.popout_board = None
-
-        if hasattr(self, "btn_popout"):
-            self.btn_popout.configure(text="Pop Out ↗", fg_color="#334155", hover_color="#475569")
-
-        if hasattr(self, "placeholder_lbl"):
-            self.placeholder_lbl.pack_forget()
-        if hasattr(self, "board_widget") and hasattr(self, "board_holder"):
-            self.board_widget.pack(in_=self.board_holder)
-
-        fen_to_set = self.board_node.board().fen() if self.board_node else (
-            self.current_game.board().fen() if self.current_game else chess.STARTING_FEN)
-        self.board_widget.set_position_fen(fen_to_set)
 
     def trigger_engine_mode(self, mode):
         self.active_engine_mode = mode
@@ -309,7 +282,7 @@ class PatternsAnalysisMixin:
 
         if not game_list and hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
             self.lbl_empty_state.configure(text="No pattern games loaded in memory.")
-            self.lbl_empty_state.pack(padx=20, pady=20)
+            self.lbl_empty_state.pack(padx=20, pady=20, anchor="w")
         elif hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
             self.lbl_empty_state.pack_forget()
 
@@ -325,20 +298,35 @@ class PatternsAnalysisWorkspace(ctk.CTkFrame, PatternsAnalysisMixin):
         self.preview_lookup = {}
         self.active_engine_mode = "standard"
 
-        self.popout_window = None
-        self.popout_board = None
-        self.is_board_popped_out = False
-
         self.col_tree = None
         self.pgn_tree = None
 
         self.init_layout()
         self._apply_tree_styles()
         self._bind_pattern_events()
-        self.load_games()
+        self._bind_keyboard_events()
+
+        # Register callback with app_state so incoming pattern collections populate automatically
+        state.register_analysis_callback(self._on_app_state_update)
+
+        # Load collection if already populated in state, otherwise load default
+        if hasattr(state, "patterns_state") and state.patterns_state.get("active_games"):
+            self.load_patterns_collection(
+                state.patterns_state["active_games"],
+                target_game=state.patterns_state.get("active_focus")
+            )
+        else:
+            self.load_games()
+
+    def _on_app_state_update(self, game_obj, category_source=None):
+        """Triggers when the workspace pushes a new pattern collection over."""
+        if category_source == "patterns" and hasattr(state, "patterns_state"):
+            games_list = state.patterns_state.get("active_games")
+            if games_list:
+                self.load_patterns_collection(games_list, target_game=game_obj)
 
     def init_layout(self):
-        """Constructs the exact visual clone of MixedAnalysis's layout."""
+        """Constructs the exact visual clone of MixedAnalysis's layout without navigation/popout controls."""
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -364,54 +352,16 @@ class PatternsAnalysisWorkspace(ctk.CTkFrame, PatternsAnalysisMixin):
         self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5))
 
         self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_holder.pack(side="top", padx=10, pady=(10, 2))
+        self.board_holder.pack(side="top", fill="x", padx=10, pady=(10, 10))
 
         self.board_widget = ChessBoardWidget(self.board_holder, square_size=50)
-        self.board_widget.pack()
+        self.board_widget.pack(anchor="w")
 
-        self.placeholder_lbl = ctk.CTkLabel(
-            self.board_holder, text="[ Board Popped Out ]", text_color="#94a3b8"
-        )
-
-        # Board Navigation & Popout Bar
-        self.board_controls = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_controls.pack(side="top", fill="x", padx=10, pady=(2, 10))
-
-        self.row_controls_layout = ctk.CTkFrame(self.board_controls, fg_color="transparent")
-        self.row_controls_layout.pack(anchor="center")
-
-        self.btn_prev = ctk.CTkButton(
-            self.row_controls_layout,
-            text="◀ Prev",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_prev_move
-        )
-        self.btn_prev.pack(side="left", padx=(0, 4))
-
-        self.btn_popout = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Pop Out ↗",
-            width=85,
-            height=26,
-            fg_color="#334155",
-            hover_color="#475569",
-            command=self.pop_out_board
-        )
-        self.btn_popout.pack(side="left", padx=4)
-
-        self.btn_next = ctk.CTkButton(
-            self.row_controls_layout,
-            text="Next ▶",
-            width=80,
-            height=26,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=self.on_next_move
-        )
-        self.btn_next.pack(side="left", padx=(4, 0))
+        # Wire integrated widget callbacks to parent methods
+        self.board_widget.on_step_back = self.on_prev_move
+        self.board_widget.on_step_forward = self.on_next_move
+        self.board_widget.on_jump_start = self.on_first_move
+        self.board_widget.on_jump_end = self.on_last_move
 
         # 2. Left Bottom Panel: Catalog / Treeview Panel
         self.top_catalog_panel = ctk.CTkFrame(
@@ -550,7 +500,7 @@ class PatternsAnalysisWorkspace(ctk.CTkFrame, PatternsAnalysisMixin):
         self.analysis_mode_content.pack(fill="x", expand=True, padx=10, pady=10)
 
         self.row_analysis_layout = ctk.CTkFrame(self.analysis_mode_content, fg_color="transparent")
-        self.row_analysis_layout.pack(anchor="center")
+        self.row_analysis_layout.pack(anchor="w")
 
         self.lbl_engine_title = ctk.CTkLabel(
             self.row_analysis_layout, text="Engine", font=ctk.CTkFont(size=11), text_color="#94a3b8"
