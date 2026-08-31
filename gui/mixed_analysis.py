@@ -555,8 +555,9 @@ class MixedAnalysis(ctk.CTkFrame):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.main_container.grid_columnconfigure(0, weight=3)
-        self.main_container.grid_columnconfigure(1, weight=2)
+        # Adjusted master weights: Left side locked down/narrower, Right side claims expanded space
+        self.main_container.grid_columnconfigure(0, weight=0, minsize=480)
+        self.main_container.grid_columnconfigure(1, weight=3)
         self.main_container.grid_rowconfigure(0, weight=1)
 
         self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
@@ -569,13 +570,16 @@ class MixedAnalysis(ctk.CTkFrame):
             border_width=1,
             border_color="#334155"
         )
-        self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5))
+        self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
-        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="transparent")
-        self.board_holder.pack(side="top", fill="x", padx=10, pady=(10, 10))
+        # Scaled to match the perfected left-aligned board layout (530x450 holder with 70px square size)
+        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="#172134", width=530, height=450,
+                                         corner_radius=0)
+        self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
+        self.board_holder.pack_propagate(False)
 
-        self.board_widget = ChessBoardWidget(self.board_holder, square_size=50)
-        self.board_widget.pack(anchor="w")
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=70)
+        self.board_widget.pack(fill="both", expand=True)
 
         # Wire integrated widget callbacks to parent methods
         self.board_widget.on_step_back = self.on_prev_move
@@ -621,10 +625,11 @@ class MixedAnalysis(ctk.CTkFrame):
         self.col_tree.heading("black", text="Black Player", anchor="w")
         self.col_tree.heading("result", text="Res")
 
+        # Trimmed column widths to fit cleanly within the slimmer left column footprint
         self.col_tree.column("no", width=30, anchor="center")
-        self.col_tree.column("white", width=145, anchor="w")
-        self.col_tree.column("black", width=145, anchor="w")
-        self.col_tree.column("result", width=45, anchor="center")
+        self.col_tree.column("white", width=120, anchor="w")
+        self.col_tree.column("black", width=120, anchor="w")
+        self.col_tree.column("result", width=40, anchor="center")
 
         self.pgn_tree = self.col_tree
 

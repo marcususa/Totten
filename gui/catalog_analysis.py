@@ -379,8 +379,8 @@ class CatalogAnalysis(ctk.CTkFrame):
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.main_container.grid_columnconfigure(0, weight=3)
-        self.main_container.grid_columnconfigure(1, weight=2)
+        self.main_container.grid_columnconfigure(0, weight=0, minsize=480)
+        self.main_container.grid_columnconfigure(1, weight=3)
         self.main_container.grid_rowconfigure(0, weight=1)
 
         # =========================================================================
@@ -389,15 +389,18 @@ class CatalogAnalysis(ctk.CTkFrame):
         self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
 
-        # 1. Board Panel (Top Left) - maximizes board area directly with integrated ChessBoardWidget controls
+        # 1. Board Panel (Top Left) - Aligned to the left using anchor="w"
         self.left_board_panel = ctk.CTkFrame(self.left_pane_container, fg_color="#0f172a", corner_radius=8,
                                              border_width=1, border_color="#334155")
-        self.left_board_panel.pack(side="top", fill="both", expand=False, padx=0, pady=(0, 5))
+        self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
-        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="#172134", corner_radius=0)
-        self.board_holder.pack(side="top", fill="both", expand=True, padx=10, pady=10)
+        # Initial board and piece sizing
+        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color="#172134", width=475, height=400,
+                                         corner_radius=0)
+        self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
+        self.board_holder.pack_propagate(False)
 
-        self.board_widget = ChessBoardWidget(self.board_holder, square_size=52)
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=58)
         self.board_widget.pack(fill="both", expand=True)
 
         # Wire integrated widget callbacks to parent methods

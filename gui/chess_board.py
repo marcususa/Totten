@@ -14,11 +14,11 @@ def load_piece_image(filename, size=55):
     try:
         png_data = cairosvg.svg2png(
             url=PIECE_PATH + filename,
-            output_width=size,
-            output_height=size
+            output_width=max(15, size),
+            output_height=max(15, size)
         )
         image = Image.open(io.BytesIO(png_data))
-        return ctk.CTkImage(light_image=image, dark_image=image, size=(size, size))
+        return ctk.CTkImage(light_image=image, dark_image=image, size=(max(15, size), max(15, size)))
     except Exception as e:
         print(f"Error loading piece image {filename}: {e}")
         return None
@@ -41,17 +41,16 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.image_cache = {}
         self.flipped = False
         self.popout_window = None
-        self._resize_timer = None
 
         self._build_ui()
         self.render_board()
         self._bind_keyboard_events()
 
-        if self.is_popout:
-            self.bind("<Configure>", self._on_resize)
+        # Track actual pixel size changes smoothly via square frame bindings
+        self.squares[(0, 0)].bind("<Configure>", self._on_square_resize)
 
     def _build_ui(self):
-        """Builds a layout with vertical action buttons."""
+        """Builds a layout with vertical action buttons and a fully responsive grid."""
         for widget in self.winfo_children():
             widget.destroy()
 
@@ -63,15 +62,14 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1)
 
         if self.is_popout:
-            panel_width = max(50, int(self.square_size * 1.2))
+            panel_width = 60
             self.control_panel = ctk.CTkFrame(self, fg_color="transparent", width=panel_width)
             self.control_panel.grid(row=0, column=0, sticky="sw", padx=(0, 2), pady=0)
             self.control_panel.grid_propagate(False)
 
             button_width = panel_width - 4
-            button_height = max(35, int(self.square_size * 0.9))
-            font_size = max(18, int(self.square_size * 0.45))
-
+            button_height = 35
+            font_size = 16
             btn_fg = "transparent"
             btn_hover = "#344268"
             text_color = "#8292a8"
@@ -128,108 +126,57 @@ class ChessBoardWidget(ctk.CTkFrame):
                     font=("Arial", font_size),
                     anchor="e"
                 )
-
-                def on_enter(e):
-                    btn.configure(text=f"{full_text} {symbol}")
-
-                def on_leave(e):
-                    btn.configure(text=f"{full_text} {symbol}")
-
-                btn.bind("<Enter>", on_enter)
-                btn.bind("<Leave>", on_leave)
                 return btn
 
-            self.flip_button = create_hover_button(
-                self.control_panel, "↻", "Flip", 14
-            )
+            self.flip_button = create_hover_button(self.control_panel, "↻", "Flip", 14)
             self.flip_button.configure(command=self.toggle_flip)
             self.flip_button.pack(side="top", pady=(0, 4), anchor="w")
 
-            self.popout_button = create_hover_button(
-                self.control_panel, chr(9703), "Pop Out", 14
-            )
+            self.popout_button = create_hover_button(self.control_panel, chr(9703), "Pop Out", 14)
             self.popout_button.configure(command=self.toggle_popout)
             self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
 
-            self.prev_button = create_hover_button(
-                self.control_panel, "◀", "Prev ", 12
-            )
+            self.prev_button = create_hover_button(self.control_panel, "◀", "Prev ", 12)
             self.prev_button.configure(command=self._on_left_arrow)
             self.prev_button.pack(side="top", pady=(0, 4), anchor="w")
 
-            self.next_button = create_hover_button(
-                self.control_panel, "▶", "Next ", 12
-            )
+            self.next_button = create_hover_button(self.control_panel, "▶", "Next ", 12)
             self.next_button.configure(command=self._on_right_arrow)
-            self.next_button.pack(side="top", anchor="w")
+            self.next_button.pack(side="top", pady=(0, 4), anchor="w")
 
-        # Right container for the 8x8 chessboard with left padding added
+        # Right container for the 8x8 chessboard
         self.grid_container = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=0)
         self.grid_container.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
 
         for row in range(8):
-            w_val = 1 if self.is_popout else 0
-            self.grid_container.grid_rowconfigure(row, minsize=self.square_size if not self.is_popout else 0,
-                                                  weight=w_val)
-            self.grid_container.grid_columnconfigure(row, minsize=self.square_size if not self.is_popout else 0,
-                                                     weight=w_val)
+            self.grid_container.grid_rowconfigure(row, weight=1)
+            self.grid_container.grid_columnconfigure(row, weight=1)
 
             for col in range(8):
                 square_color = "#9f7939" if (row + col) % 2 else "#fbcba4"
 
                 square = ctk.CTkFrame(
                     self.grid_container,
-                    width=self.square_size if not self.is_popout else 0,
-                    height=self.square_size if not self.is_popout else 0,
                     fg_color=square_color,
                     corner_radius=0
                 )
+                # sticky="nsew" ensures squares stretch and fill their grid cells uniformly
                 square.grid(row=row, column=col, sticky="nsew", padx=0, pady=0)
                 square.grid_propagate(False)
                 square.pack_propagate(False)
 
                 self.squares[(row, col)] = square
 
-                lbl = ctk.CTkLabel(square, text="", width=self.square_size if not self.is_popout else 0,
-                                   height=self.square_size if not self.is_popout else 0,
-                                   fg_color="transparent")
+                lbl = ctk.CTkLabel(square, text="", fg_color="transparent")
                 lbl.pack(fill="both", expand=True)
                 self.piece_labels[(row, col)] = lbl
 
-    def _on_resize(self, event):
-        """Directly ties square/piece growth to 1:1 window expansion bounds for popout only."""
-        if not self.is_popout or event.widget != self:
-            return
-
-        if self._resize_timer is not None:
-            self.after_cancel(self._resize_timer)
-
-        def apply_resize():
-            w = self.winfo_width()
-            h = self.winfo_height()
-
-            if (w <= 1 or h <= 1) and self.popout_window:
-                try:
-                    geometry = self.popout_window.geometry().split('+')[0]
-                    w, h = map(int, geometry.split('x'))
-                except Exception:
-                    pass
-
-            if w > 1 and h > 1:
-                panel_w = self.control_panel.winfo_width() if hasattr(self,
-                                                                      'control_panel') and self.control_panel.winfo_width() > 1 else 60
-                avail_w = w - panel_w
-                avail_h = h
-
-                new_size = max(40, min(avail_w // 8, avail_h // 8))
-
-                if new_size != self.square_size:
-                    self.square_size = new_size
-                    self._build_ui()
-                    self.render_board()
-                    self._bind_keyboard_events()
-
-        self._resize_timer = self.after(30, apply_resize)
+    def _on_square_resize(self, event):
+        """Monitors actual square dimension adjustments organically and redraws pieces."""
+        new_size = event.height
+        if new_size > 10 and new_size != self.square_size:
+            self.square_size = new_size
+            self.render_board()
 
     def resize_board(self, new_square_size):
         """Resizes square grid dimensions, clears image cache, and re-renders SVG pieces."""
@@ -238,9 +185,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.square_size = new_square_size
         self.image_cache.clear()
-        self._build_ui()
         self.render_board()
-        self._bind_keyboard_events()
 
     def set_position_fen(self, fen: str):
         """Updates internal board position via FEN string and redraws."""
@@ -365,6 +310,9 @@ class ChessBoardWidget(ctk.CTkFrame):
                     filename = PIECE_MAP.get(piece.symbol())
                     cache_key = (filename, self.square_size)
                     if cache_key not in self.image_cache:
+                        # Clear old cache values for this piece to prevent memory leaks over time
+                        if len(self.image_cache) > 64:
+                            self.image_cache.clear()
                         self.image_cache[cache_key] = load_piece_image(filename, size=self.square_size)
 
                     img = self.image_cache.get(cache_key)
