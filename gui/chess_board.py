@@ -44,7 +44,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self._build_ui()
         self.render_board()
-        self._bind_keyboard_events()
+        self._bind_global_shortcuts()
 
         # Track actual pixel size changes smoothly via square frame bindings
         self.squares[(0, 0)].bind("<Configure>", self._on_square_resize)
@@ -160,7 +160,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                     fg_color=square_color,
                     corner_radius=0
                 )
-                # sticky="nsew" ensures squares stretch and fill their grid cells uniformly
                 square.grid(row=row, column=col, sticky="nsew", padx=0, pady=0)
                 square.grid_propagate(False)
                 square.pack_propagate(False)
@@ -261,16 +260,30 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_window.protocol("WM_DELETE_WINDOW", on_close)
 
-    def _bind_keyboard_events(self):
-        """Binds arrow keys and 'f'/'F' keys at the top-level window to bypass widget focus traps."""
-        top_level = self.winfo_toplevel()
+    def _bind_global_shortcuts(self):
+        """Binds arrow keys and 'f'/'F' globally to the top-level window for any active board, avoiding text entry traps."""
+        try:
+            top_level = self.winfo_toplevel()
+            top_level.bind("<Left>", lambda e: self._safe_handle_shortcut(self._on_left_arrow, e))
+            top_level.bind("<Right>", lambda e: self._safe_handle_shortcut(self._on_right_arrow, e))
+            top_level.bind("<Up>", lambda e: self._safe_handle_shortcut(self._on_up_arrow, e))
+            top_level.bind("<Down>", lambda e: self._safe_handle_shortcut(self._on_down_arrow, e))
+            top_level.bind("f", lambda e: self._safe_handle_shortcut(self.toggle_flip, e))
+            top_level.bind("F", lambda e: self._safe_handle_shortcut(self.toggle_flip, e))
+        except Exception:
+            pass
 
-        top_level.bind("<Left>", self._on_left_arrow)
-        top_level.bind("<Right>", self._on_right_arrow)
-        top_level.bind("<Up>", self._on_up_arrow)
-        top_level.bind("<Down>", self._on_down_arrow)
-        top_level.bind("f", lambda e: self.toggle_flip())
-        top_level.bind("F", lambda e: self.toggle_flip())
+    def _safe_handle_shortcut(self, callback, event):
+        """Ensures shortcuts only trigger if this board widget is mapped and avoids stealing focus from text boxes or entries."""
+        try:
+            if self.winfo_ismapped():
+                focused = self.winfo_toplevel().focus_get()
+                if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+                    return
+                if callable(callback):
+                    callback()
+        except Exception:
+            pass
 
     def _on_left_arrow(self, event=None):
         if hasattr(self, 'on_step_back') and callable(self.on_step_back):
@@ -310,7 +323,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                     filename = PIECE_MAP.get(piece.symbol())
                     cache_key = (filename, self.square_size)
                     if cache_key not in self.image_cache:
-                        # Clear old cache values for this piece to prevent memory leaks over time
                         if len(self.image_cache) > 64:
                             self.image_cache.clear()
                         self.image_cache[cache_key] = load_piece_image(filename, size=self.square_size)

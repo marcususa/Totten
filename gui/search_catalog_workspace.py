@@ -466,13 +466,24 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                         hover_color="#2d3e5f",
                         text_color="#e2e8f0",
                         font=("Arial", 12),
-                        height=32,
-                        command=lambda idata=item_data, gk=group_key: [
-                            self.toggle_group_expansion(gk),
-                            self.on_group_click(idata)
-                        ]
+                        height=32
                     )
                     row_btn.pack(fill="x", padx=2, pady=2)
+
+                    def handle_single_click(e, gk=group_key):
+                        # Cancel any pending double-click timer if it exists, then wait briefly
+                        if hasattr(self, "_click_timer") and self._click_timer:
+                            self.after_cancel(self._click_timer)
+                        self._click_timer = self.after(250, lambda: self.toggle_group_expansion(gk))
+
+                    def handle_double_click(e, idata=item_data):
+                        if hasattr(self, "_click_timer") and self._click_timer:
+                            self.after_cancel(self._click_timer)
+                            self._click_timer = None
+                        self.on_group_click(idata)
+
+                    row_btn.bind("<Button-1>", handle_single_click)
+                    row_btn.bind("<Double-Button-1>", handle_double_click)
 
                     if is_expanded and instances:
                         sub_container = ctk.CTkFrame(content_container, fg_color="#1b263b", corner_radius=4)

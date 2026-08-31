@@ -85,6 +85,7 @@ class MixedAnalysis(ctk.CTkFrame):
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
+        self.active_engine_mode = "standard"
 
         self.popout_window = None
         self.popout_board = None
@@ -173,6 +174,18 @@ class MixedAnalysis(ctk.CTkFrame):
     def load_games_list(self, games_list):
         """Directly updates and loads a new list of games into the mixed collection view."""
         self.load_mixed_collection(games_list)
+
+    def trigger_engine_mode(self, mode):
+        self.active_engine_mode = mode
+        if hasattr(self, "btn_review") and hasattr(self, "btn_candidates") and hasattr(self, "btn_standard"):
+            for b in (self.btn_review, self.btn_candidates, self.btn_standard):
+                b.configure(fg_color="#1e293b", hover_color="#334155")
+            if mode == "review":
+                self.btn_review.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+            elif mode == "candidates":
+                self.btn_candidates.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+            elif mode == "standard":
+                self.btn_standard.configure(fg_color="#2e4a8c", hover_color="#4870cd")
 
     def _apply_tree_styles(self):
         style = ttk.Style()
@@ -647,6 +660,7 @@ class MixedAnalysis(ctk.CTkFrame):
 
         self.right_analysis_panel.rowconfigure(0, weight=1)
         self.right_analysis_panel.rowconfigure(1, weight=1)
+        self.right_analysis_panel.rowconfigure(2, weight=0)
         self.right_analysis_panel.columnconfigure(0, weight=1)
 
         self.analysis_container_frame = ctk.CTkFrame(
@@ -696,7 +710,7 @@ class MixedAnalysis(ctk.CTkFrame):
             border_width=1,
             border_color="#334155"
         )
-        self.pgn_data_panel.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+        self.pgn_data_panel.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         self.lbl_pgn_data_title = ctk.CTkLabel(
             self.pgn_data_panel, text="Game Details", font=ctk.CTkFont(size=12, weight="bold"),
@@ -716,6 +730,66 @@ class MixedAnalysis(ctk.CTkFrame):
         self.pgn_data_text._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
         self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.pgn_data_text.insert("end", "[No game selected. Click a game to load its PGN moves...]\n")
+
+        # 3. Bottom Panel: Engine Option Mode Controls
+        self.controls_panel = ctk.CTkFrame(
+            self.right_analysis_panel,
+            fg_color="#0f172a",
+            corner_radius=8,
+            border_width=1,
+            border_color="#334155"
+        )
+        self.controls_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
+
+        self.analysis_mode_content = ctk.CTkFrame(self.controls_panel, fg_color="transparent")
+        self.analysis_mode_content.pack(fill="x", expand=True, padx=10, pady=10)
+
+        self.row_analysis_layout = ctk.CTkFrame(self.analysis_mode_content, fg_color="transparent")
+        self.row_analysis_layout.pack(anchor="w")
+
+        self.lbl_engine_title = ctk.CTkLabel(
+            self.row_analysis_layout, text="Engine", font=ctk.CTkFont(size=11), text_color="#94a3b8"
+        )
+        self.lbl_engine_title.pack(side="left", padx=(0, 8))
+
+        self.row_analysis_btns = ctk.CTkFrame(self.row_analysis_layout, fg_color="transparent")
+        self.row_analysis_btns.pack(side="left")
+
+        self.btn_review = ctk.CTkButton(
+            self.row_analysis_btns,
+            text="1",
+            width=24,
+            height=24,
+            fg_color="#2e4a8c",
+            hover_color="#4870cd",
+            command=lambda: self.trigger_engine_mode("review")
+        )
+        self.btn_review.pack(side="left", padx=2)
+        ToolTip(self.btn_review, "Game Review")
+
+        self.btn_candidates = ctk.CTkButton(
+            self.row_analysis_btns,
+            text="2",
+            width=24,
+            height=24,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            command=lambda: self.trigger_engine_mode("candidates")
+        )
+        self.btn_candidates.pack(side="left", padx=2)
+        ToolTip(self.btn_candidates, "Candidate Moves")
+
+        self.btn_standard = ctk.CTkButton(
+            self.row_analysis_btns,
+            text="3",
+            width=24,
+            height=24,
+            fg_color="#1e293b",
+            hover_color="#334155",
+            command=lambda: self.trigger_engine_mode("standard")
+        )
+        self.btn_standard.pack(side="left", padx=2)
+        ToolTip(self.btn_standard, "Standard")
 
 
 def create_mixed_workspace(master, filename=None, initial_games=None):

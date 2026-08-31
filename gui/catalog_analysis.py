@@ -112,7 +112,6 @@ class CatalogAnalysis(ctk.CTkFrame):
             return self.load_game_hardwired(game_node, category_source=category_source)
         return self.load_game_from_state(game_node, category_source=category_source)
 
-
     def load_catalog_data(self):
         """Loads games from the target catalog PGN file into memory silently if no subset is active."""
         # ABSOLUTE GUARD: If self.game_list already contains games (like our 5-game subset),
@@ -303,21 +302,11 @@ class CatalogAnalysis(ctk.CTkFrame):
 
         try:
             self.moves_textbox.configure(state="normal")
-            # Clear previous highlights across all possible tags
-            temp_node = self.current_game
-            while temp_node:
-                for var in temp_node.variations:
-                    tag = str(id(var))
-                    self.moves_textbox.tag_remove("active_move", "1.0", "end")
-                    temp_node = var
-                    break
-                else:
-                    break
+            self.moves_textbox.tag_remove("active_move", "1.0", "end")
 
             # If we are past the root, highlight the current board_node's tag
             if self.board_node and self.board_node != self.current_game:
                 current_tag = str(id(self.board_node))
-                # Find ranges for this tag and apply active_move background
                 ranges = self.moves_textbox.tag_ranges(current_tag)
                 if ranges:
                     self.moves_textbox.tag_add("active_move", ranges[0], ranges[1])
