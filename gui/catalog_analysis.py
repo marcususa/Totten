@@ -316,28 +316,28 @@ class CatalogAnalysis(ctk.CTkFrame):
         except Exception:
             pass
 
-    def on_prev_move(self):
+    def on_prev_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
             self.board_node = self.board_node.parent
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
 
-    def on_next_move(self):
+    def on_next_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
 
-    def on_first_move(self):
+    def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
             self.board_node = self.current_game
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.current_game.board().fen())
             self.update_active_move_highlight()
 
-    def on_last_move(self):
+    def on_last_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
             node = self.current_game
             while node.variations:
@@ -346,6 +346,13 @@ class CatalogAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(node.board().fen())
             self.update_active_move_highlight()
+
+    def on_flip_board(self, event=None):
+        if hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self.board_widget, "flip_board"):
+                self.board_widget.flip_board()
+            elif hasattr(self.board_widget, "toggle_flip"):
+                self.board_widget.toggle_flip()
 
     def trigger_engine_mode(self, mode):
         self.active_engine_mode = mode
@@ -583,7 +590,7 @@ class CatalogAnalysis(ctk.CTkFrame):
         self.pgn_data_text.insert("end", "[No game selected. Click a game to load its PGN moves...]\n")
 
         # 3. Engine Modes Frame (Bottom Right)
-        self.controls_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color="#0f172a", corner_radius=8,
+        self.controls_panel = ctk.CTkFrame(self.right_analysis_panel,fg_color="#0f172a", corner_radius=8,
                                            border_width=1, border_color="#334155")
         self.controls_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
@@ -636,6 +643,19 @@ class CatalogAnalysis(ctk.CTkFrame):
         )
         self.btn_standard.pack(side="left", padx=2)
         ToolTip(self.btn_standard, "Standard")
+
+        # --- BIND KEYBOARD SHORTCUTS AT APPLICATION LEVEL & ROBUST FOCUS CAPTURE ---
+        def _bind_keys(event=None):
+            top = self.winfo_toplevel()
+            top.bind("<f>", self.on_flip_board)
+            top.bind("<F>", self.on_flip_board)
+            top.bind("<Left>", self.on_prev_move)
+            top.bind("<Right>", self.on_next_move)
+            top.bind("<Up>", self.on_first_move)
+            top.bind("<Down>", self.on_last_move)
+
+        self.bind("<Map>", _bind_keys)
+        self.after(100, _bind_keys)
 
 
 def create_workspace(master, initial_games=None, **kwargs):

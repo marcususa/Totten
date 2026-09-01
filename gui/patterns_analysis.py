@@ -6,7 +6,7 @@ from pathlib import Path
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
-from .chess_board import ChessBoardWidget
+from gui.chess_board import ChessBoardWidget
 from core.constants import CONFIG_FILE
 
 BASE_PGN_DIR = Path(__file__).resolve().parent.parent / "pgn"
@@ -168,21 +168,43 @@ class PatternsAnalysis(ctk.CTkFrame):
             target.bind("<<TreeviewSelect>>", self._on_tree_select, add="+")
 
     def _bind_keyboard_events(self):
-        top_level = self.winfo_toplevel()
-        top_level.bind("<Left>", lambda e: self._safe_handle(self.on_prev_move, e))
-        top_level.bind("<Right>", lambda e: self._safe_handle(self.on_next_move, e))
-        top_level.bind("<Up>", lambda e: self._safe_handle(self.on_first_move, e))
-        top_level.bind("<Down>", lambda e: self._safe_handle(self.on_last_move, e))
-        top_level.bind("f", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
-        top_level.bind("F", lambda e: self._safe_handle(lambda: self.board_widget.toggle_flip(), e))
-
-    def _safe_handle(self, callback, event):
         try:
-            if self.winfo_ismapped():
-                focused = self.winfo_toplevel().focus_get()
-                if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
-                    return
-                callback()
+            top_level = self.winfo_toplevel()
+            top_level.bind_all("<Left>", lambda e: self._safe_handle(self.on_prev_move, e))
+            top_level.bind_all("<Right>", lambda e: self._safe_handle(self.on_next_move, e))
+            top_level.bind_all("<Up>", lambda e: self._safe_handle(self.on_first_move, e))
+            top_level.bind_all("<Down>", lambda e: self._safe_handle(self.on_last_move, e))
+            top_level.bind_all("f", lambda e: self._safe_handle(self.toggle_board_flip, e))
+            top_level.bind_all("F", lambda e: self._safe_handle(self.toggle_board_flip, e))
+        except Exception:
+            pass
+
+    def toggle_board_flip(self):
+        if not self.winfo_ismapped():
+            return
+        if hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self.board_widget, "toggle_flip"):
+                self.board_widget.toggle_flip()
+            elif hasattr(self.board_widget, "flipped"):
+                self.board_widget.flipped = not self.board_widget.flipped
+                if hasattr(self.board_widget, "draw_board"):
+                    self.board_widget.draw_board()
+        if self.is_board_popped_out and hasattr(self, "popout_board") and self.popout_board:
+            if hasattr(self.popout_board, "toggle_flip"):
+                self.popout_board.toggle_flip()
+            elif hasattr(self.popout_board, "flipped"):
+                self.popout_board.flipped = not self.popout_board.flipped
+                if hasattr(self.popout_board, "draw_board"):
+                    self.popout_board.draw_board()
+
+    def _safe_handle(self, callback, event=None):
+        if not self.winfo_ismapped():
+            return
+        try:
+            focused = self.winfo_toplevel().focus_get()
+            if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+                return
+            callback()
         except Exception:
             pass
 
