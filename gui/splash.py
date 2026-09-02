@@ -21,7 +21,6 @@ class StandaloneSplash:
         self.frame = tk.Frame(self.root, bg="#222e42", bd=0)
         self.frame.pack(fill="both", expand=True, padx=2, pady=2)
 
-        # Centered vertical padding for startup splash (no progress bar)
         self.lbl_title = tk.Label(
             self.frame, text=title_text, font=("Arial", 28, "bold"), fg="white", bg="#222e42"
         )
@@ -58,20 +57,12 @@ class LoadingOverlay(ctk.CTkToplevel):
         self.overrideredirect(True)
 
         width = 280
-        height = 195
+        height = 150
 
-        if master and master.winfo_exists():
-            m_x = master.winfo_rootx()
-            m_y = master.winfo_rooty()
-            m_w = master.winfo_width()
-            m_h = master.winfo_height()
-            x = int(m_x + (m_w / 2) - (width / 2))
-            y = int(m_y + (m_h / 2) - (height / 2))
-        else:
-            screen_width = self.winfo_screenwidth()
-            screen_height = self.winfo_screenheight()
-            x = int((screen_width / 2) - (width / 2))
-            y = int((screen_height / 2) - (height / 2))
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = int((screen_width / 2) - (width / 2))
+        y = int((screen_height / 2) - (height / 2))
 
         self.geometry(f"{width}x{height}+{x}+{y}")
         self.configure(fg_color="#172134")
@@ -92,42 +83,13 @@ class LoadingOverlay(ctk.CTkToplevel):
         )
         self.lbl_message.pack(pady=(0, 10))
 
-        # Animated looping progress bar
-        self.progress_bar = ctk.CTkProgressBar(
-            frame, width=220, height=8, fg_color="#172134", progress_color="#2e4a8c", corner_radius=0
-        )
-        self.progress_bar.pack(pady=(0, 8))
-        self.progress_bar.set(0)
-
-        # "Please wait." label using exact same font style and size (Arial 12)
         self.lbl_wait = ctk.CTkLabel(
             frame, text="", font=("Arial", 12), text_color="#94a3b8", fg_color="#222e42", width=260
         )
         self.lbl_wait.pack(pady=(0, 10))
 
-        self._is_animating = True
-        self._animate_progress()
-
         self.update_idletasks()
         self.deiconify()
-
-    def _animate_progress(self):
-        if not self._is_animating:
-            return
-        try:
-            current = self.progress_bar.get()
-            next_val = current + 0.05
-            if next_val > 1.0:
-                next_val = 0.0
-            self.progress_bar.set(next_val)
-
-            self.update_idletasks()
-            if self.master and hasattr(self.master, "update_idletasks"):
-                self.master.update_idletasks()
-
-            self.after(30, self._animate_progress)
-        except Exception:
-            pass
 
     def update_message(self, new_message):
         try:
@@ -144,7 +106,6 @@ class LoadingOverlay(ctk.CTkToplevel):
             pass
 
     def close(self):
-        self._is_animating = False
         try:
             self.grab_release()
             self.destroy()

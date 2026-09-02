@@ -12,7 +12,8 @@ catalog_state = {
 
 mixed_state = {
     "active_games": None,
-    "current_filename": None
+    "active_focus": None,
+    "current_filename": "mixed_analysis.pgn"
 }
 
 search_state = {
@@ -23,8 +24,18 @@ search_state = {
 patterns_state = {
     "active_games": None,
     "active_focus": None,
-    "current_filename": "patterns_analysis.pgn"
+    "current_filename": None
 }
+
+def set_active_mixed_collection(games_list, focused_game=None):
+    """Sets the active mixed collection and triggers registered analysis callbacks."""
+    mixed_state["active_games"] = games_list
+    mixed_state["active_focus"] = focused_game
+    for cb in _analysis_callbacks:
+        try:
+            cb(focused_game, category_source="mixed")
+        except Exception as e:
+            print(f"[APP STATE DEBUG] Error executing mixed analysis callback: {e}")
 
 def set_active_patterns_collection(games_list, focused_game=None):
     """Sets the active patterns collection and triggers registered analysis callbacks."""
@@ -39,6 +50,11 @@ def set_active_patterns_collection(games_list, focused_game=None):
 # General active workspace references
 workspace = None
 mixed_workspace = None
+catalog_workspace = None
+search_catalog_workspace = None
+edit_workspace = None
+calendar_workspace = None
+patterns_workspace = None
 
 # Global event callbacks registry
 _analysis_callbacks = []

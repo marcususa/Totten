@@ -96,6 +96,7 @@ class EditWorkspace(ctk.CTkFrame):
 
         # Clear out state bucket after consumption so it doesn't stale-lock
         state.mixed_state["active_games"] = None
+        state.mixed_state["active_focus"] = None
         state.mixed_state["current_filename"] = None
 
     def load_catalog_data(self):
@@ -417,14 +418,19 @@ class EditWorkspace(ctk.CTkFrame):
         # Fallback to single game if file lookup fails
         all_file_games = target_file_games if target_file_games else [game]
 
-        # Populate state with the correct collection file and games
-        state.mixed_state["active_games"] = all_file_games
+        # Populate state properly with active focus and collection file reference
+        if hasattr(state, "set_active_mixed_collection"):
+            state.set_active_mixed_collection(all_file_games, focused_game=game)
+        else:
+            state.mixed_state["active_games"] = all_file_games
+            state.mixed_state["active_focus"] = game
+
         state.mixed_state["current_filename"] = source_data
 
         # Traverse up to the main application window and trigger Stage 2 switchboard safely
         top_level = self.winfo_toplevel()
         if hasattr(top_level, "show_workspace"):
-            top_level.show_workspace("mixed_analysis", initial_games=all_file_games, filename=source_data)
+            top_level.show_workspace("mixed_analysis", initial_games=all_file_games, filename=source_data, active_focus=game)
         else:
             print("[DEBUG] Error: top_level window has no show_workspace method.")
 

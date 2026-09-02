@@ -238,12 +238,16 @@ class MixedAnalysis(ctk.CTkFrame):
             except Exception:
                 pass
 
+        # 4. Refresh/Restart engine analysis threads for new position
+        self.update_engine_analysis()
+
     def jump_to_node(self, target_node):
         """Jumps directly to a specific game node when clicked in the move list."""
         self.board_node = target_node
         if hasattr(self, "board_widget") and self.board_widget:
             self.board_widget.set_position_fen(self.board_node.board().fen())
         self.update_active_move_highlight()
+        self.update_engine_analysis()
 
     def update_active_move_highlight(self):
         """Updates active background highlight in the moves textbox corresponding to self.board_node."""
@@ -279,6 +283,7 @@ class MixedAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+            self.update_engine_analysis()
 
     def on_next_move(self):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
@@ -286,6 +291,7 @@ class MixedAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+            self.update_engine_analysis()
 
     def on_first_move(self):
         if hasattr(self, "current_game") and self.current_game:
@@ -293,6 +299,7 @@ class MixedAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.current_game.board().fen())
             self.update_active_move_highlight()
+            self.update_engine_analysis()
 
     def on_last_move(self):
         if hasattr(self, "current_game") and self.current_game:
@@ -303,6 +310,7 @@ class MixedAnalysis(ctk.CTkFrame):
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(node.board().fen())
             self.update_active_move_highlight()
+            self.update_engine_analysis()
 
     def trigger_engine_mode(self, mode):
         self.active_engine_mode = mode
@@ -315,6 +323,19 @@ class MixedAnalysis(ctk.CTkFrame):
                 self.btn_candidates.configure(fg_color="#2e4a8c", hover_color="#4870cd")
             elif mode == "standard":
                 self.btn_standard.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+        self.update_engine_analysis()
+
+    def update_engine_analysis(self):
+        """Lifecycle hook to reset, restart, and feed active engine slots (1, 2, 3) with current FEN."""
+        if not hasattr(self, "board_node") or not self.board_node:
+            return
+        try:
+            current_fen = self.board_node.board().fen()
+            # Reset/restart active background engine workers bound to engine slots 1 and 3
+            if hasattr(state, "engine_manager") and state.engine_manager:
+                state.engine_manager.analyze_position(current_fen, mode=self.active_engine_mode)
+        except Exception as e:
+            print(f"[ENGINE DEBUG] Error updating engine analysis: {e}")
 
     def init_layout(self):
         if hasattr(state, "register_analysis_callback"):

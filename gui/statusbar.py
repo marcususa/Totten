@@ -18,20 +18,33 @@ def set_status_message(message, text_color="#ddddff"):
 
 
 def start_progress(indeterminate=False):
-    """Forces determinate mode so the bar always starts empty on the left (0.0)."""
-    try:
-        pb = getattr(state, "progress_bar", None)
-        if pb:
-            # Force determinate mode so it grows from left to right instead of sliding in the middle
-            pb.configure(mode="determinate")
-            pb.set(0.0)  # Starts completely empty at the left edge
+    """Packs the container and resets progress bar to start with stack trace debugging."""
+    import traceback
+    print("[DEBUG START_PROGRESS CALLED BY:]")
+    traceback.print_stack(limit=5)
 
-            master_root = pb.winfo_toplevel()
-            if master_root:
-                master_root.update_idletasks()
+    try:
+        pc = getattr(state, "progress_container", None)
+        pb = getattr(state, "progress_bar", None)
+
+        if pc and pb:
+            if not pc.winfo_ismapped():
+                status_box = getattr(state, "status", None)
+                if status_box and status_box.master:
+                    pc.pack(side="bottom", fill="x", padx=6, pady=(2, 2), before=status_box.master)
+                else:
+                    pc.pack(side="bottom", fill="x", padx=6, pady=(2, 2))
+
+            if indeterminate:
+                pb.configure(mode="indeterminate")
+                pb.start()
+            else:
+                pb.configure(mode="determinate")
+                pb.set(0.01)
+
+            pc.update_idletasks()
     except Exception as e:
         print(f"Progress Start Error: {e}")
-
 
 def update_progress(value):
     """Grows the red bar smoothly from left to right (value between 0.0 and 1.0)."""
@@ -61,3 +74,15 @@ def stop_progress():
                 master_root.update_idletasks()
     except Exception as e:
         print(f"Progress Stop Error: {e}")
+
+def hide_progress():
+    """Resets the progress bar to 0.0 and leaves it ready for the next task."""
+    try:
+        pb = getattr(state, "progress_bar", None)
+        if pb:
+            pb.set(0.0)
+            master_root = pb.winfo_toplevel()
+            if master_root:
+                master_root.update_idletasks()
+    except Exception as e:
+        print(f"Progress Hide Error: {e}")

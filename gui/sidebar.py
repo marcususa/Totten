@@ -46,6 +46,9 @@ class Sidebar(ctk.CTkFrame):
 
         state.progress_bar = self.progress_bar
 
+        # Keep the progress bar hidden by default on startup
+        self.progress_container.pack_forget()
+
         # --- NAVIGATION BUTTONS ---
         self.btn_catalog = ctk.CTkButton(
             self, text="Catalog", anchor="w", fg_color="transparent",
@@ -53,7 +56,9 @@ class Sidebar(ctk.CTkFrame):
             command=lambda: self.on_navigate("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
-        state.show_workspace("search_catalog")
+
+        # Start with the analysis workspace instead
+        self.on_navigate("analysis")
 
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
@@ -106,70 +111,62 @@ class Sidebar(ctk.CTkFrame):
 
     def _default_navigate(self, target):
         """Switchboard navigation router handling workspace switching directly via state."""
-        if hasattr(state, "show_workspace") and callable(state.show_workspace):
-            if target == "analysis":
-                state.show_workspace("catalog", initial_games=None)
-            elif target == "patterns":
-                state.show_workspace("patterns")
-            else:
-                state.show_workspace(target)
-        else:
-            # Fallback block...
-            parent = self.master
-            if target == "search_catalog":
-                state.active_group_games = None
-                state.active_focus_game = None
+        parent = self.master
 
-                if not hasattr(state,
-                               "search_catalog_workspace") or not state.search_catalog_workspace or not state.search_catalog_workspace.winfo_exists():
-                    from gui.search_catalog_workspace import SearchCatalogWorkspace
-                    state.search_catalog_workspace = SearchCatalogWorkspace(parent)
-                    state.search_catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        if target == "analysis":
+            state.active_group_games = None
+            state.active_focus_game = None
 
-                state.search_catalog_workspace.tkraise()
-                state.workspace = state.search_catalog_workspace
-                if hasattr(state.search_catalog_workspace, "refresh_view"):
-                    state.search_catalog_workspace.refresh_view()
+            if not hasattr(state,
+                           "catalog_workspace") or state.catalog_workspace is None or not state.catalog_workspace.winfo_exists():
+                from gui.catalog_analysis import create_workspace
+                state.catalog_workspace = create_workspace(parent)
+                state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-            elif target == "analysis":
-                state.active_group_games = None
-                state.active_focus_game = None
+            state.catalog_workspace.tkraise()
+            state.workspace = state.catalog_workspace
+            if hasattr(state.catalog_workspace, "refresh_view"):
+                state.catalog_workspace.refresh_view()
 
-                if not hasattr(state,
-                               "catalog_workspace") or not state.catalog_workspace or not state.catalog_workspace.winfo_exists():
-                    from gui.catalog_analysis import create_workspace
-                    state.catalog_workspace = create_workspace(parent)
-                    state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        elif target == "search_catalog":
+            state.active_group_games = None
+            state.active_focus_game = None
 
-                state.catalog_workspace.tkraise()
-                state.workspace = state.catalog_workspace
-                if hasattr(state.catalog_workspace, "refresh_view"):
-                    state.catalog_workspace.refresh_view()
+            if not hasattr(state,
+                           "search_catalog_workspace") or state.search_catalog_workspace is None or not state.search_catalog_workspace.winfo_exists():
+                from gui.search_catalog_workspace import SearchCatalogWorkspace
+                state.search_catalog_workspace = SearchCatalogWorkspace(parent)
+                state.search_catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-            elif target == "patterns":
-                state.show_workspace("patterns")
+            state.search_catalog_workspace.tkraise()
+            state.workspace = state.search_catalog_workspace
+            if hasattr(state.search_catalog_workspace, "refresh_view"):
+                state.search_catalog_workspace.refresh_view()
 
-            elif target == "mixed":
-                if not hasattr(state,
-                               "edit_workspace") or not state.edit_workspace or not state.edit_workspace.winfo_exists():
-                    from gui.edit_workspace import EditWorkspace
-                    state.edit_workspace = EditWorkspace(parent)
-                    state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-                state.edit_workspace.tkraise()
-                state.workspace = state.edit_workspace
-                if hasattr(state.edit_workspace, "refresh_view"):
-                    state.edit_workspace.refresh_view()
+        elif target == "patterns":
+            state.show_workspace("patterns")
 
-            elif target == "calendar":
-                if not hasattr(state,
-                               "calendar_workspace") or not state.calendar_workspace or not state.calendar_workspace.winfo_exists():
-                    from gui.calendar_workspace import CalendarWorkspace
-                    state.calendar_workspace = CalendarWorkspace(parent)
-                    state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-                state.calendar_workspace.tkraise()
-                state.workspace = state.calendar_workspace
-                if hasattr(state.calendar_workspace, "refresh_view"):
-                    state.calendar_workspace.refresh_view()
+        elif target == "mixed":
+            if not hasattr(state,
+                           "edit_workspace") or state.edit_workspace is None or not state.edit_workspace.winfo_exists():
+                from gui.edit_workspace import EditWorkspace
+                state.edit_workspace = EditWorkspace(parent)
+                state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.edit_workspace.tkraise()
+            state.workspace = state.edit_workspace
+            if hasattr(state.edit_workspace, "refresh_view"):
+                state.edit_workspace.refresh_view()
+
+        elif target == "calendar":
+            if not hasattr(state,
+                           "calendar_workspace") or state.calendar_workspace is None or not state.calendar_workspace.winfo_exists():
+                from gui.calendar_workspace import CalendarWorkspace
+                state.calendar_workspace = CalendarWorkspace(parent)
+                state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.calendar_workspace.tkraise()
+            state.workspace = state.calendar_workspace
+            if hasattr(state.calendar_workspace, "refresh_view"):
+                state.calendar_workspace.refresh_view()
 
     def _on_qeval_focus_in(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
