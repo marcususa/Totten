@@ -24,7 +24,18 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
+        # Show native loading overlay before heavy UI initialization
+        from gui.splash import LoadingOverlay
+        splash = LoadingOverlay(self, "Totten", "Loading...")
+        self.update_idletasks()
+
         self._init_ui()
+
+        splash.close()
+
+        # Hide the status bar progress bar now that loading is complete
+        from gui.statusbar import hide_progress
+        hide_progress()
 
     def _handle_global_analysis_callback(self, game_obj, category_source=None):
         """Automatically navigates to the respective workspace when a collection is pushed."""
@@ -43,7 +54,6 @@ class Totten(ctk.CTk):
         from gui.catalog_analysis import create_workspace
         from gui.mixed_analysis import MixedAnalysis
         from gui.patterns_analysis import create_patterns_analysis_workspace
-        from gui.patterns_workspace import PatternsWorkspace
 
         # 1. Default Catalog Workspace
         self.catalog_workspace = create_workspace(self)
@@ -52,22 +62,20 @@ class Totten(ctk.CTk):
         # 2. Mixed Analysis Workspace
         self.mixed_workspace = MixedAnalysis(self)
         self.mixed_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.mixed_workspace.grid_remove()  # Hide initially
+        self.mixed_workspace.grid_remove()
 
         # 3. Standard Analysis Workspace
         self.analysis_workspace = MixedAnalysis(self)
         self.analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.analysis_workspace.grid_remove()  # Hide initially
+        self.analysis_workspace.grid_remove()
 
-        # 4. Patterns Analysis Workspace (from patterns_analysis.py)
+        # 4. Patterns Analysis Workspace
         self.patterns_analysis_workspace = create_patterns_analysis_workspace(self)
         self.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.patterns_analysis_workspace.grid_remove()  # Hide initially
+        self.patterns_analysis_workspace.grid_remove()
 
-        # 5. Patterns Workspace (from patterns_workspace.py)
-        self.patterns_workspace = PatternsWorkspace(self)
-        self.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        self.patterns_workspace.grid_remove()  # Hide initially
+        # 5. Patterns Workspace
+        self.patterns_workspace = None
 
         # Register references in state
         state.workspace = self.catalog_workspace
@@ -75,11 +83,10 @@ class Totten(ctk.CTk):
         state.mixed_workspace = self.mixed_workspace
         state.analysis_workspace = self.analysis_workspace
         state.patterns_analysis_workspace = self.patterns_analysis_workspace
-        state.patterns_workspace = self.patterns_workspace
+        state.patterns_workspace = None
         state.app_root = self
         state.show_workspace = self.show_workspace
 
-        # Register global analysis callback once on startup
         state.register_analysis_callback(self._handle_global_analysis_callback)
 
     def show_workspace(self, target, *args, **kwargs):
@@ -126,21 +133,33 @@ class Totten(ctk.CTk):
             self.transient_workspace.tkraise()
             state.workspace = self.transient_workspace
 
+
         elif target == "catalog" or target == "catalog_analysis":
+
             initial_games = kwargs.get("initial_games") or state.catalog_state.get("active_games")
 
             if initial_games:
+
                 if hasattr(state, "catalog_workspace") and state.catalog_workspace:
                     state.catalog_workspace.destroy()
 
                 from gui.catalog_analysis import create_workspace
+
                 state.catalog_workspace = create_workspace(self, initial_games=initial_games)
+
                 state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
                 state.catalog_state["active_games"] = None
 
             state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
             state.catalog_workspace.tkraise()
+
             state.workspace = state.catalog_workspace
+
+            from gui.statusbar import set_status_message
+
+            set_status_message(f"Loaded catalog: {state.catalog_state.get('current_filename', 'personal_catalog.pgn')}")
 
         elif target == "mixed" or target == "mixed_analysis":
             initial_games = kwargs.get("initial_games") or state.mixed_state.get("active_games")
@@ -171,18 +190,18 @@ class Totten(ctk.CTk):
             state.analysis_workspace.tkraise()
             state.workspace = state.analysis_workspace
 
-
         elif target == "patterns":
+            if not getattr(state, "patterns_workspace", None):
+                from gui.patterns_workspace import PatternsWorkspace
+                state.patterns_workspace = PatternsWorkspace(self)
+                self.patterns_workspace = state.patterns_workspace
 
             state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-
             state.patterns_workspace.tkraise()
-
             state.workspace = state.patterns_workspace
 
             if hasattr(state.patterns_workspace, "refresh_view"):
                 state.patterns_workspace.refresh_view()
-
 
         elif target == "patterns_analysis":
 
