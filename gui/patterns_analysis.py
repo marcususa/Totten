@@ -135,45 +135,64 @@ class PatternsAnalysis(ctk.CTkFrame, EngineReviewMixin, EngineCandidateMixin, En
         self.moves_header_frame.pack(fill="x", padx=10, pady=(6, 2))
 
         self.lbl_moves_title = ctk.CTkLabel(
-            self.moves_header_frame, text="Engine", font=ctk.CTkFont(size=12, weight="bold"),
+            self.moves_header_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#94a3b8"
         )
         self.lbl_moves_title.pack(side="left")
 
         self.row_analysis_btns = ctk.CTkFrame(self.moves_header_frame, fg_color="transparent")
-        self.row_analysis_btns.pack(side="left", padx=(10, 0))
+        self.row_analysis_btns.pack(side="left", padx=(15, 0))
 
-        self.btn_review = ctk.CTkButton(
-            self.row_analysis_btns, text="1", width=24, height=24,
-            fg_color="#2e4a8c", hover_color="#4870cd",
-            command=lambda: self.trigger_engine_mode("review")
-        )
-        self.btn_review.pack(side="left", padx=2)
-        ToolTip(self.btn_review, "Game Review")
+        if not hasattr(self, "_active_pattern_mode"):
+            self._active_pattern_mode = None
 
-        self.btn_candidates = ctk.CTkButton(
-            self.row_analysis_btns, text="2", width=24, height=24,
-            fg_color="#1e293b", hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("candidates")
-        )
-        self.btn_candidates.pack(side="left", padx=2)
-        ToolTip(self.btn_candidates, "Candidate Moves")
+        def update_pattern_ui(mode):
+            self._active_pattern_mode = mode
 
-        self.btn_standard = ctk.CTkButton(
-            self.row_analysis_btns, text="3", width=24, height=24,
-            fg_color="#1e293b", hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("standard")
-        )
-        self.btn_standard.pack(side="left", padx=2)
-        ToolTip(self.btn_standard, "Standard")
+            is_motif = (mode == "motif")
+            is_stats = (mode == "stats")
 
-        self.moves_textbox = ctk.CTkTextbox(
-            self.moves_container_frame, fg_color="#1e293b", text_color="#f8fafc",
-            font=ctk.CTkFont(family="Arial", size=11), wrap="word"
+            self.btn_motif.configure(
+                fg_color="#2e4a8c" if is_motif else "#1e293b",
+                hover_color="#2e4a8c" if is_motif else "#1e293b"
+            )
+            self.btn_stats.configure(
+                fg_color="#2e4a8c" if is_stats else "#1e293b",
+                hover_color="#2e4a8c" if is_stats else "#1e293b"
+            )
+
+            self.trigger_pattern_mode(mode)
+
+        is_motif = (self._active_pattern_mode == "motif")
+        is_stats = (self._active_pattern_mode == "stats")
+
+        self.btn_motif = ctk.CTkButton(
+            self.row_analysis_btns,
+            text="Motif Match",
+            height=24,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#2e4a8c" if is_motif else "#1e293b",
+            hover_color="#2e4a8c" if is_motif else "#1e293b",
+            text_color="#f8fafc",
+            font=ctk.CTkFont(size=11),
+            command=lambda: update_pattern_ui("motif")
         )
-        self.moves_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
-        self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
-        self.moves_textbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self.btn_motif.pack(side="left", padx=3)
+
+        self.btn_stats = ctk.CTkButton(
+            self.row_analysis_btns,
+            text="Frequency",
+            height=24,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#2e4a8c" if is_stats else "#1e293b",
+            hover_color="#2e4a8c" if is_stats else "#1e293b",
+            text_color="#f8fafc",
+            font=ctk.CTkFont(size=11),
+            command=lambda: update_pattern_ui("stats")
+        )
+        self.btn_stats.pack(side="left", padx=3)
 
         # Right Pane: Tree + Analysis + Game Details
         self.right_analysis_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
