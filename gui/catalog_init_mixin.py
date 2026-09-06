@@ -24,49 +24,6 @@ THEME_CONFIG = {
     }
 }
 
-
-class ToolTip:
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tooltip_window = None
-        self.widget.bind("<Enter>", self.show_tooltip)
-        self.widget.bind("<Leave>", self.hide_tooltip)
-
-    def show_tooltip(self, event=None):
-        if self.tooltip_window or not self.text:
-            return
-        x = self.widget.winfo_rootx() + 20
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
-        self.tooltip_window = tw = ctk.CTkToplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        tw.configure(fg_color="#0f172a")
-
-        try:
-            tw.wm_attributes("-disabled", True)
-        except Exception:
-            pass
-
-        label = ctk.CTkLabel(
-            tw,
-            text=self.text,
-            fg_color="#0f172a",
-            text_color="#f8fafc",
-            corner_radius=4,
-            font=("Arial", 11)
-        )
-        label.pack(padx=6, pady=4)
-
-    def hide_tooltip(self, event=None):
-        if self.tooltip_window:
-            try:
-                self.tooltip_window.destroy()
-            except Exception:
-                pass
-            self.tooltip_window = None
-
-
 class CatalogInitMixin:
     """Mixin class to handle the UI initialization and layout for CatalogAnalysis."""
 
@@ -179,49 +136,78 @@ class CatalogInitMixin:
         self.moves_header_frame.pack(fill="x", padx=10, pady=(6, 2))
 
         self.lbl_moves_title = ctk.CTkLabel(
-            self.moves_header_frame, text="Engine", font=ctk.CTkFont(size=12, weight="bold"),
+            self.moves_header_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#94a3b8"
         )
         self.lbl_moves_title.pack(side="left")
 
         self.row_analysis_btns = ctk.CTkFrame(self.moves_header_frame, fg_color="transparent")
-        self.row_analysis_btns.pack(side="left", padx=(10, 0))
+        self.row_analysis_btns.pack(side="left", padx=(15, 0))
 
-        self.btn_review = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="1",
-            width=24,
-            height=24,
-            fg_color="#2e4a8c",
-            hover_color="#4870cd",
-            command=lambda: self.trigger_engine_mode("review")
-        )
-        self.btn_review.pack(side="left", padx=2)
-        ToolTip(self.btn_review, "Game Review")
+        if not hasattr(self, "_active_engine_mode"):
+            self._active_engine_mode = None
 
-        self.btn_candidates = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="2",
-            width=24,
-            height=24,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("candidates")
-        )
-        self.btn_candidates.pack(side="left", padx=2)
-        ToolTip(self.btn_candidates, "Candidate Moves")
+        def update_engine_ui(mode):
+            self._active_engine_mode = mode
 
-        self.btn_standard = ctk.CTkButton(
-            self.row_analysis_btns,
-            text="3",
-            width=24,
-            height=24,
-            fg_color="#1e293b",
-            hover_color="#334155",
-            command=lambda: self.trigger_engine_mode("standard")
-        )
-        self.btn_standard.pack(side="left", padx=2)
-        ToolTip(self.btn_standard, "Standard")
+            for widget in self.row_analysis_btns.winfo_children():
+                widget.destroy()
+
+            is_review = (mode == "review")
+            is_candidates = (mode == "candidates")
+            is_standard = (mode == "standard")
+
+            # --- Game Review Frame & Button ---
+            frame_review = ctk.CTkFrame(
+                self.row_analysis_btns, fg_color="transparent", corner_radius=6,
+                border_width=0 if is_review else 1, border_color="#334155"
+            )
+            frame_review.pack(side="left", padx=3)
+            self.btn_review = ctk.CTkButton(
+                frame_review, text="Game Review", height=24, corner_radius=6,
+                border_width=0, fg_color="#2e4a8c" if is_review else "#1e293b",
+                hover_color="#2e4a8c" if is_review else "#1e293b",
+                text_color="#f8fafc", font=ctk.CTkFont(size=11),
+                command=lambda: update_engine_ui("review")
+            )
+            self.btn_review.pack(fill="both", expand=True)
+
+            # --- Candidate Moves Frame & Button ---
+            frame_candidates = ctk.CTkFrame(
+                self.row_analysis_btns, fg_color="transparent", corner_radius=6,
+                border_width=0 if is_candidates else 1, border_color="#334155"
+            )
+            frame_candidates.pack(side="left", padx=3)
+            self.btn_candidates = ctk.CTkButton(
+                frame_candidates, text="Candidate Moves", height=24, corner_radius=6,
+                border_width=0, fg_color="#2e4a8c" if is_candidates else "#1e293b",
+                hover_color="#2e4a8c" if is_candidates else "#1e293b",
+                text_color="#f8fafc", font=ctk.CTkFont(size=11),
+                command=lambda: update_engine_ui("candidates")
+            )
+            self.btn_candidates.pack(fill="both", expand=True)
+
+            # --- Standard Frame & Button ---
+            frame_standard = ctk.CTkFrame(
+                self.row_analysis_btns, fg_color="transparent", corner_radius=6,
+                border_width=0 if is_standard else 1, border_color="#334155"
+            )
+            frame_standard.pack(side="left", padx=3)
+            self.btn_standard = ctk.CTkButton(
+                frame_standard, text="Standard", height=24, corner_radius=6,
+                border_width=0, fg_color="#2e4a8c" if is_standard else "#1e293b",
+                hover_color="#2e4a8c" if is_standard else "#1e293b",
+                text_color="#f8fafc", font=ctk.CTkFont(size=11),
+                command=lambda: update_engine_ui("standard")
+            )
+            self.btn_standard.pack(fill="both", expand=True)
+
+            self.trigger_engine_mode(mode)
+
+        if not hasattr(self, "_active_engine_mode"):
+            self._active_engine_mode = "review"
+        update_engine_ui(self._active_engine_mode)
+
 
         self.moves_textbox = ctk.CTkTextbox(
             self.moves_container_frame,
