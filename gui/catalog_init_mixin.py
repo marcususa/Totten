@@ -1,4 +1,3 @@
-# catalog_init_mixin.py
 import customtkinter as ctk
 from tkinter import ttk
 import gui.app_state as state
@@ -42,6 +41,7 @@ class ToolTip:
         self.tooltip_window = tw = ctk.CTkToplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
+        tw.configure(fg_color="#0f172a")
 
         try:
             tw.wm_attributes("-disabled", True)
@@ -51,7 +51,7 @@ class ToolTip:
         label = ctk.CTkLabel(
             tw,
             text=self.text,
-            fg_color="#1e293b",
+            fg_color="#0f172a",
             text_color="#f8fafc",
             corner_radius=4,
             font=("Arial", 11)
