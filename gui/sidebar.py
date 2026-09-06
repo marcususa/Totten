@@ -8,9 +8,8 @@ import gui.app_state as state
 
 class Sidebar(ctk.CTkFrame):
 
-    def __init__(self, parent, on_navigate_callback=None):
+    def __init__(self, parent):
         super().__init__(parent, width=105, corner_radius=0, fg_color="#172134")
-        self.on_navigate = on_navigate_callback or self._default_navigate
 
         # --- STATUS DISPLAY ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -53,24 +52,21 @@ class Sidebar(ctk.CTkFrame):
         self.btn_catalog = ctk.CTkButton(
             self, text="Catalog", anchor="w", fg_color="transparent",
             hover_color="#2e4a8c", text_color="white",
-            command=lambda: self.on_navigate("search_catalog")
+            command=lambda: state.show_workspace("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
-
-        # Start with the analysis workspace instead
-        self.on_navigate("analysis")
 
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
             hover_color="#2e4a8c", text_color="white",
-            command=lambda: self.on_navigate("analysis")
+            command=lambda: state.show_workspace("analysis")
         )
         self.btn_analysis.pack(fill="x", padx=4, pady=5)
 
         self.btn_patterns = ctk.CTkButton(
             self, text="Patterns", anchor="w", fg_color="transparent",
             hover_color="#2e4a8c", text_color="white",
-            command=lambda: self.on_navigate("patterns")
+            command=lambda: state.show_workspace("patterns")
         )
         self.btn_patterns.pack(fill="x", padx=4, pady=5)
 
@@ -84,9 +80,12 @@ class Sidebar(ctk.CTkFrame):
         self.btn_calendar = ctk.CTkButton(
             self, text="Calendar", anchor="w", fg_color="transparent",
             hover_color="#2e4a8c", text_color="white",
-            command=lambda: self.on_navigate("calendar")
+            command=lambda: state.show_workspace("calendar")
         )
         self.btn_calendar.pack(fill="x", padx=4, pady=5)
+
+        # Start with the analysis workspace on startup
+        state.show_workspace("analysis")
 
         # --- QUICK EVALUATION SECTION ---
         self.placeholder_text = "Paste PGN for quick analysis."
@@ -102,6 +101,8 @@ class Sidebar(ctk.CTkFrame):
 
         self.txt_qeval_moves.bind("<FocusIn>", self._on_qeval_focus_in)
         self.txt_qeval_moves.bind("<FocusOut>", self._on_qeval_focus_out)
+        self.txt_qeval_moves.bind("<Button-3>", self._on_qeval_right_click)
+        self.txt_qeval_moves.bind("<Button-2>", self._on_qeval_right_click)
 
         self.btn_qeval_analysis = ctk.CTkButton(
             self, text="Analyze", height=24, font=ctk.CTkFont(size=10),
@@ -109,64 +110,25 @@ class Sidebar(ctk.CTkFrame):
         )
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 6))
 
-    def _default_navigate(self, target):
-        """Switchboard navigation router handling workspace switching directly via state."""
-        parent = self.master
+    def _on_qeval_right_click(self, event):
+        """Pasted clipboard text directly on right-click, handling placeholders."""
+        try:
+            self.txt_qeval_moves.focus_set()
+            clipboard_text = self.winfo_toplevel().clipboard_get()
+            if not clipboard_text:
+                return "break"
 
-        if target == "analysis":
-            state.active_group_games = None
-            state.active_focus_game = None
+            # Clear placeholder text if it's currently showing
+            current_text = self.txt_qeval_moves.get("1.0", "end").strip()
+            if current_text == self.placeholder_text:
+                self.txt_qeval_moves.delete("1.0", "end")
+                self.txt_qeval_moves.configure(text_color="#f8fafc")
 
-            if not hasattr(state,
-                           "catalog_workspace") or state.catalog_workspace is None or not state.catalog_workspace.winfo_exists():
-                from gui.catalog_analysis import create_workspace
-                state.catalog_workspace = create_workspace(parent)
-                state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-
-            state.catalog_workspace.tkraise()
-            state.workspace = state.catalog_workspace
-            if hasattr(state.catalog_workspace, "refresh_view"):
-                state.catalog_workspace.refresh_view()
-
-        elif target == "search_catalog":
-            state.active_group_games = None
-            state.active_focus_game = None
-
-            if not hasattr(state,
-                           "search_catalog_workspace") or state.search_catalog_workspace is None or not state.search_catalog_workspace.winfo_exists():
-                from gui.search_catalog_workspace import SearchCatalogWorkspace
-                state.search_catalog_workspace = SearchCatalogWorkspace(parent)
-                state.search_catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-
-            state.search_catalog_workspace.tkraise()
-            state.workspace = state.search_catalog_workspace
-            if hasattr(state.search_catalog_workspace, "refresh_view"):
-                state.search_catalog_workspace.refresh_view()
-
-        elif target == "patterns":
-            state.show_workspace("patterns")
-
-        elif target == "mixed":
-            if not hasattr(state,
-                           "edit_workspace") or state.edit_workspace is None or not state.edit_workspace.winfo_exists():
-                from gui.edit_workspace import EditWorkspace
-                state.edit_workspace = EditWorkspace(parent)
-                state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.edit_workspace.tkraise()
-            state.workspace = state.edit_workspace
-            if hasattr(state.edit_workspace, "refresh_view"):
-                state.edit_workspace.refresh_view()
-
-        elif target == "calendar":
-            if not hasattr(state,
-                           "calendar_workspace") or state.calendar_workspace is None or not state.calendar_workspace.winfo_exists():
-                from gui.calendar_workspace import CalendarWorkspace
-                state.calendar_workspace = CalendarWorkspace(parent)
-                state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.calendar_workspace.tkraise()
-            state.workspace = state.calendar_workspace
-            if hasattr(state.calendar_workspace, "refresh_view"):
-                state.calendar_workspace.refresh_view()
+            # Insert clipboard contents at the current cursor position
+            self.txt_qeval_moves.insert("insert", clipboard_text)
+        except Exception:
+            pass
+        return "break"
 
     def _on_qeval_focus_in(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
@@ -184,37 +146,43 @@ class Sidebar(ctk.CTkFrame):
         raw_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if not raw_text or raw_text == self.placeholder_text:
             set_status_message("Error: Quick Evaluation box is empty.")
-            return None
+            return []
 
-        cleaned_lines = []
-        for line in raw_text.splitlines():
-            cleaned_lines.append(line.strip())
+        cleaned_lines = [line.strip() for line in raw_text.splitlines()]
         normalized_text = "\n".join(cleaned_lines)
 
+        games_list = []
         try:
             pgn_io = io.StringIO(normalized_text)
-            game_node = chess.pgn.read_game(pgn_io)
-            if not game_node:
-                set_status_message("Error: Invalid PGN format in Quick Evaluation.")
-                return None
-            return game_node
+            while True:
+                game = chess.pgn.read_game(pgn_io)
+                if game is None:
+                    break
+                games_list.append(game)
+
+            if not games_list:
+                set_status_message("Error: No valid PGN games found in Quick Evaluation.")
+                return []
+            return games_list
         except Exception as e:
             set_status_message(f"Quick Evaluation Parse Error: {e}")
-            return None
+            return []
 
     def handle_qeval_send_analysis(self):
-        game_node = self.parse_qeval_pgn()
-        if not game_node:
+        games_list = self.parse_qeval_pgn()
+        if not games_list:
             return
 
-        state.set_active_analysis_game(game_node)
+        state.catalog_state["active_games"] = games_list
+        state.catalog_state["active_index"] = 0
+        state.catalog_state["active_focus"] = games_list[0]
 
         self.txt_qeval_moves.delete("1.0", "end")
         self.txt_qeval_moves.insert("1.0", self.placeholder_text)
         self.txt_qeval_moves.configure(text_color="#94a3b8")
 
-        self.on_navigate("analysis")
-        set_status_message("Quick Evaluation sent to Analysis.")
+        state.show_workspace("analysis")
+        set_status_message(f"Loaded {len(games_list)} game(s) for quick analysis.")
 
 
 # --- LOCALIZED STATUS & PROGRESS BAR CONTROLLERS ---
@@ -307,7 +275,7 @@ def stop_progress():
 # --- TOP LEVEL FUNCTIONS ---
 
 def create_sidebar(app, on_navigate_callback=None):
-    sidebar = Sidebar(app, on_navigate_callback)
+    sidebar = Sidebar(app)
     state.left_frame = sidebar
     state.sidebar_visible = True
 

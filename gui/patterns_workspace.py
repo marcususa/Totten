@@ -1,3 +1,5 @@
+# gui/patterns_workspace.py
+
 import io
 import json
 import os
@@ -19,9 +21,7 @@ except ImportError:
     HAS_SVG_SUPPORT = False
 
 import gui.app_state as state
-from gui.statusbar import (
-    set_status_message,
-)
+from gui.statusbar import set_status_message
 
 # 1-3-5 Material Values Setup
 PIECE_VALUES = {
@@ -43,13 +43,13 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.pgn_path = Path("personal_catalog.pgn")
         self.eco_dir = Path("catalog_eco")
 
-        # Robust Asset Path Resolver with explicit print debugging
+        # Robust Asset Path Resolver
         self.assets_dir = self._find_assets_dir()
 
         root_project_dir = os.path.dirname(os.path.dirname(self.assets_dir))
         self.stockfish_path = (
-                stockfish_path
-                or os.path.join(root_project_dir, "engines", "stockfish-ubuntu-x86-64-bmi2")
+            stockfish_path
+            or os.path.join(root_project_dir, "engines", "stockfish-ubuntu-x86-64-bmi2")
         )
 
         self.all_games_cache = []
@@ -58,7 +58,11 @@ class PatternsWorkspace(ctk.CTkFrame):
         # State tracking
         self.tier_collapsed = {"tier1": False, "tier2": False, "tier3": False}
         self.selected_piece_filter = None  # Single piece selection
-        self.svg_image_cache = {}  # Critical to prevent Garbage Collection of images
+        self.svg_image_cache = {}  # Prevent Garbage Collection of images
+
+        # Debounce and update flags
+        self._slider_timer = None
+        self._updating_sliders = False
 
         # Three thresholds for 3 tiers (representing the starting move of each tier)
         self.slider_1_val = ctk.IntVar(value=1)
@@ -67,7 +71,7 @@ class PatternsWorkspace(ctk.CTkFrame):
 
         self._init_db()
         self._build_ui()
-        self.after(100, self.check_and_load_catalog)
+        self.after(200, self.check_and_load_catalog)  # Deferred initialization
 
     def _find_assets_dir(self):
         current = Path(__file__).resolve().parent
@@ -126,7 +130,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.master_container.grid_rowconfigure(1, weight=1)  # Scrollable Tiers
         self.master_container.grid_columnconfigure(0, weight=1)
 
-        # Unified Toolbar Ring Housing Sliders + Piece Tray Together (Halved padding: 6px / 3px)
+        # Unified Toolbar Ring Housing Sliders + Piece Tray Together
         self.unified_toolbar_ring = ctk.CTkFrame(
             self.master_container,
             fg_color="#1e293b",
@@ -145,7 +149,7 @@ class PatternsWorkspace(ctk.CTkFrame):
         )
         self.sliders_frame.pack(anchor="w", fill="x", padx=6, pady=(6, 2))
 
-        # Slider 1 Container (Opening) - fg_color acts as the right-side fill
+        # Slider 1 Container (Opening)
         s1_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
         s1_box.pack(side="left", padx=4, pady=2)
         self.lbl_s1 = ctk.CTkLabel(
@@ -223,10 +227,10 @@ class PatternsWorkspace(ctk.CTkFrame):
         )
         self.slider_3.pack(anchor="w", padx=2, pady=(2, 0))
 
-        # SVG Piece Selection Tray (Directly nested underneath sliders inside the same ring)
+        # SVG Piece Selection Tray
         self._build_piece_tray()
 
-        # 3. Main Scrollable Tier Results Container (Halved outer side margins to 6px)
+        # Main Scrollable Tier Results Container
         self.cards_scroll_frame = ctk.CTkScrollableFrame(
             self.master_container, fg_color="#172134", corner_radius=0, border_width=0
         )
@@ -295,8 +299,8 @@ class PatternsWorkspace(ctk.CTkFrame):
             self.piece_buttons[piece_code].configure(fg_color="#334155")
         else:
             if (
-                    self.selected_piece_filter
-                    and self.selected_piece_filter in self.piece_buttons
+                self.selected_piece_filter
+                and self.selected_piece_filter in self.piece_buttons
             ):
                 self.piece_buttons[self.selected_piece_filter].configure(
                     fg_color="#334155"
@@ -307,26 +311,37 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.recalculate_tiers()
 
     def on_slider_changed(self, val=None):
-        s1 = int(self.slider_1_val.get())
-        s2 = int(self.slider_2_val.get())
-        s3 = int(self.slider_3_val.get())
+        if self._updating_sliders:
+            return
 
-        if s1 >= s2:
-            s2 = s1 + 1
-            self.slider_2_val.set(s2)
-        if s2 >= s3:
-            s3 = s2 + 1
-            self.slider_3_val.set(s3)
+        self._updating_sliders = True
+        try:
+            s1 = int(self.slider_1_val.get())
+            s2 = int(self.slider_2_val.get())
+            s3 = int(self.slider_3_val.get())
 
-        self.lbl_s1.configure(text=f"Opening: {s1}–{s2 - 1}")
-        self.lbl_s2.configure(text=f"Middlegame: {s2}–{s3 - 1}")
-        self.lbl_s3.configure(text=f"Endgame: {s3}+")
-        self.recalculate_tiers()
+            if s1 >= s2:
+                s2 = s1 + 1
+                self.slider_2_val.set(s2)
+            if s2 >= s3:
+                s3 = s2 + 1
+                self.slider_3_val.set(s3)
+
+            # Instantly update textual feedback for smooth dragging feel
+            self.lbl_s1.configure(text=f"Opening: {s1}–{s2 - 1}")
+            self.lbl_s2.configure(text=f"Middlegame: {s2}–{s3 - 1}")
+            self.lbl_s3.configure(text=f"Endgame: {s3}+")
+        finally:
+            self._updating_sliders = False
+
+        # Debounce the expensive tier recalculation & UI rebuild
+        if self._slider_timer:
+            self.after_cancel(self._slider_timer)
+        self._slider_timer = self.after(150, self.recalculate_tiers)
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
         if self.db_path.exists() or self.pgn_path.exists() or eco_exists:
-            self.pack_propagate(True)
             self.update_idletasks()
             self.after(50, self.load_catalog_games)
         else:
@@ -354,14 +369,31 @@ class PatternsWorkspace(ctk.CTkFrame):
                         if game is None:
                             break
                         headers = dict(game.headers)
-                        ply_count = sum(1 for _ in game.mainline_moves())
-                        if ply_count == 0:
-                            ply_count = 20 + (idx * 5) % 60
+
+                        # Compute piece plies off the main GUI thread for fast indexing
+                        board = game.board()
+                        piece_plies = {}
+                        ply_idx = 0
+                        for move in game.mainline_moves():
+                            piece = board.piece_at(move.from_square)
+                            board.push(move)
+                            ply_idx += 1
+                            if piece:
+                                color_char = "w" if piece.color == chess.WHITE else "b"
+                                piece_char = piece.symbol().lower()
+                                code = f"{color_char}{piece_char}"
+                                move_num = (ply_idx + 1) // 2
+                                if code not in piece_plies:
+                                    piece_plies[code] = set()
+                                piece_plies[code].add(move_num)
+
+                        ply_count = ply_idx if ply_idx > 0 else (20 + (idx * 5) % 60)
 
                         loaded_games.append({
                             "headers": headers,
                             "ply_count": ply_count,
                             "game_object": game,
+                            "piece_plies": piece_plies,
                         })
                         idx += 1
             else:
@@ -392,6 +424,7 @@ class PatternsWorkspace(ctk.CTkFrame):
                                 "headers": h_dict,
                                 "ply_count": ply_count,
                                 "game_object": dummy_game,
+                                "piece_plies": {},
                             })
                         except Exception:
                             pass
@@ -414,6 +447,8 @@ class PatternsWorkspace(ctk.CTkFrame):
         self.recalculate_tiers()
 
     def recalculate_tiers(self):
+        self._slider_timer = None
+
         s1 = int(self.slider_1_val.get())
         s2 = int(self.slider_2_val.get())
         s3 = int(self.slider_3_val.get())
@@ -421,52 +456,20 @@ class PatternsWorkspace(ctk.CTkFrame):
         tier_1, tier_2, tier_3 = [], [], []
 
         for game in self.all_games_cache:
-            game_obj = game.get("game_object")
-            if not game_obj:
-                continue
-
             total_moves = int(game["ply_count"] / 2)
 
-            # 1. Determine if game satisfies piece filter criteria per tier window
             if not self.selected_piece_filter:
-                # No filter: pure length/phase sorting
                 in_t1 = s1 <= total_moves < s2
                 in_t2 = s2 <= total_moves < s3
+                in_t3_matched = total_moves >= s3
             else:
-                # Piece filter active: check which tier windows contain the selected piece move
-                color_char = self.selected_piece_filter[0]
-                piece_char = self.selected_piece_filter[1].upper()
+                piece_plies = game.get("piece_plies", {})
+                matched_moves = piece_plies.get(self.selected_piece_filter, set())
 
-                board = game_obj.board()
-                ply_index = 0
-                matched_windows = set()
+                in_t1 = any(s1 <= m < s2 for m in matched_moves)
+                in_t2 = any(s2 <= m < s3 for m in matched_moves)
+                in_t3_matched = any(m >= s3 for m in matched_moves)
 
-                for move in game_obj.mainline_moves():
-                    piece_moved = board.piece_at(move.from_square)
-                    board.push(move)
-                    ply_index += 1
-                    current_move_num = int((ply_index + 1) / 2)
-
-                    if piece_moved:
-                        is_white = piece_moved.color == chess.WHITE
-                        p_symbol = piece_moved.symbol().upper()
-
-                        if (color_char == "w" and is_white) or (
-                                color_char == "b" and not is_white
-                        ):
-                            if p_symbol == piece_char:
-                                if s1 <= current_move_num < s2:
-                                    matched_windows.add(1)
-                                elif s2 <= current_move_num < s3:
-                                    matched_windows.add(2)
-                                elif current_move_num >= s3:
-                                    matched_windows.add(3)
-
-                in_t1 = 1 in matched_windows
-                in_t2 = 2 in matched_windows
-                in_t3_matched = 3 in matched_windows
-
-            # 2. Distribute into tiers ensuring Tier 3 catches the remainder
             assigned_to_t1_or_t2 = False
 
             if not self.selected_piece_filter:
@@ -486,10 +489,7 @@ class PatternsWorkspace(ctk.CTkFrame):
                     tier_2.append(game)
                     assigned_to_t1_or_t2 = True
 
-                # Tier 3 acts as the catch-all remainder if it didn't fit into T1/T2
-                # or if it matched down in the endgame tier window.
                 if not assigned_to_t1_or_t2 or in_t3_matched:
-                    # Prevent duplicate additions if a game spans multiple rules loosely
                     if game not in tier_3:
                         tier_3.append(game)
 
@@ -602,7 +602,6 @@ class PatternsWorkspace(ctk.CTkFrame):
         black = headers.get("Black", "Unknown")
         set_status_message(f"Sending tier to analysis, focused on: {white} vs {black}")
 
-        # Find which tier container holds this game so we send the full tier list
         full_tier_games = []
         for t_data in self.aggregated_tiers.values():
             if game_data in t_data.get("games", []):
@@ -614,8 +613,32 @@ class PatternsWorkspace(ctk.CTkFrame):
 
         target_game = game_data.get("game_object")
 
-        # Clean 1-line handoff to app_state
-        self.app_state.set_active_patterns_collection(full_tier_games, focused_game=target_game)
+        # Find the exact index of the clicked game within the tier list
+        active_index = 0
+        try:
+            active_index = full_tier_games.index(game_data)
+        except ValueError:
+            for idx, g in enumerate(full_tier_games):
+                if g == game_data or (
+                        isinstance(g, dict) and isinstance(game_data, dict) and g.get("game_object") == game_data.get(
+                        "game_object")):
+                    active_index = idx
+                    break
+
+        # Explicitly set state and trigger workspace switch with active_index payload
+        state.patterns_state["active_games"] = full_tier_games
+        state.patterns_state["active_focus"] = target_game
+        state.patterns_state["active_index"] = active_index
+
+        if hasattr(state, "show_workspace"):
+            state.show_workspace(
+                "patterns_analysis",
+                initial_games=full_tier_games,
+                target_game=target_game,
+                active_index=active_index
+            )
+        else:
+            self.app_state.set_active_patterns_collection(full_tier_games, focused_game=target_game)
 
     def send_tier_to_analysis(self, tier_key):
         tier_info = self.aggregated_tiers.get(tier_key, {})
@@ -625,8 +648,14 @@ class PatternsWorkspace(ctk.CTkFrame):
             f"{tier_info.get('label', tier_key)} to Analysis Section..."
         )
 
-        # Clean 1-line handoff to app_state
-        self.app_state.set_active_patterns_collection(games)
+        # Explicitly set state and trigger workspace switch with payload
+        state.patterns_state["active_games"] = games
+        state.patterns_state["active_focus"] = None
+        if hasattr(state, "show_workspace"):
+            state.show_workspace("patterns_analysis", initial_games=games)
+        else:
+            self.app_state.set_active_patterns_collection(games)
+
 
 # --- WORKSPACE FACTORY FUNCTION ---
 

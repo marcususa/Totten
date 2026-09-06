@@ -7,8 +7,8 @@ class StandaloneSplash:
         self.root = tk.Tk()
         self.root.overrideredirect(True)
 
-        width = 280
-        height = 170
+        width = 282
+        height = 172
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -18,8 +18,12 @@ class StandaloneSplash:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         self.root.configure(bg="#172134")
 
-        self.frame = tk.Frame(self.root, bg="#222e42", bd=0)
-        self.frame.pack(fill="both", expand=True, padx=2, pady=2)
+        # Sleeker 1px border ring using the app's border blue (#344268)
+        self.border_ring = tk.Frame(self.root, bg="#344268", bd=0)
+        self.border_ring.pack(fill="both", expand=True, padx=0, pady=0)
+
+        self.frame = tk.Frame(self.border_ring, bg="#222e42", bd=0)
+        self.frame.pack(fill="both", expand=True, padx=1, pady=1)
 
         self.lbl_title = tk.Label(
             self.frame, text=title_text, font=("Arial", 28, "bold"), fg="white", bg="#222e42"
@@ -56,8 +60,8 @@ class LoadingOverlay(ctk.CTkToplevel):
         self.withdraw()
         self.overrideredirect(True)
 
-        width = 280
-        height = 150
+        width = 282
+        height = 152
 
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -69,8 +73,12 @@ class LoadingOverlay(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
 
-        frame = ctk.CTkFrame(self, fg_color="#222e42", corner_radius=0)
-        frame.pack(fill="both", expand=True, padx=2, pady=2)
+        # Sleeker 1px border ring
+        border_ring = ctk.CTkFrame(self, fg_color="#344268", corner_radius=11)
+        border_ring.pack(fill="both", expand=True, padx=0, pady=0)
+
+        frame = ctk.CTkFrame(border_ring, fg_color="#222e42", corner_radius=10)
+        frame.pack(fill="both", expand=True, padx=1, pady=1)
 
         self.lbl_title = ctk.CTkLabel(
             frame, text=title_text, font=("Arial", 28, "bold"), text_color="white", fg_color="#222e42"

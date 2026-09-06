@@ -397,40 +397,41 @@ class EditWorkspace(ctk.CTkFrame):
 
     def _on_tree_double_click(self, event):
         item_id = self.col_tree.identify_row(event.y)
-        if not item_id or item_id not in self.tree_map:
+        if not item_id or not hasattr(self, "tree_map") or item_id not in self.tree_map:
             return
 
+        # Get all visible items currently in the tree in their exact order
+        children = self.col_tree.get_children()
+
+        # Build the game list and find our target index simultaneously
+        all_file_games = []
+        selected_index = 0
+
+        for idx, child_id in enumerate(children):
+            if child_id in self.tree_map:
+                game_obj, source_path = self.tree_map[child_id]
+                all_file_games.append(game_obj)
+                if child_id == item_id:
+                    selected_index = idx
+
         game, source_data = self.tree_map[item_id]
-        print(f"[DEBUG] Double click fired! Selected game source file: {source_data}")
 
-        # Directly search all cached category file dictionaries using absolute resolved path
-        target_file_games = []
-        resolved_source = str(Path(source_data).resolve())
-
-        for cat, files_dict in self.collection_files.items():
-            for fpath_str, rows in files_dict.items():
-                if str(Path(fpath_str).resolve()) == resolved_source:
-                    target_file_games = [row[3] for row in rows]
-                    break
-            if target_file_games:
-                break
-
-        # Fallback to single game if file lookup fails
-        all_file_games = target_file_games if target_file_games else [game]
-
-        # Populate state properly with active focus and collection file reference
-        if hasattr(state, "set_active_mixed_collection"):
-            state.set_active_mixed_collection(all_file_games, focused_game=game)
-        else:
-            state.mixed_state["active_games"] = all_file_games
-            state.mixed_state["active_focus"] = game
-
+        # Save index and collection into state properly
+        state.mixed_state["active_index"] = selected_index
+        state.mixed_state["active_games"] = all_file_games
+        state.mixed_state["active_focus"] = game
         state.mixed_state["current_filename"] = source_data
 
         # Traverse up to the main application window and trigger Stage 2 switchboard safely
         top_level = self.winfo_toplevel()
         if hasattr(top_level, "show_workspace"):
-            top_level.show_workspace("mixed_analysis", initial_games=all_file_games, filename=source_data, active_focus=game)
+            top_level.show_workspace(
+                "mixed_analysis",
+                initial_games=all_file_games,
+                filename=source_data,
+                active_focus=game,
+                active_index=selected_index
+            )
         else:
             print("[DEBUG] Error: top_level window has no show_workspace method.")
 

@@ -22,19 +22,17 @@ STANDARD_TAG_BANK = {
 
 
 def on_group_selected(self, chosen_games_list):
-    # Store the chosen subset in the isolated catalog bucket
     state.catalog_state["active_games"] = chosen_games_list
-
-    # Trigger the switch to the catalog analysis workspace
     if hasattr(state, "show_workspace"):
         state.show_workspace("catalog")
 
+
 class SearchCatalogWorkspace(ctk.CTkFrame):
     def __init__(self, master, app_state=None, *args, **kwargs):
-        # Pop custom app_state or extra kwargs if passed to prevent CustomTkinter errors
         kwargs.pop("app_state", None)
         kwargs.pop("filename", None)
         super().__init__(master, fg_color="#172134", corner_radius=0, *args, **kwargs)
+
         self.app_state = app_state or state
 
         self.json_path = Path("personal_catalog.json")
@@ -58,7 +56,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         self.expanded_groups = set()
 
         self._build_ui()
-        self.after(100, self.check_and_load_catalog)
+        self.check_and_load_catalog()
 
     def _build_ui(self):
         self.grid_rowconfigure(0, weight=1)
@@ -169,6 +167,73 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
         )
         self.cards_scroll_frame.grid(row=1, column=0, sticky="nsew", padx=1, pady=(0, 1))
         self.cards_scroll_frame.grid_columnconfigure(0, weight=1)
+
+    def check_and_load_catalog(self):
+        if self.json_path.exists():
+            try:
+                with open(self.json_path, "r", encoding="utf-8") as f:
+                    self.aggregated_games_data = json.load(f)
+                    self.refresh_current_view()
+                    return
+            except Exception as e:
+                print(f"Error loading JSON catalog: {e}")
+
+        if self.pgn_path.exists():
+            set_status_message("Loading personal catalog...")
+            start_progress(indeterminate=True)
+            threading.Thread(target=self._background_load_catalog, daemon=True).start()
+        else:
+            self.refresh_current_view()
+
+    def _background_load_catalog(self):
+        aggregated = {}
+        try:
+            with open(self.pgn_path, "r", encoding="utf-8", errors="replace") as f:
+                while True:
+                    game = chess.pgn.read_game(f)
+                    if game is None:
+                        break
+                    headers = {k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in game.headers.items()}
+                    eco = self.get_header(headers, "ECO", "A00")
+                    opening = self.get_header(headers, "Opening", "Unknown")
+                    variation = self.get_header(headers, "Variation", "")
+
+                    key = (eco, opening, variation)
+                    if key not in aggregated:
+                        aggregated[key] = {
+                            "eco": eco,
+                            "opening": opening,
+                            "variation": variation,
+                            "count": 0,
+                            "instances": []
+                        }
+                    aggregated[key]["count"] += 1
+                    aggregated[key]["instances"].append({
+                        "headers": headers,
+                        "game_object": game
+                    })
+
+            self.aggregated_games_data = list(aggregated.values())
+            try:
+                cache_data = []
+                for item in self.aggregated_games_data:
+                    cache_item = {
+                        "eco": item["eco"],
+                        "opening": item["opening"],
+                        "variation": item["variation"],
+                        "count": item["count"],
+                        "instances": [{"headers": inst["headers"], "game_object": None} for inst in item["instances"]]
+                    }
+                    cache_data.append(cache_item)
+                with open(self.json_path, "w", encoding="utf-8") as jf:
+                    json.dump(cache_data, jf)
+            except Exception as ex:
+                print(f"Error saving JSON cache: {ex}")
+
+        except Exception as e:
+            print(f"Error loading PGN catalog: {e}")
+
+        self.after(0, lambda: [stop_progress(), self.refresh_current_view(), set_status_message("Catalog loaded.")])
 
     def get_header(self, headers, key, default="Unknown"):
         if not headers:
@@ -471,7 +536,6 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                     row_btn.pack(fill="x", padx=2, pady=2)
 
                     def handle_single_click(e, gk=group_key):
-                        # Cancel any pending double-click timer if it exists, then wait briefly
                         if hasattr(self, "_click_timer") and self._click_timer:
                             self.after_cancel(self._click_timer)
                         self._click_timer = self.after(250, lambda: self.toggle_group_expansion(gk))
@@ -531,7 +595,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
                                 text_color="#cbd5e1",
                                 font=("Arial", 11),
                                 height=28,
-                                command=lambda game_inst=inst: self.on_game_click(game_inst)
+                                command=lambda idata=item_data, game_inst=inst: self.on_game_click(idata, game_inst)
                             )
                             sub_btn.pack(fill="x", padx=2, pady=1)
 
@@ -647,142 +711,129 @@ class SearchCatalogWorkspace(ctk.CTkFrame):
             self.expanded_groups.add(group_key)
         self.refresh_current_view()
 
-    def on_game_click(self, game_data):
-        if not game_data:
-            return
+    def _navigate_to_analysis(self):
+        sw_func = None
+        if hasattr(state, "show_workspace") and callable(state.show_workspace):
+            sw_func = state.show_workspace
+        elif hasattr(self.winfo_toplevel(), "show_workspace") and callable(
+                getattr(self.winfo_toplevel(), "show_workspace")):
+            sw_func = self.winfo_toplevel().show_workspace
+        elif hasattr(self.master, "show_workspace") and callable(getattr(self.master, "show_workspace")):
+            sw_func = self.master.show_workspace
 
-        headers = game_data.get("headers", {})
-        white = self.get_header(headers, "White", "Unknown")
-        black = self.get_header(headers, "Black", "Unknown")
-        set_status_message(f"Loading analysis: {white} vs {black}")
-
-        game_obj = game_data.get("game_object")
-        if not game_obj:
-            eco = self.get_header(headers, "ECO", "A00")
-            cat = eco[0].upper() if eco else "A"
-            eco_pgn = self.eco_files.get(cat)
-            source_pgn = eco_pgn if (eco_pgn and eco_pgn.exists()) else self.pgn_path
-
-            if source_pgn.exists():
+        if sw_func:
+            for name in ["catalog_analysis", "analysis", "catalog"]:
                 try:
-                    with open(source_pgn, "r", encoding="utf-8", errors="replace") as f:
-                        while True:
-                            parsed_game = chess.pgn.read_game(f)
-                            if parsed_game is None:
-                                break
+                    sw_func(name)
+                    return True
+                except Exception:
+                    continue
+        return False
 
-                            p_white = parsed_game.headers.get("White", "")
-                            p_black = parsed_game.headers.get("Black", "")
-                            if p_white == white and p_black == black:
-                                game_obj = parsed_game
-                                game_data["game_object"] = parsed_game
-                                break
-                except Exception as err:
-                    print(f"Error reading game on click: {err}")
-
-        if not game_obj:
-            set_status_message("Error: Could not load game data.")
+    def on_game_click(self, item_data, game_data):
+        if not item_data or not game_data:
             return
 
-        # -------------------------------------------------------------
-        # FIX: Directly inject the single game into state and switch view
-        # -------------------------------------------------------------
-        state.active_group_games = None
-        state.active_category_source = None
-        state.active_analysis_game = game_obj
-        state.active_focus_game = game_obj
-
-        try:
-            if hasattr(state, "show_workspace") and callable(state.show_workspace):
-                state.show_workspace("analysis")
-        except Exception as e:
-            print(f"Error routing game to analysis: {e}")
-
-    def on_group_click(self, item_data):
-        """Passes the instances belonging to this specific ECO/variation group to analysis."""
-        if not item_data or not item_data.get("instances"):
-            return
-
-        instances = item_data["instances"]
+        instances = item_data.get("instances", [])
         opening = item_data.get("opening", "Unknown")
         eco = item_data.get("eco", "A00")
 
-        set_status_message(f"Loading ECO group {eco}: {opening} ({len(instances)} games)")
+        headers = game_data.get("headers", {})
+        target_white = self.get_header(headers, "White", "").strip()
+        target_black = self.get_header(headers, "Black", "").strip()
+
+        set_status_message(f"Loading analysis: {target_white} vs {target_black} ({len(instances)} games in group)")
 
         game_list = []
+        target_game_obj = None
+
         for inst in instances:
             g_obj = inst.get("game_object")
+            inst_headers = inst.get("headers", {})
+            w = self.get_header(inst_headers, "White", "").strip()
+            b = self.get_header(inst_headers, "Black", "").strip()
+
             if not g_obj:
-                headers = inst.get("headers", {})
-                w = self.get_header(headers, "White", "")
-                b = self.get_header(headers, "Black", "")
                 cat = eco[0].upper() if eco else "A"
                 eco_pgn = self.eco_files.get(cat)
-                source_pgn = eco_pgn if (eco_pgn and eco_pgn.exists()) else self.pgn_path
+                candidate_paths = []
+                if eco_pgn and eco_pgn.exists():
+                    candidate_paths.append(eco_pgn)
+                if self.pgn_path.exists() and self.pgn_path not in candidate_paths:
+                    candidate_paths.append(self.pgn_path)
 
-                if source_pgn.exists():
+                for src_path in candidate_paths:
+                    if g_obj:
+                        break
                     try:
-                        with open(source_pgn, "r", encoding="utf-8", errors="replace") as f:
+                        with open(src_path, "r", encoding="utf-8", errors="replace") as f:
                             while True:
                                 parsed = chess.pgn.read_game(f)
                                 if parsed is None:
                                     break
-                                if parsed.headers.get("White") == w and parsed.headers.get("Black") == b:
+                                p_w = parsed.headers.get("White", "").strip()
+                                p_b = parsed.headers.get("Black", "").strip()
+                                if p_w.lower() == w.lower() and p_b.lower() == b.lower():
                                     g_obj = parsed
                                     inst["game_object"] = parsed
                                     break
                     except Exception:
                         pass
+
             if g_obj:
                 game_list.append(g_obj)
+                if inst == game_data or g_obj == game_data.get("game_object"):
+                    target_game_obj = g_obj
 
-        if not game_list:
-            set_status_message("Error: No games could be loaded for this group.")
-            return
+        if not target_game_obj and game_list:
+            target_game_obj = game_list[0]
 
-        # -------------------------------------------------------------
-        # FIX: Directly set the state properties correctly before switching
-        # -------------------------------------------------------------
-        state.active_group_games = game_list
-        state.active_category_source = game_list
-        state.active_analysis_game = game_list[0]
-        state.active_focus_game = game_list[0]
-
-        try:
-            if hasattr(state, "show_workspace") and callable(state.show_workspace):
-                # Pass initial_games explicitly so it bypasses global state lookups
-                state.show_workspace("catalog_analysis", initial_games=game_list)
-        except Exception as e:
-            print(f"Error routing game group to catalog analysis: {e}")
-
-    def check_and_load_catalog(self):
-        eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
-        if self.db_path.exists() or self.pgn_path.exists() or eco_exists:
-            self.pack_propagate(True)
-            self.update_idletasks()
-            self.after(50, self.load_catalog)
+        # Determine the exact active index of the clicked game
+        active_index = 0
+        if target_game_obj in game_list:
+            active_index = game_list.index(target_game_obj)
         else:
-            self.aggregated_games_data = []
-            self.refresh_current_view()
+            for idx, g in enumerate(game_list):
+                g_headers = g.headers if hasattr(g, "headers") else {}
+                if (g_headers.get("White", "").strip().lower() == target_white.lower() and
+                        g_headers.get("Black", "").strip().lower() == target_black.lower()):
+                    active_index = idx
+                    break
 
-    def load_catalog(self):
-        self.pack_propagate(True)
-        set_status_message("Loading catalog via DuckDB...")
-        start_progress(indeterminate=False)
-        update_progress(0.1)
+        # Save to catalog state
+        state.catalog_state["active_games"] = game_list
+        state.catalog_state["active_focus"] = target_game_obj
+        state.catalog_state["active_index"] = active_index
 
-        self.aggregated_games_data = []
-        self.refresh_current_view()
+        # Trigger workspace switch with active_index and target parameters
+        sw_func = None
+        if hasattr(state, "show_workspace") and callable(state.show_workspace):
+            sw_func = state.show_workspace
+        elif hasattr(self.winfo_toplevel(), "show_workspace") and callable(getattr(self.winfo_toplevel(), "show_workspace")):
+            sw_func = self.winfo_toplevel().show_workspace
+        elif hasattr(self.master, "show_workspace") and callable(getattr(self.master, "show_workspace")):
+            sw_func = self.master.show_workspace
 
-        self.after(50, lambda: threading.Thread(target=self._background_load_catalog_worker, daemon=True).start())
-
-    def _background_load_catalog_worker(self):
-        catalog_data = {}
-        if self.json_path.exists():
+        if sw_func:
             try:
-                with open(self.json_path, "r", encoding="utf-8") as f:
-                    catalog_data = json.load(f)
-            except Exception as e:
-                print(f"Error loading catalog json: {e}")
+                sw_func("analysis", initial_games=game_list, target_game=target_game_obj, active_index=active_index)
+                return
+            except TypeError:
+                try:
+                    sw_func("analysis")
+                    return
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
-        self.after(0, lambda: update_progress(0.3))
+        self._navigate_to_analysis()
+
+    def on_group_click(self, item_data):
+        if not item_data:
+            return
+        instances = item_data.get("instances", [])
+        if not instances:
+            return
+        # Default to clicking the first game in the group
+        self.on_game_click(item_data, instances[0])

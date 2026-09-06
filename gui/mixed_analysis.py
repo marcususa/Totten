@@ -61,15 +61,21 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
     """
 
-    def __init__(self, parent, filename=None, initial_games=None, *args, **kwargs):
+    def __init__(self, parent, filename=None, initial_games=None, active_focus=None, active_index=None, *args, **kwargs):
         super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
-        self.filename = filename
 
-        # Pull from isolated state immediately if initial_games is empty
+        # Pull from isolated state immediately if arguments are empty
+        if not filename and hasattr(state, "mixed_state"):
+            filename = state.mixed_state.get("current_filename")
         if not initial_games and hasattr(state, "mixed_state"):
             initial_games = state.mixed_state.get("active_games")
+        if not active_focus and hasattr(state, "mixed_state"):
+            active_focus = state.mixed_state.get("active_focus")
+        if active_index is None and hasattr(state, "mixed_state"):
+            active_index = state.mixed_state.get("active_index")
 
-        self.game_list = list(initial_games) if initial_games else []
+        self.filename = filename
+        self.game_list = []
         self.current_game = None
         self.board_node = None
         self.preview_lookup = {}
@@ -81,11 +87,27 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         self.active_engine_mode = "standard"
         self.analysis_rows = {}
 
-        # Initialize the full UI shell layout
+        # Initialize the full UI shell layout first
         self.init_layout()
 
-        # Initial load of PGN folder data (will skip file load if initial_games were provided)
-        self.load_catalog_data()
+        # 1. Populate game list from initial_games subset or fallback to file/catalog
+        if initial_games:
+            self.game_list = list(initial_games)
+        elif self.filename and Path(self.filename).exists():
+            self.load_games_from_file(self.filename)
+        else:
+            self.load_catalog_data()
+
+        # 2. Populate tree and let it handle the target index/focus selection in one clean pass
+        if self.game_list and hasattr(self, "pgn_tree"):
+            self.populate_catalog_tree(self.game_list, active_game=active_focus, active_index=active_index)
+
+        # Clear out state bucket after consumption
+        if hasattr(state, "mixed_state"):
+            state.mixed_state["active_games"] = None
+            state.mixed_state["active_focus"] = None
+            state.mixed_state["active_index"] = None
+            state.mixed_state["current_filename"] = None
 
         # Wire up engine mode buttons securely
         self._bind_engine_buttons()
@@ -104,7 +126,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         if "analysis_textbox" in found_boxes:
             self._cached_analysis_box = found_boxes["analysis_textbox"]
 
-        # Fallback search through all attributes for something with text-inserting capabilities
         print("[DIAGNOSTIC] Running one-time attribute scan for analysis widget:")
         for attr_name in dir(self):
             if not attr_name.startswith("_"):
@@ -171,7 +192,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                 self.board_widget.set_position_fen(board_obj.fen())
             except Exception:
                 pass
-    # ---------------------------------------------
 
     def load_games_list(self, games_list, focused_game=None):
         """Populates the analysis view with a filtered subset of games and loads the board."""
@@ -180,11 +200,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
 
         self.game_list = games_list
         if hasattr(self, "populate_catalog_tree"):
-            self.populate_catalog_tree(self.game_list)
-
-        target_game = focused_game if focused_game else games_list[0]
-        if hasattr(self, "load_game"):
-            self.load_game(target_game)
+            self.populate_catalog_tree(self.game_list, active_game=focused_game)
 
     def pop_out_board(self, *args, **kwargs):
         if hasattr(self, "board_widget") and self.board_widget and hasattr(self.board_widget, "toggle_popout"):
@@ -195,6 +211,22 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             return self.load_game_hardwired(game_node, category_source=category_source)
         return self.load_game_from_state(game_node, category_source=category_source)
 
+    def load_games_from_file(self, filepath):
+        """Loads all games from a specific PGN file path."""
+        source_games = []
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                while True:
+                    g = chess.pgn.read_game(f)
+                    if g is None:
+                        break
+                    source_games.append(g)
+            self.game_list = source_games
+            if hasattr(state, "all_games"):
+                state.all_games = source_games
+        except Exception as e:
+            print(f"[MIXED ANALYSIS ERROR] Failed to load PGN file {filepath}: {e}")
+
     def load_catalog_data(self):
         if self.game_list:
             if hasattr(self, "pgn_tree"):
@@ -202,6 +234,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             return
 
         source_games = []
+        target_path = None
         if self.filename and Path(self.filename).exists():
             target_path = self.filename
         else:
@@ -212,24 +245,13 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                 if pgn_files:
                     target_path = pgn_files[0]
 
-        if Path(target_path).exists():
-            try:
-                with open(target_path, "r", encoding="utf-8", errors="replace") as f:
-                    while True:
-                        g = chess.pgn.read_game(f)
-                        if g is None:
-                            break
-                        source_games.append(g)
-                self.game_list = source_games
-                if hasattr(state, "all_games"):
-                    state.all_games = source_games
-            except Exception as e:
-                print(f"[MIXED ANALYSIS DEBUG] Error reading PGN file: {e}")
+        if target_path and Path(target_path).exists():
+            self.load_games_from_file(target_path)
 
         if self.game_list and hasattr(self, "pgn_tree"):
             self.populate_catalog_tree(self.game_list)
 
-    def populate_catalog_tree(self, games_to_display, active_game=None):
+    def populate_catalog_tree(self, games_to_display, active_game=None, active_index=None):
         if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
             return
 
@@ -242,8 +264,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             except Exception:
                 pass
 
-        target = active_game or (games_to_display[0] if games_to_display else None)
-
+        item_ids = []
         for idx, g in enumerate(games_to_display, start=1):
             headers = g.headers
             white = headers.get("White", "Unknown")
@@ -252,13 +273,28 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
 
             item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
             self.preview_lookup[item_id] = g
+            item_ids.append(item_id)
 
-            if target and g == target:
-                self.pgn_tree.selection_set(item_id)
-                self.pgn_tree.see(item_id)
+        # Resolve target index: use argument/state index first
+        target_idx = active_index
+        if target_idx is None and hasattr(state, "mixed_state"):
+            target_idx = state.mixed_state.get("active_index")
 
-        if target:
-            self.load_game_from_state(target)
+        target_item = None
+        if target_idx is not None and 0 <= target_idx < len(item_ids):
+            target_item = item_ids[target_idx]
+        elif active_game is not None:
+            for iid, g in self.preview_lookup.items():
+                if g is active_game or g == active_game:
+                    target_item = iid
+                    break
+        elif item_ids:
+            target_item = item_ids[0]
+
+        if target_item:
+            self.pgn_tree.selection_set(target_item)
+            self.pgn_tree.see(target_item)
+            self.load_game_from_state(self.preview_lookup[target_item])
 
     def load_games_by_eco(self, eco_code, active_game=None):
         if not eco_code:
@@ -352,7 +388,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                     tag_name = id(next_node)
                     self.moves_textbox.insert("end", move_str, ("default", str(tag_name)))
                     self.moves_textbox.tag_bind(str(tag_name), "<Button-1>",
-                                                lambda e, n=next_node: self.jump_to_node(n))
+                                                lambda *args, n=next_node: self.jump_to_node(n))
 
                     temp_node = next_node
 
@@ -436,7 +472,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         """Routes engine mode changes directly to the appropriate mixin handler."""
         self.active_engine_mode = mode
 
-        # Style buttons securely across name variants
         for name in ("btn_review", "btn_review_mode"):
             if hasattr(self, name) and getattr(self, name):
                 getattr(self, name).configure(fg_color="#2e4a8c" if mode == "review" else "#1e293b",
@@ -450,7 +485,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                 getattr(self, name).configure(fg_color="#2e4a8c" if mode == "standard" else "#1e293b",
                                               hover_color="#4870cd" if mode == "standard" else "#334155")
 
-        # Delegate directly to the specific mixin's trigger implementation
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
         elif mode == "candidates":
@@ -458,7 +492,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         elif mode == "standard":
             EngineStandardMixin.trigger_engine_mode(self, "standard")
 
-def create_workspace(master, initial_games=None, filename=None, **kwargs):
+def create_workspace(master, initial_games=None, filename=None, active_focus=None, active_index=None, **kwargs):
     """Instantiates MixedAnalysis, utilizing filtered games and files from the PGN folder structure."""
     import gui.app_state as state_mod
 
@@ -468,21 +502,19 @@ def create_workspace(master, initial_games=None, filename=None, **kwargs):
     if filename is None and hasattr(state_mod, "mixed_state"):
         filename = state_mod.mixed_state.get("current_filename")
 
-    focus = None
-    if hasattr(state_mod, "mixed_state"):
-        focus = state_mod.mixed_state.get("active_focus")
+    if active_focus is None and hasattr(state_mod, "mixed_state"):
+        active_focus = state_mod.mixed_state.get("active_focus")
 
-    instance = MixedAnalysis(master, filename=filename, initial_games=initial_games)
+    if active_index is None and hasattr(state_mod, "mixed_state"):
+        active_index = state_mod.mixed_state.get("active_index")
 
-    if focus and hasattr(instance, "load_game"):
-        instance.load_game(focus)
-    elif initial_games and hasattr(instance, "load_game"):
-        instance.load_game(initial_games[0])
-
-    if hasattr(state_mod, "mixed_state"):
-        state_mod.mixed_state["active_games"] = None
-        state_mod.mixed_state["active_focus"] = None
-        state_mod.mixed_state["current_filename"] = None
+    instance = MixedAnalysis(
+        master,
+        filename=filename,
+        initial_games=initial_games,
+        active_focus=active_focus,
+        active_index=active_index
+    )
 
     state_mod.workspace = instance
     return instance

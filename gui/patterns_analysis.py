@@ -1,21 +1,62 @@
-import chess
-import chess.pgn
+import json
+from pathlib import Path
 import customtkinter as ctk
 from tkinter import ttk
-from pathlib import Path
+import chess
+import chess.pgn
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
 from gui.chess_board import ChessBoardWidget
 from core.constants import CONFIG_FILE
-from .patterns_init_mixin import PatternsInitMixin
+from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
+from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
+from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 BASE_PGN_DIR = Path(__file__).resolve().parent.parent / "pgn"
 
-class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
-    def __init__(self, parent, filename=None, initial_games=None, *args, **kwargs):
-        if initial_games is not None:
-            kwargs["initial_games"] = initial_games
+
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip_window = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event=None):
+        if self.tooltip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tooltip_window = tw = ctk.CTkToplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        try:
+            tw.wm_attributes("-disabled", True)
+        except Exception:
+            pass
+        label = ctk.CTkLabel(
+            tw,
+            text=self.text,
+            fg_color="#1e293b",
+            text_color="#f8fafc",
+            corner_radius=4,
+            font=("Arial", 11)
+        )
+        label.pack(padx=6, pady=4)
+
+    def hide_tooltip(self, event=None):
+        if self.tooltip_window:
+            try:
+                self.tooltip_window.destroy()
+            except Exception:
+                pass
+            self.tooltip_window = None
+
+
+class PatternsAnalysis(ctk.CTkFrame, EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
+    def __init__(self, parent, filename=None, initial_games=None, target_game=None, active_index=None, *args, **kwargs):
         super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
         self.filename = filename or (BASE_PGN_DIR / "patterns_analysis.pgn")
         self.game_list = []
@@ -37,20 +78,194 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
         self.col_tree = None
         self.pgn_tree = None
 
+        # Inline layout initialization
         self.init_layout()
         self._apply_tree_styles()
         self._bind_analysis_events()
         self._bind_keyboard_events()
 
-        if "initial_games" in kwargs and kwargs["initial_games"]:
-            self.load_patterns_collection(kwargs["initial_games"])
+        if initial_games is not None:
+            self.load_patterns_collection(initial_games, target_game=target_game, active_index=active_index)
         elif hasattr(state, "active_category_source") and state.active_category_source:
             if isinstance(state.active_category_source, list):
-                self.load_patterns_collection(state.active_category_source)
+                self.load_patterns_collection(state.active_category_source, target_game=target_game, active_index=active_index)
             else:
                 self.load_games(filename=state.active_category_source)
-        else:
-            pass
+
+    def init_layout(self):
+        self.main_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.main_container.grid_columnconfigure(0, weight=0, minsize=480)
+        self.main_container.grid_columnconfigure(1, weight=3)
+        self.main_container.grid_rowconfigure(0, weight=1)
+
+        # Left Pane: Board + Moves
+        self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
+
+        self.left_board_panel = ctk.CTkFrame(
+            self.left_pane_container, fg_color="#0f172a", corner_radius=8,
+            border_width=1, border_color="#334155"
+        )
+        self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
+
+        self.board_holder = ctk.CTkFrame(
+            self.left_board_panel, fg_color="#172134", width=475, height=397,
+            corner_radius=0
+        )
+        self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
+        self.board_holder.pack_propagate(False)
+
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=58)
+        self.board_widget.pack(fill="both", expand=True)
+
+        self.board_widget.on_step_back = self.on_prev_move
+        self.board_widget.on_step_forward = self.on_next_move
+        self.board_widget.on_jump_start = self.on_first_move
+        self.board_widget.on_jump_end = self.on_last_move
+
+        self.moves_container_frame = ctk.CTkFrame(
+            self.left_pane_container, fg_color="#0f172a", corner_radius=8,
+            border_width=1, border_color="#334155"
+        )
+        self.moves_container_frame.pack(side="top", fill="both", expand=True, padx=0, pady=0)
+
+        self.moves_header_frame = ctk.CTkFrame(self.moves_container_frame, fg_color="transparent")
+        self.moves_header_frame.pack(fill="x", padx=10, pady=(6, 2))
+
+        self.lbl_moves_title = ctk.CTkLabel(
+            self.moves_header_frame, text="Engine", font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#94a3b8"
+        )
+        self.lbl_moves_title.pack(side="left")
+
+        self.row_analysis_btns = ctk.CTkFrame(self.moves_header_frame, fg_color="transparent")
+        self.row_analysis_btns.pack(side="left", padx=(10, 0))
+
+        self.btn_review = ctk.CTkButton(
+            self.row_analysis_btns, text="1", width=24, height=24,
+            fg_color="#2e4a8c", hover_color="#4870cd",
+            command=lambda: self.trigger_engine_mode("review")
+        )
+        self.btn_review.pack(side="left", padx=2)
+        ToolTip(self.btn_review, "Game Review")
+
+        self.btn_candidates = ctk.CTkButton(
+            self.row_analysis_btns, text="2", width=24, height=24,
+            fg_color="#1e293b", hover_color="#334155",
+            command=lambda: self.trigger_engine_mode("candidates")
+        )
+        self.btn_candidates.pack(side="left", padx=2)
+        ToolTip(self.btn_candidates, "Candidate Moves")
+
+        self.btn_standard = ctk.CTkButton(
+            self.row_analysis_btns, text="3", width=24, height=24,
+            fg_color="#1e293b", hover_color="#334155",
+            command=lambda: self.trigger_engine_mode("standard")
+        )
+        self.btn_standard.pack(side="left", padx=2)
+        ToolTip(self.btn_standard, "Standard")
+
+        self.moves_textbox = ctk.CTkTextbox(
+            self.moves_container_frame, fg_color="#1e293b", text_color="#f8fafc",
+            font=ctk.CTkFont(family="Arial", size=11), wrap="word"
+        )
+        self.moves_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
+        self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
+        self.moves_textbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        # Right Pane: Tree + Analysis + Game Details
+        self.right_analysis_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.right_analysis_panel.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+
+        self.right_analysis_panel.rowconfigure(0, weight=1)
+        self.right_analysis_panel.rowconfigure(1, weight=3)
+        self.right_analysis_panel.rowconfigure(2, weight=1)
+        self.right_analysis_panel.columnconfigure(0, weight=1)
+
+        self.top_catalog_panel = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color="#0f172a", corner_radius=8,
+            border_width=1, border_color="#334155"
+        )
+        self.top_catalog_panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 8))
+
+        self.lbl_empty_state = ctk.CTkLabel(
+            self.top_catalog_panel, text="No games loaded in patterns analysis view.",
+            font=ctk.CTkFont(size=11), text_color="gray70", wraplength=250
+        )
+
+        self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
+        self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
+
+        self.col_tree = ttk.Treeview(
+            self.tree_frame, columns=("no", "white", "black", "result"),
+            show="headings", selectmode="browse", height=3, takefocus=False,
+            style="Borderless.Treeview"
+        )
+        self.col_tree.heading("no", text="No.")
+        self.col_tree.heading("white", text="White Player", anchor="w")
+        self.col_tree.heading("black", text="Black Player", anchor="w")
+        self.col_tree.heading("result", text="Res")
+
+        self.col_tree.column("no", width=30, anchor="center")
+        self.col_tree.column("white", width=145, anchor="w")
+        self.col_tree.column("black", width=145, anchor="w")
+        self.col_tree.column("result", width=45, anchor="center")
+        self.pgn_tree = self.col_tree
+
+        self.pgn_scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.col_tree.yview)
+        self.col_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
+        self.col_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        self.pgn_scrollbar.pack(side="right", fill="y", padx=0, pady=0)
+
+        # Analysis Container
+        self.analysis_container_frame = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color="#0f172a", corner_radius=8,
+            border_width=1, border_color="#334155"
+        )
+        self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
+
+        self.lbl_analysis_title = ctk.CTkLabel(
+            self.analysis_container_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#94a3b8"
+        )
+        self.lbl_analysis_title.pack(anchor="w", padx=10, pady=(6, 2))
+
+        self.analysis_inner_wrapper = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
+        self.analysis_inner_wrapper.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        self.analysis_textbox = ctk.CTkTextbox(
+            self.analysis_inner_wrapper, fg_color="#1e293b", text_color="#f8fafc",
+            font=ctk.CTkFont(family="Arial", size=11), wrap="word", height=90
+        )
+        self.analysis_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
+        self.analysis_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
+        self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # PGN Data Panel
+        self.pgn_data_panel = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color="#0f172a", corner_radius=8,
+            border_width=1, border_color="#334155"
+        )
+        self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
+
+        self.pgn_data_header = ctk.CTkFrame(self.pgn_data_panel, fg_color="transparent")
+        self.pgn_data_header.pack(fill="x", padx=10, pady=(6, 2))
+
+        self.lbl_pgn_data_title = ctk.CTkLabel(
+            self.pgn_data_header, text="Game Details", font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#94a3b8"
+        )
+        self.lbl_pgn_data_title.pack(side="left")
+
+        self.pgn_data_text = ctk.CTkTextbox(
+            self.pgn_data_panel, fg_color="#1e293b", text_color="#f8fafc",
+            font=ctk.CTkFont(family="Arial", size=11), wrap="word", height=70
+        )
+        self.pgn_data_text._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
+        self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self.pgn_data_text.insert("end", "[No game selected. Click a game to load its PGN moves...]\n")
 
     def pop_out_board(self, *args, **kwargs):
         if self.is_board_popped_out:
@@ -59,15 +274,12 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
             return
 
         self.is_board_popped_out = True
-
         self.board_widget.pack_forget()
-        self.placeholder_lbl.pack(padx=10, pady=25, anchor="w")
 
         self.popout_window = ctk.CTkToplevel(self)
         self.popout_window.title("Chess Board Analysis - Patterns Pop-out")
         self.popout_window.geometry("400x440")
         self.popout_window.configure(fg_color="#172134")
-
         self.popout_window.attributes("-topmost", True)
         self.popout_window.protocol("WM_DELETE_WINDOW", self.restore_popped_board)
 
@@ -92,10 +304,8 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
             self.popout_window = None
             self.popout_board = None
 
-        if hasattr(self, "placeholder_lbl"):
-            self.placeholder_lbl.pack_forget()
         if hasattr(self, "board_widget") and hasattr(self, "board_holder"):
-            self.board_widget.pack(in_=self.board_holder, anchor="w")
+            self.board_widget.pack(in_=self.board_holder, fill="both", expand=True)
 
         fen_to_set = self.board_node.board().fen() if self.board_node else (
             self.current_game.board().fen() if self.current_game else chess.STARTING_FEN)
@@ -111,10 +321,13 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
                 b.configure(fg_color="#1e293b", hover_color="#334155")
             if mode == "review":
                 self.btn_review.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+                EngineReviewMixin.trigger_engine_mode(self, "review")
             elif mode == "candidates":
                 self.btn_candidates.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+                EngineCandidateMixin.trigger_engine_mode(self, "candidates")
             elif mode == "standard":
                 self.btn_standard.configure(fg_color="#2e4a8c", hover_color="#4870cd")
+                EngineStandardMixin.trigger_engine_mode(self, "standard")
 
     def _apply_tree_styles(self):
         style = ttk.Style()
@@ -124,23 +337,20 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
             pass
 
         style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
-
         style.configure(
             "Borderless.Treeview",
             background="#172134",
             foreground="#f8fafc",
             fieldbackground="#172134",
-            rowheight=22,
+            rowheight=18,
             font=("Arial", 10),
             borderwidth=0,
             relief="flat",
-            highlightthickness=0
         )
         style.map(
             "Borderless.Treeview",
-            background=[("selected", "#2e4a8c"), ("focus", "#172134"), ("active", "#172134")],
-            foreground=[("selected", "#ffffff"), ("focus", "#f8fafc"), ("active", "#f8fafc")],
-            borderwidth=[("focus", 0), ("active", 0)]
+            background=[("selected", "#2e4a8c")],
+            foreground=[("selected", "#ffffff")]
         )
         style.configure(
             "Borderless.Treeview.Heading",
@@ -149,11 +359,6 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
             font=("Arial", 10, "bold"),
             relief="flat",
             borderwidth=0
-        )
-        style.map(
-            "Borderless.Treeview.Heading",
-            background=[('active', '#0f172a'), ('selected', '#0f172a')],
-            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
         )
 
         target = getattr(self, "col_tree", None) or getattr(self, "pgn_tree", None)
@@ -186,17 +391,13 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
         if hasattr(self, "board_widget") and self.board_widget:
             if hasattr(self.board_widget, "toggle_flip"):
                 self.board_widget.toggle_flip()
-            elif hasattr(self.board_widget, "flipped"):
-                self.board_widget.flipped = not self.board_widget.flipped
-                if hasattr(self.board_widget, "draw_board"):
-                    self.board_widget.draw_board()
+            elif hasattr(self.board_widget, "flip_board"):
+                self.board_widget.flip_board()
         if self.is_board_popped_out and hasattr(self, "popout_board") and self.popout_board:
             if hasattr(self.popout_board, "toggle_flip"):
                 self.popout_board.toggle_flip()
-            elif hasattr(self.popout_board, "flipped"):
-                self.popout_board.flipped = not self.popout_board.flipped
-                if hasattr(self.popout_board, "draw_board"):
-                    self.popout_board.draw_board()
+            elif hasattr(self.popout_board, "flip_board"):
+                self.popout_board.flip_board()
 
     def _safe_handle(self, callback, event=None):
         if not self.winfo_ismapped():
@@ -214,7 +415,6 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
         selected_items = target.selection()
         if not selected_items:
             return
-
         item_id = selected_items[0]
         self._handle_item_selection(item_id)
 
@@ -225,68 +425,65 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
         lookup_dict = getattr(self, "game_lookup", None) or getattr(self, "preview_lookup", None)
         if lookup_dict and item_id in lookup_dict:
             game_data = lookup_dict[item_id]
-            if isinstance(game_data, tuple):
-                game, source_data = game_data
-            else:
-                game = game_data
-                source_data = getattr(self, "filename", None)
+            game = game_data[0] if isinstance(game_data, tuple) else game_data
+            source_data = game_data[1] if isinstance(game_data, tuple) else getattr(self, "filename", None)
 
             state.active_analysis_game = game
             state.active_category_source = source_data
             self.load_game_from_state(game, category_source=source_data, update_tree_selection=False)
             return True
-
         return False
 
-    def load_patterns_collection(self, games_list, category=None, target_game=None):
-        target_dir = BASE_PGN_DIR
-        file_name = "patterns_analysis.pgn"
+    def load_patterns_collection(self, games_list, target_game=None, active_index=None):
+        self.game_list = list(games_list)
+        self.preview_lookup = {}
+        self.game_lookup = {}
 
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_file_path = target_dir / file_name
+        if self.col_tree:
+            self.col_tree.delete(*self.col_tree.get_children())
 
-        extracted_games = []
-        for item in games_list:
-            if isinstance(item, dict):
-                g_obj = item.get("game_object") or item.get("game")
-                if g_obj:
-                    extracted_games.append(g_obj)
-            elif isinstance(item, chess.pgn.Game):
-                extracted_games.append(item)
+        for idx, game_item in enumerate(self.game_list):
+            headers = game_item.get("headers", {})
+            white = headers.get("White", "Unknown")
+            black = headers.get("Black", "Unknown")
+            result = headers.get("Result", "*")
+            eco = headers.get("ECO", "")
 
-        if not target_game and extracted_games:
-            target_game = extracted_games[0]
-        elif isinstance(target_game, dict):
-            target_game = target_game.get("game_object") or target_game.get("game", target_game)
+            node_id = self.col_tree.insert("", "end", values=(str(idx + 1), white, black, result, eco))
+            self.preview_lookup[node_id] = game_item
+            self.game_lookup[id(game_item)] = node_id
 
-        try:
-            with open(target_file_path, "w", encoding="utf-8") as f:
-                exporter = chess.pgn.FileExporter(f)
-                for g in extracted_games:
-                    g.accept(exporter)
-                    f.write("\n")
-        except Exception as e:
-            set_status_message(f"Error saving patterns collection to PGN path: {e}")
-            return
+        if self.game_list:
+            selected_idx = 0
+            if active_index is not None and 0 <= active_index < len(self.game_list):
+                selected_idx = active_index
+            elif target_game is not None:
+                for idx, g in enumerate(self.game_list):
+                    if g == target_game or (
+                            isinstance(target_game, dict) and g.get("game_object") == target_game.get("game_object")):
+                        selected_idx = idx
+                        break
 
-        self.filename = target_file_path
-        self.load_games(filename=target_file_path)
+            target_item = self.game_list[selected_idx]
+            node_ids = list(self.preview_lookup.keys())
+            if selected_idx < len(node_ids):
+                target_node_id = node_ids[selected_idx]
+                self.col_tree.selection_set(target_node_id)
+                self.col_tree.see(target_node_id)
 
-        if target_game:
-            self.load_game_from_state(target_game, category_source=target_file_path)
+            load_func = getattr(self, "load_game", None) or getattr(self, "load_single_game", None) or getattr(self,
+                                                                                                               "select_game",
+                                                                                                               None)
+            if load_func:
+                load_func(target_item)
 
     def load_games(self, filename=None):
         if filename:
             self.filename = filename
 
         active_load_file = self.filename if self.filename else (BASE_PGN_DIR / "patterns_analysis.pgn")
-
         target = getattr(self, "col_tree", None) or getattr(self, "pgn_tree", None)
         if target:
-            try:
-                target.configure(style="Borderless.Treeview", takefocus=False)
-            except Exception:
-                pass
             target.delete(*target.get_children())
 
         self.preview_lookup.clear()
@@ -323,8 +520,7 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
                 self.load_game_from_state(game_list[0], update_tree_selection=False)
 
         if not game_list and hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
-            self.lbl_empty_state.configure(text="No games loaded in patterns analysis view.")
-            self.lbl_empty_state.pack(padx=20, pady=20, anchor="w")
+            self.lbl_empty_state.pack(padx=10, pady=25, anchor="w")
         elif hasattr(self, "lbl_empty_state") and self.lbl_empty_state:
             self.lbl_empty_state.pack_forget()
 
@@ -383,8 +579,7 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
 
                     tag_name = id(next_node)
                     self.moves_textbox.insert("end", move_str, ("default", str(tag_name)))
-                    self.moves_textbox.tag_bind(str(tag_name), "<Button-1>",
-                                                lambda e, n=next_node: self.jump_to_node(n))
+                    self.moves_textbox.tag_bind(str(tag_name), "<Button-1>", lambda e, n=next_node: self.jump_to_node(n))
 
                     temp_node = next_node
 
@@ -487,6 +682,7 @@ class PatternsAnalysis(PatternsInitMixin, ctk.CTkFrame):
                 except Exception:
                     pass
             self.update_active_move_highlight()
+
 
 def create_patterns_analysis_workspace(master, filename=None, initial_games=None):
     instance = PatternsAnalysis(master, filename=filename, initial_games=initial_games)

@@ -12,49 +12,6 @@ from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
 from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
-class ToolTip:
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tooltip_window = None
-        self.widget.bind("<Enter>", self.show_tooltip)
-        self.widget.bind("<Leave>", self.hide_tooltip)
-
-    def show_tooltip(self, event=None):
-        if self.tooltip_window or not self.text:
-            return
-        x = self.widget.winfo_rootx() + 20
-        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
-        self.tooltip_window = tw = ctk.CTkToplevel(self.widget)
-        tw.wm_overrideredirect(True)
-        tw.wm_geometry(f"+{x}+{y}")
-        label = ctk.CTkLabel(
-            tw,
-            text=self.text,
-            fg_color="#1e293b",
-            text_color="#f8fafc",
-            corner_radius=4,
-            font=("Arial", 11)
-        )
-        label.pack(padx=6, pady=4)
-
-    def hide_tooltip(self, event=None):
-        if self.tooltip_window:
-            self.tooltip_window.destroy()
-            self.tooltip_window = None
-
-
-def get_saved_pgn_filename():
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("current_pgn_filename")
-        except Exception:
-            pass
-    return None
-
-
 class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
     """
     Dedicated self-contained workspace controller for Catalog Analysis.
@@ -63,9 +20,10 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
 
     def __init__(self, parent, filename=None, initial_games=None, *args, **kwargs):
         super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
+
         self.filename = filename or "personal_catalog.pgn"
 
-        # Pull from isolated state immediately if initial_games is empty
+        # Pull from the hub if initial_games wasn't provided
         if not initial_games and hasattr(state, "catalog_state"):
             initial_games = state.catalog_state.get("active_games")
 
@@ -74,21 +32,17 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
         self.board_node = None
         self.preview_lookup = {}
 
-        # State tracking fields absorbed from layout mixin
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
         self.active_engine_mode = "standard"
         self.analysis_rows = {}
 
-        # Initialize the full UI shell layout
         self.init_layout()
-
-        # Initial load of catalog data (will skip file load if initial_games were provided)
         self.load_catalog_data()
-
-        # Wire up engine mode buttons securely
         self._bind_engine_buttons()
+        self._bind_global_shortcuts()
+        self.after(100, self.focus_set)
 
     def _find_and_cache_analysis_box(self):
         """Scans once during startup to list all available text widgets."""
@@ -115,6 +69,31 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
                     return
 
         print("[DIAGNOSTIC WARNING] No text-inserting widget found on CatalogAnalysis!")
+
+    def _bind_global_shortcuts(self):
+        """Binds arrow keys and 'f'/'F' globally to the window for the active analysis view."""
+        try:
+            top_level = self.winfo_toplevel()
+            top_level.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
+            top_level.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
+            top_level.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
+            top_level.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
+            top_level.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
+            top_level.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
+        except Exception:
+            pass
+
+    def _safe_handle_shortcut(self, callback, event):
+        """Ensures shortcuts only trigger when appropriate, ignoring text box inputs and halting event propagation."""
+        try:
+            focused = self.winfo_toplevel().focus_get()
+            if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+                return
+            if callable(callback):
+                callback(event)
+                return "break"
+        except Exception:
+            pass
 
     def _bind_engine_buttons(self):
         """Binds UI buttons to engine mode triggers with debug checks."""
@@ -198,7 +177,12 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
     def load_catalog_data(self):
         if self.game_list:
             if hasattr(self, "pgn_tree"):
-                self.populate_catalog_tree(self.game_list)
+                active_game = None
+                if hasattr(state, "catalog_state") and "active_index" in state.catalog_state:
+                    idx = state.catalog_state.get("active_index", 0)
+                    if 0 <= idx < len(self.game_list):
+                        active_game = self.game_list[idx]
+                self.populate_catalog_tree(self.game_list, active_game=active_game)
             return
 
         source_games = []
@@ -251,6 +235,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
 
         if target:
             self.load_game_from_state(target)
+        self.after(50, self.focus_set)
 
     def load_games_by_eco(self, eco_code, active_game=None):
         if not eco_code:
@@ -392,6 +377,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_next_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
@@ -399,6 +385,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
@@ -451,17 +438,27 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
             EngineStandardMixin.trigger_engine_mode(self, "standard")
 
 def create_workspace(master, initial_games=None, **kwargs):
-    """Instantiates CatalogAnalysis, utilizing filtered games from search or group selection."""
+    """Instantiates CatalogAnalysis, reading from the persistent catalog_state hub."""
     import gui.app_state as state_mod
 
     if initial_games is None:
         initial_games = (
-                getattr(state_mod, "active_group_games", None) or
-                getattr(state_mod, "active_search_results", None) or
-                getattr(state_mod, "active_category_source", None)
+            getattr(state_mod, "catalog_state", {}).get("active_games") or
+            getattr(state_mod, "active_group_games", None) or
+            getattr(state_mod, "active_search_results", None) or
+            getattr(state_mod, "active_category_source", None)
         )
 
-    focus = getattr(state_mod, "active_focus_game", None)
+    active_index = getattr(state_mod, "catalog_state", {}).get("active_index", 0)
+
+    focus = (
+        getattr(state_mod, "catalog_state", {}).get("active_focus") or
+        getattr(state_mod, "active_focus_game", None)
+    )
+
+    # Prefer the active_index to resolve the exact game clicked
+    if initial_games and 0 <= active_index < len(initial_games):
+        focus = initial_games[active_index]
 
     instance = CatalogAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games)
 
@@ -469,13 +466,6 @@ def create_workspace(master, initial_games=None, **kwargs):
         instance.load_game(focus)
     elif initial_games and hasattr(instance, "load_game"):
         instance.load_game(initial_games[0])
-
-    if hasattr(state_mod, "active_group_games"):
-        state_mod.active_group_games = None
-    if hasattr(state_mod, "active_search_results"):
-        state_mod.active_search_results = None
-    if hasattr(state_mod, "active_focus_game"):
-        state_mod.active_focus_game = None
 
     state_mod.workspace = instance
     return instance
