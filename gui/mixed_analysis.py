@@ -109,8 +109,20 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             state.mixed_state["active_index"] = None
             state.mixed_state["current_filename"] = None
 
-        # Wire up engine mode buttons securely
-        self._bind_engine_buttons()
+            # Wire up engine mode buttons securely
+            self._bind_engine_buttons()
+
+            # Bind keyboard shortcuts to the top-level window so they always catch inputs when active
+            top = self.winfo_toplevel()
+            top.bind("<Left>", self.on_prev_move)
+            top.bind("<Right>", self.on_next_move)
+            top.bind("<Home>", self.on_first_move)
+            top.bind("<End>", self.on_last_move)
+            top.bind("f", self.on_flip_board)
+            top.bind("F", self.on_flip_board)
+
+            # Force focus after the UI has fully settled
+            self.after(100, self.focus_set)
 
     def _find_and_cache_analysis_box(self):
         """Scans once during startup to list all available text widgets."""
@@ -436,6 +448,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_next_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
@@ -443,6 +456,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.board_node.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
@@ -450,6 +464,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.current_game.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_last_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
@@ -460,6 +475,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(node.board().fen())
             self.update_active_move_highlight()
+        return "break"
 
     def on_flip_board(self, event=None):
         if hasattr(self, "board_widget") and self.board_widget:
@@ -467,6 +483,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                 self.board_widget.flip_board()
             elif hasattr(self.board_widget, "toggle_flip"):
                 self.board_widget.toggle_flip()
+        return "break"
 
     def trigger_engine_mode(self, mode):
         """Routes engine mode changes directly to the appropriate mixin handler."""

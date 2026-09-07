@@ -4,6 +4,7 @@ import chess
 import chess.pgn
 import customtkinter as ctk
 import gui.app_state as state
+import gui.calendar_workspace
 
 
 class Sidebar(ctk.CTkFrame):
@@ -139,7 +140,7 @@ class Sidebar(ctk.CTkFrame):
     def _on_qeval_focus_out(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if not current_text:
-            self.txt_qeval_moves.insert("1.0", self.placeholder_text)
+            self.txt_qeval_moves.insert("1.0", "end")
             self.txt_qeval_moves.configure(text_color="#94a3b8")
 
     def parse_qeval_pgn(self):
