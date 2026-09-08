@@ -117,6 +117,9 @@ class Totten(ctk.CTk):
         # 5. Patterns Workspace
         self.patterns_workspace = None
 
+        # 6. Calendar Workspace
+        self.calendar_workspace = None
+
         # Register references in state
         state.workspace = self.catalog_workspace
         state.catalog_workspace = self.catalog_workspace
@@ -124,6 +127,7 @@ class Totten(ctk.CTk):
         state.analysis_workspace = self.analysis_workspace
         state.patterns_analysis_workspace = self.patterns_analysis_workspace
         state.patterns_workspace = None
+        state.calendar_workspace = None
         state.app_root = self
         state.show_workspace = self.show_workspace
 
@@ -142,6 +146,8 @@ class Totten(ctk.CTk):
             state.patterns_analysis_workspace.grid_remove()
         if hasattr(state, "patterns_workspace") and state.patterns_workspace:
             state.patterns_workspace.grid_remove()
+        if hasattr(state, "calendar_workspace") and state.calendar_workspace:
+            state.calendar_workspace.grid_remove()
 
         # Also clean up any transient search/selector workspace frame if active
         if hasattr(state, "transient_workspace") and state.transient_workspace:
@@ -287,6 +293,19 @@ class Totten(ctk.CTk):
             state.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
             state.patterns_analysis_workspace.tkraise()
             state.workspace = state.patterns_analysis_workspace
+
+        elif target == "calendar":
+            if not getattr(state, "calendar_workspace", None):
+                from gui.calendar_workspace import CalendarWorkspace
+                state.calendar_workspace = CalendarWorkspace(self)
+                self.calendar_workspace = state.calendar_workspace
+
+            state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.calendar_workspace.tkraise()
+            state.workspace = state.calendar_workspace
+
+            if hasattr(state.calendar_workspace, "update_date_display"):
+                state.calendar_workspace.update_date_display()
 
 
 if __name__ == "__main__":
