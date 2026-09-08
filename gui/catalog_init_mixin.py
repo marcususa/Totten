@@ -136,7 +136,7 @@ class CatalogInitMixin:
         self.moves_header_frame.pack(fill="x", padx=10, pady=(6, 2))
 
         self.lbl_moves_title = ctk.CTkLabel(
-            self.moves_header_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
+            self.moves_header_frame, text="Engine", font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#94a3b8"
         )
         self.lbl_moves_title.pack(side="left")

@@ -244,6 +244,13 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.popout_window.attributes("-topmost", True)
 
         self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
+
+        # Wire up navigation callbacks from the parent board instance so pop-out buttons work
+        self.popout_board.on_step_back = getattr(self, 'on_step_back', None)
+        self.popout_board.on_step_forward = getattr(self, 'on_step_forward', None)
+        self.popout_board.on_jump_start = getattr(self, 'on_jump_start', None)
+        self.popout_board.on_jump_end = getattr(self, 'on_jump_end', None)
+
         self.popout_board.configure(fg_color="#0f172a")
         self.popout_board.flipped = self.flipped
         self.popout_board.set_board(self.board)

@@ -42,7 +42,15 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
         self.load_catalog_data()
         self._bind_engine_buttons()
         self._bind_global_shortcuts()
-        self.after(100, self.focus_set)
+
+        # Wire up chess_board control button callbacks to CatalogAnalysis navigation handlers
+        if hasattr(self, "board_widget") and self.board_widget:
+            self.board_widget.on_step_back = self.on_prev_move
+            self.board_widget.on_step_forward = self.on_next_move
+            self.board_widget.on_jump_start = self.on_first_move
+            self.board_widget.on_jump_end = self.on_last_move
+
+        self.after(50, self.focus_force)
 
     def _find_and_cache_analysis_box(self):
         """Scans once during startup to list all available text widgets."""
@@ -71,29 +79,49 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
         print("[DIAGNOSTIC WARNING] No text-inserting widget found on CatalogAnalysis!")
 
     def _bind_global_shortcuts(self):
-        """Binds arrow keys and 'f'/'F' globally to the window for the active analysis view."""
+        """Binds arrow keys and 'f'/'F' globally and to key interactive sub-widgets to prevent interception."""
         try:
             top_level = self.winfo_toplevel()
-            top_level.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
-            top_level.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
-            top_level.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
-            top_level.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
-            top_level.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-            top_level.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-        except Exception:
-            pass
+
+            # Global window bindings
+            for key, callback in [
+                ("<Left>", self.on_prev_move),
+                ("<Right>", self.on_next_move),
+                ("<Up>", self.on_first_move),
+                ("<Down>", self.on_last_move),
+                ("f", self.on_flip_board),
+                ("F", self.on_flip_board)
+            ]:
+                top_level.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+                self.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+
+            # Explicitly override treeview interception of left/right keys
+            if hasattr(self, "pgn_tree") and self.pgn_tree:
+                self.pgn_tree.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
+                self.pgn_tree.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
+                self.pgn_tree.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
+                self.pgn_tree.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
+
+            # Bind to board widget if present
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
+                self.board_widget.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
+        except Exception as e:
+            print(f"[SHORTCUT BIND ERROR] {e}")
 
     def _safe_handle_shortcut(self, callback, event):
-        """Ensures shortcuts only trigger when appropriate, ignoring text box inputs and halting event propagation."""
+        """Ensures shortcuts execute properly and ignore text entry fields."""
         try:
             focused = self.winfo_toplevel().focus_get()
-            if isinstance(focused, (ctk.CTkTextbox, ctk.CTkEntry)):
+            # Ignore if user is typing in a textbox, entry, or interacting with input fields
+            if focused and type(focused).__name__ in ("CTkTextbox", "CTkEntry", "Text", "Entry"):
                 return
+
             if callable(callback):
                 callback(event)
                 return "break"
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _bind_engine_buttons(self):
         """Binds UI buttons to engine mode triggers with debug checks."""
@@ -150,6 +178,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
                 self.board_widget.set_position_fen(board_obj.fen())
             except Exception:
                 pass
+
     # ---------------------------------------------
 
     def load_games_list(self, games_list, focused_game=None):
@@ -182,7 +211,16 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
                     idx = state.catalog_state.get("active_index", 0)
                     if 0 <= idx < len(self.game_list):
                         active_game = self.game_list[idx]
+
                 self.populate_catalog_tree(self.game_list, active_game=active_game)
+
+            if self.game_list:
+                target_game = self.game_list[0]
+                if hasattr(state, "catalog_state") and "active_index" in state.catalog_state:
+                    idx = state.catalog_state.get("active_index", 0)
+                    if 0 <= idx < len(self.game_list):
+                        target_game = self.game_list[idx]
+                self.load_game(target_game)
             return
 
         source_games = []
@@ -204,6 +242,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
 
         if self.game_list and hasattr(self, "pgn_tree"):
             self.populate_catalog_tree(self.game_list)
+            self.load_game(self.game_list[0])
 
     def populate_catalog_tree(self, games_to_display, active_game=None):
         if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
@@ -415,7 +454,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
         """Routes engine mode changes directly to the appropriate mixin handler."""
         self.active_engine_mode = mode
 
-        # Style buttons securely across name variants
         for name in ("btn_review", "btn_review_mode"):
             if hasattr(self, name) and getattr(self, name):
                 getattr(self, name).configure(fg_color="#2e4a8c" if mode == "review" else "#1e293b",
@@ -429,7 +467,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
                 getattr(self, name).configure(fg_color="#2e4a8c" if mode == "standard" else "#1e293b",
                                               hover_color="#4870cd" if mode == "standard" else "#334155")
 
-        # Delegate directly to the specific mixin's trigger implementation
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
         elif mode == "candidates":
@@ -437,26 +474,26 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineC
         elif mode == "standard":
             EngineStandardMixin.trigger_engine_mode(self, "standard")
 
+
 def create_workspace(master, initial_games=None, **kwargs):
     """Instantiates CatalogAnalysis, reading from the persistent catalog_state hub."""
     import gui.app_state as state_mod
 
     if initial_games is None:
         initial_games = (
-            getattr(state_mod, "catalog_state", {}).get("active_games") or
-            getattr(state_mod, "active_group_games", None) or
-            getattr(state_mod, "active_search_results", None) or
-            getattr(state_mod, "active_category_source", None)
+                getattr(state_mod, "catalog_state", {}).get("active_games") or
+                getattr(state_mod, "active_group_games", None) or
+                getattr(state_mod, "active_search_results", None) or
+                getattr(state_mod, "active_category_source", None)
         )
 
     active_index = getattr(state_mod, "catalog_state", {}).get("active_index", 0)
 
     focus = (
-        getattr(state_mod, "catalog_state", {}).get("active_focus") or
-        getattr(state_mod, "active_focus_game", None)
+            getattr(state_mod, "catalog_state", {}).get("active_focus") or
+            getattr(state_mod, "active_focus_game", None)
     )
 
-    # Prefer the active_index to resolve the exact game clicked
     if initial_games and 0 <= active_index < len(initial_games):
         focus = initial_games[active_index]
 
