@@ -43,8 +43,10 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         self.current_node = None
         self.active_engine_mode = "standard"
         self.analysis_rows = {}
+        self._cached_analysis_box = None
 
         self.init_layout()
+        self._find_and_cache_analysis_box()
         self.load_catalog_data()
         self._bind_engine_buttons()
         self._bind_global_shortcuts()
@@ -70,7 +72,6 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         if hasattr(item, "board") and hasattr(item, "headers"):
             return item
         if isinstance(item, dict):
-            # Include "game_object" to match what PatternsWorkspace passes
             for k in ("game_object", "game", "game_obj", "node", "pgn", "item", "target_game"):
                 if k in item and item[k] is not None:
                     res = self._resolve_game_obj(item[k])
@@ -102,24 +103,74 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
             top_level = self.winfo_toplevel()
 
             shortcuts = [
-                ("<Left>", self.on_prev_move),
-                ("<Right>", self.on_next_move),
-                ("<Up>", self.on_first_move),
-                ("<Down>", self.on_last_move),
+                ("Left", self.on_prev_move),
+                ("Right", self.on_next_move),
+                ("Up", self.on_first_move),
+                ("Down", self.on_last_move),
                 ("f", self.on_flip_board),
                 ("F", self.on_flip_board)
             ]
 
             for key, callback in shortcuts:
-                top_level.bind_all(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e), add="+")
-                self.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+                seq = f"<{key}>"
+                top_level.bind_all(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e), add="+")
+                self.bind(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
 
             if hasattr(self, "board_widget") and self.board_widget:
                 for key, callback in shortcuts:
-                    self.board_widget.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+                    seq = f"<{key}>"
+                    self.board_widget.bind(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+
+            # Force the catalog tree to cede all arrow key control exclusively to the chess game
+            if hasattr(self, "pgn_tree") and self.pgn_tree:
+                tree_shortcuts = [
+                    ("Left", self.on_prev_move),
+                    ("Right", self.on_next_move),
+                    ("Up", self.on_first_move),
+                    ("Down", self.on_last_move)
+                ]
+                for key, callback in tree_shortcuts:
+                    seq = f"<{key}>"
+                    self.pgn_tree.bind(seq, lambda e, cb=callback: self._safe_handle_tree_shortcut(cb, e))
 
         except Exception as e:
             print(f"[SHORTCUT BIND ERROR] {e}")
+
+    def _safe_handle_tree_shortcut(self, callback, event):
+        try:
+            if callable(callback):
+                callback(event)
+                return "break"
+        except Exception as e:
+            print(f"[TREE SHORTCUT EXECUTION ERROR] {e}")
+
+    def _safe_handle_shortcut(self, callback, event):
+        try:
+            focused = self.winfo_toplevel().focus_get()
+            if focused:
+                widget_class = type(focused).__name__
+                if any(t in widget_class for t in ("Textbox", "Entry", "Text", "CTkTextbox", "CTkEntry")):
+                    return
+
+            if callable(callback):
+                callback(event)
+                return "break"
+        except Exception as e:
+            print(f"[SHORTCUT EXECUTION ERROR] {e}")
+
+    def _safe_handle_shortcut(self, callback, event):
+        try:
+            focused = self.winfo_toplevel().focus_get()
+            if focused:
+                widget_class = type(focused).__name__
+                if any(t in widget_class for t in ("Textbox", "Entry", "Text", "CTkTextbox", "CTkEntry", "Treeview")):
+                    return
+
+            if callable(callback):
+                callback(event)
+                return "break"
+        except Exception as e:
+            print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _safe_handle_shortcut(self, callback, event):
         try:
@@ -204,14 +255,6 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
                         active_game = self.game_list[idx]
 
                 self.populate_catalog_tree(self.game_list, active_game=active_game)
-
-            if self.game_list:
-                target_game = self.game_list[0]
-                if hasattr(state, "catalog_state") and "active_index" in state.catalog_state:
-                    idx = state.catalog_state.get("active_index", 0)
-                    if 0 <= idx < len(self.game_list):
-                        target_game = self.game_list[idx]
-                self.load_game(target_game)
             return
 
         source_games = []
