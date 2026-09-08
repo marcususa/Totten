@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import io
 import customtkinter as ctk
 import chess
 import chess.pgn
@@ -63,10 +62,9 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
             self.board_widget.on_jump_start = self.on_first_move
             self.board_widget.on_jump_end = self.on_last_move
 
-        self.after(100, self.focus_set)
+        self.after(50, self.focus_force)
 
     def _resolve_game_obj(self, item):
-        """Unwraps item safely without altering standard chess.pgn.Game structures."""
         if item is None:
             return None
         if hasattr(item, "board") and hasattr(item, "headers"):
@@ -102,75 +100,28 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         try:
             top_level = self.winfo_toplevel()
 
-            shortcuts = [
-                ("Left", self.on_prev_move),
-                ("Right", self.on_next_move),
-                ("Up", self.on_first_move),
-                ("Down", self.on_last_move),
+            for key, callback in [
+                ("<Left>", self.on_prev_move),
+                ("<Right>", self.on_next_move),
+                ("<Up>", self.on_first_move),
+                ("<Down>", self.on_last_move),
                 ("f", self.on_flip_board),
                 ("F", self.on_flip_board)
-            ]
+            ]:
+                top_level.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+                self.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
 
-            for key, callback in shortcuts:
-                seq = f"<{key}>"
-                top_level.bind_all(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e), add="+")
-                self.bind(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+            if hasattr(self, "pgn_tree") and self.pgn_tree:
+                self.pgn_tree.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
+                self.pgn_tree.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
+                self.pgn_tree.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
+                self.pgn_tree.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
 
             if hasattr(self, "board_widget") and self.board_widget:
-                for key, callback in shortcuts:
-                    seq = f"<{key}>"
-                    self.board_widget.bind(seq, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
-
-            # Force the catalog tree to cede all arrow key control exclusively to the chess game
-            if hasattr(self, "pgn_tree") and self.pgn_tree:
-                tree_shortcuts = [
-                    ("Left", self.on_prev_move),
-                    ("Right", self.on_next_move),
-                    ("Up", self.on_first_move),
-                    ("Down", self.on_last_move)
-                ]
-                for key, callback in tree_shortcuts:
-                    seq = f"<{key}>"
-                    self.pgn_tree.bind(seq, lambda e, cb=callback: self._safe_handle_tree_shortcut(cb, e))
-
+                self.board_widget.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
+                self.board_widget.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
         except Exception as e:
             print(f"[SHORTCUT BIND ERROR] {e}")
-
-    def _safe_handle_tree_shortcut(self, callback, event):
-        try:
-            if callable(callback):
-                callback(event)
-                return "break"
-        except Exception as e:
-            print(f"[TREE SHORTCUT EXECUTION ERROR] {e}")
-
-    def _safe_handle_shortcut(self, callback, event):
-        try:
-            focused = self.winfo_toplevel().focus_get()
-            if focused:
-                widget_class = type(focused).__name__
-                if any(t in widget_class for t in ("Textbox", "Entry", "Text", "CTkTextbox", "CTkEntry")):
-                    return
-
-            if callable(callback):
-                callback(event)
-                return "break"
-        except Exception as e:
-            print(f"[SHORTCUT EXECUTION ERROR] {e}")
-
-    def _safe_handle_shortcut(self, callback, event):
-        try:
-            focused = self.winfo_toplevel().focus_get()
-            if focused:
-                widget_class = type(focused).__name__
-                if any(t in widget_class for t in ("Textbox", "Entry", "Text", "CTkTextbox", "CTkEntry", "Treeview")):
-                    return
-
-            if callable(callback):
-                callback(event)
-                return "break"
-        except Exception as e:
-            print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _safe_handle_shortcut(self, callback, event):
         try:
@@ -369,8 +320,6 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
             except Exception:
                 pass
 
-        headers = getattr(resolved, "headers", {})
-
         if hasattr(self, "pgn_data_text") and self.pgn_data_text:
             try:
                 exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
@@ -386,33 +335,26 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         if hasattr(self, "moves_textbox") and self.moves_textbox:
             try:
                 self.moves_textbox.configure(state="normal")
+                self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
                 self.moves_textbox.delete("1.0", "end")
 
-                node = resolved
-                while node.parent:
-                    node = node.parent
+                temp_node = resolved
+                move_num = 1
+                while temp_node.variations:
+                    next_node = temp_node.variation(0)
+                    san_move = temp_node.board().san(next_node.move)
 
-                game_root = node
-                board = game_root.board()
-
-                current_node = game_root
-                move_idx = 1
-                while current_node.variations:
-                    next_node = current_node.variation(0)
-                    san = board.san(next_node.move)
-
-                    if board.turn == chess.WHITE:
-                        move_text = f"{move_idx}. {san} "
+                    if temp_node.board().turn == chess.WHITE:
+                        move_str = f"{move_num}. {san_move} "
                     else:
-                        move_text = f"{san} "
-                        move_idx += 1
+                        move_str = f"{san_move} "
+                        move_num += 1
 
-                    tag_name = f"node_{id(next_node)}"
-                    self.moves_textbox.insert("end", move_text, ("move_tag", tag_name))
+                    tag_name = str(id(next_node))
+                    self.moves_textbox.insert("end", move_str, ("default", tag_name))
                     self.moves_textbox.tag_bind(tag_name, "<Button-1>", lambda e, n=next_node: self.jump_to_node(n))
 
-                    board.push(next_node.move)
-                    current_node = next_node
+                    temp_node = next_node
 
                 self.moves_textbox.configure(state="disabled")
                 self.update_active_move_highlight()
@@ -440,10 +382,11 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
 
         try:
             self.moves_textbox.configure(state="normal")
+            self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
             self.moves_textbox.tag_remove("active_move", "1.0", "end")
 
             if self.board_node and self.board_node != self.current_game:
-                current_tag = f"node_{id(self.board_node)}"
+                current_tag = str(id(self.board_node))
                 ranges = self.moves_textbox.tag_ranges(current_tag)
                 if ranges:
                     self.moves_textbox.tag_add("active_move", ranges[0], ranges[1])
@@ -454,7 +397,7 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
             pass
 
     def on_prev_move(self, event=None):
-        if hasattr(self, "board_node") and self.board_node and getattr(self.board_node, "parent", None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
             self.board_node = self.board_node.parent
             if hasattr(self, "board_widget") and self.board_widget:
                 try:
@@ -465,7 +408,7 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         return "break"
 
     def on_next_move(self, event=None):
-        if hasattr(self, "board_node") and self.board_node and getattr(self.board_node, "variations", None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
             if hasattr(self, "board_widget") and self.board_widget:
                 try:
@@ -477,13 +420,10 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
 
     def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
-            node = self.current_game
-            while node.parent:
-                node = node.parent
-            self.board_node = node
+            self.board_node = self.current_game
             if hasattr(self, "board_widget") and self.board_widget:
                 try:
-                    self.board_widget.set_position_fen(node.board().fen())
+                    self.board_widget.set_position_fen(self.current_game.board().fen())
                 except Exception:
                     pass
             self.update_active_move_highlight()
@@ -558,16 +498,16 @@ def create_workspace(master, initial_games=None, **kwargs):
 
     active_index = kwargs.get("active_index", getattr(state_mod, "catalog_state", {}).get("active_index", 0))
 
-    focus = (
+    defocus = (
             kwargs.get("target_game") or
             getattr(state_mod, "catalog_state", {}).get("active_focus") or
             getattr(state_mod, "active_focus_game", None)
     )
 
-    if initial_games and 0 <= active_index < len(initial_games) and not focus:
-        focus = initial_games[active_index]
+    if initial_games and 0 <= active_index < len(initial_games) and not defocus:
+        defocus = initial_games[active_index]
 
-    instance = PatternsAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games, target_game=focus,
+    instance = PatternsAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games, target_game=defocus,
                                 active_index=active_index)
     state_mod.workspace = instance
     return instance
