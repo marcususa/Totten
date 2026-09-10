@@ -39,6 +39,49 @@ class ChessEngine:
         if not self.engine_path:
             self.engine_path = possible_paths[0]
 
+    def analyze_position(self, board, depths=(10, 15, 20, 25), multipv=3, callback=None, worker_ref=None):
+        """Analyzes a single board position incrementally across increasing depths."""
+        try:
+            with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
+                engine.configure({"Hash": 64, "Threads": 2})
+
+                for d in depths:
+                    if worker_ref and getattr(worker_ref, "cancel", False):
+                        break
+
+                    info = engine.analyse(board, chess.engine.Limit(depth=d), multipv=multipv)
+
+                    pv_lines = []
+                    primary_eval = 0.0
+
+                    for idx, entry in enumerate(info):
+                        score_obj = entry["score"].white()
+                        if score_obj.is_mate():
+                            eval_val = 100.0 if score_obj.mate() > 0 else -100.0
+                        else:
+                            eval_val = (score_obj.score() or 0) / 100.0
+
+                        if idx == 0:
+                            primary_eval = eval_val
+
+                        if "pv" in entry:
+                            temp_b = board.copy()
+                            san_moves = []
+                            for m in entry["pv"][:20]:
+                                san_moves.append(temp_b.san(m))
+                                temp_b.push(m)
+                            pv_lines.append(" ".join(san_moves))
+
+                    result = {
+                        "depth": d,
+                        "eval": primary_eval,
+                        "pv_lines": pv_lines
+                    }
+                    if callback:
+                        callback(result)
+        except Exception as e:
+            print(f"[Position Engine Error]: {e}")
+
     def analyze_game(self, pgn_input, mode="review", game_index=0, callback=None):
         game = None
         if isinstance(pgn_input, str):
