@@ -83,13 +83,27 @@ class Totten(ctk.CTk):
 
         self.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-        # 2. Mixed Analysis Workspace
-        self.mixed_workspace = MixedAnalysis(self)
+        # 2. Mixed Analysis Workspace (with fallback try-except if THEME key is missing)
+        try:
+            self.mixed_workspace = MixedAnalysis(self)
+        except KeyError:
+            from core.constants import THEME
+            if "btn_active" not in THEME:
+                THEME["btn_active"] = THEME.get("btn_hover", "#3b82ed")
+            self.mixed_workspace = MixedAnalysis(self)
+
         self.mixed_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
         self.mixed_workspace.grid_remove()
 
         # 3. Standard Analysis Workspace
-        self.analysis_workspace = MixedAnalysis(self)
+        try:
+            self.analysis_workspace = MixedAnalysis(self)
+        except KeyError:
+            from core.constants import THEME
+            if "btn_active" not in THEME:
+                THEME["btn_active"] = THEME.get("btn_hover", "#3b82ed")
+            self.analysis_workspace = MixedAnalysis(self)
+
         self.analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
         self.analysis_workspace.grid_remove()
 
