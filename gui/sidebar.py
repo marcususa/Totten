@@ -5,6 +5,7 @@ import chess.pgn
 import customtkinter as ctk
 import gui.app_state as state
 import gui.calendar_workspace
+from core.constants import THEME
 
 
 class Sidebar(ctk.CTkFrame):
@@ -23,7 +24,7 @@ class Sidebar(ctk.CTkFrame):
             justify="left",
             wraplength=95,
             font=ctk.CTkFont(size=11),
-            text_color="#ddddff"
+            text_color=THEME.get("status_text", "#ddddff")
         )
         self.lbl_status.pack(side="bottom", fill="x", anchor="sw")
 
@@ -37,8 +38,8 @@ class Sidebar(ctk.CTkFrame):
             self.progress_container,
             height=8,
             corner_radius=2,
-            fg_color="#0f172a",
-            progress_color="#ff0000",
+            fg_color=THEME.get("progress_bg", "#0f172a"),
+            progress_color=THEME.get("progress_fill", "#ff0000"),
             mode="determinate"
         )
         self.progress_bar.pack(fill="x", expand=True, pady=4)
@@ -52,35 +53,35 @@ class Sidebar(ctk.CTkFrame):
         # --- NAVIGATION BUTTONS ---
         self.btn_catalog = ctk.CTkButton(
             self, text="Catalog", anchor="w", fg_color="transparent",
-            hover_color="#2e4a8c", text_color="white",
+            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
             command=lambda: state.show_workspace("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
 
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
-            hover_color="#2e4a8c", text_color="white",
+            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
             command=lambda: state.show_workspace("analysis")
         )
         self.btn_analysis.pack(fill="x", padx=4, pady=5)
 
         self.btn_patterns = ctk.CTkButton(
             self, text="Patterns", anchor="w", fg_color="transparent",
-            hover_color="#2e4a8c", text_color="white",
+            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
             command=lambda: state.show_workspace("patterns")
         )
         self.btn_patterns.pack(fill="x", padx=4, pady=5)
 
         self.btn_mixed = ctk.CTkButton(
             self, text="Mixed Collections", anchor="w", fg_color="transparent",
-            hover_color="#2e4a8c", text_color="white",
+            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
             command=lambda: state.show_workspace("mixed_search")
         )
         self.btn_mixed.pack(fill="x", padx=4, pady=5)
 
         self.btn_calendar = ctk.CTkButton(
             self, text="Calendar", anchor="w", fg_color="transparent",
-            hover_color="#2e4a8c", text_color="white",
+            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
             command=lambda: state.show_workspace("calendar")
         )
         self.btn_calendar.pack(fill="x", padx=4, pady=5)
@@ -92,13 +93,13 @@ class Sidebar(ctk.CTkFrame):
         self.placeholder_text = "Paste PGN for quick analysis."
 
         self.txt_qeval_moves = ctk.CTkTextbox(
-            self, height=130, fg_color="#1e293b", text_color="#f8fafc",
-            font=ctk.CTkFont(size=10), border_color="#344268", border_width=1, wrap="word"
+            self, height=130, fg_color=THEME["bg_surface"], text_color=THEME["text_primary"],
+            font=ctk.CTkFont(size=10), border_color=THEME["border_color"], border_width=1, wrap="word"
         )
         self.txt_qeval_moves.pack(fill="x", padx=4, pady=(10, 4))
 
         self.txt_qeval_moves.insert("1.0", self.placeholder_text)
-        self.txt_qeval_moves.configure(text_color="#94a3b8")
+        self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
 
         self.txt_qeval_moves.bind("<FocusIn>", self._on_qeval_focus_in)
         self.txt_qeval_moves.bind("<FocusOut>", self._on_qeval_focus_out)
@@ -107,7 +108,7 @@ class Sidebar(ctk.CTkFrame):
 
         self.btn_qeval_analysis = ctk.CTkButton(
             self, text="Analyze", height=24, font=ctk.CTkFont(size=10),
-            fg_color="#344268", hover_color="#2e4a8c", command=self.handle_qeval_send_analysis
+            fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], command=self.handle_qeval_send_analysis
         )
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 6))
 
@@ -123,7 +124,7 @@ class Sidebar(ctk.CTkFrame):
             current_text = self.txt_qeval_moves.get("1.0", "end").strip()
             if current_text == self.placeholder_text:
                 self.txt_qeval_moves.delete("1.0", "end")
-                self.txt_qeval_moves.configure(text_color="#f8fafc")
+                self.txt_qeval_moves.configure(text_color=THEME["text_primary"])
 
             # Insert clipboard contents at the current cursor position
             self.txt_qeval_moves.insert("insert", clipboard_text)
@@ -135,13 +136,13 @@ class Sidebar(ctk.CTkFrame):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if current_text == self.placeholder_text:
             self.txt_qeval_moves.delete("1.0", "end")
-            self.txt_qeval_moves.configure(text_color="#f8fafc")
+            self.txt_qeval_moves.configure(text_color=THEME["text_primary"])
 
     def _on_qeval_focus_out(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if not current_text:
             self.txt_qeval_moves.insert("1.0", "end")
-            self.txt_qeval_moves.configure(text_color="#94a3b8")
+            self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
 
     def parse_qeval_pgn(self):
         raw_text = self.txt_qeval_moves.get("1.0", "end").strip()
@@ -180,7 +181,7 @@ class Sidebar(ctk.CTkFrame):
 
         self.txt_qeval_moves.delete("1.0", "end")
         self.txt_qeval_moves.insert("1.0", self.placeholder_text)
-        self.txt_qeval_moves.configure(text_color="#94a3b8")
+        self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
 
         state.show_workspace("analysis")
         set_status_message(f"Loaded {len(games_list)} game(s) for quick analysis.")
@@ -188,9 +189,11 @@ class Sidebar(ctk.CTkFrame):
 
 # --- LOCALIZED STATUS & PROGRESS BAR CONTROLLERS ---
 
-def set_status_message(message, text_color="#ddddff"):
+def set_status_message(message, text_color=None):
     """Updates the status bar label in the sidebar safely."""
     try:
+        if text_color is None:
+            text_color = THEME.get("status_text", "#ddddff")
         label = getattr(state, "status", None)
         if label:
             label.configure(text=message, text_color=text_color)

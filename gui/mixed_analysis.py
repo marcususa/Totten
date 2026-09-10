@@ -5,7 +5,7 @@ import chess
 import chess.pgn
 import gui.app_state as state
 
-from core.constants import CONFIG_FILE
+from core.constants import CONFIG_FILE, THEME
 from gui.catalog_init_mixin import CatalogInitMixin
 from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
 from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
@@ -31,8 +31,8 @@ class ToolTip:
         label = ctk.CTkLabel(
             tw,
             text=self.text,
-            fg_color="#1e293b",
-            text_color="#f8fafc",
+            fg_color=THEME["bg_surface"],
+            text_color=THEME["text_primary"],
             corner_radius=4,
             font=("Arial", 11)
         )
@@ -62,7 +62,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
     """
 
     def __init__(self, parent, filename=None, initial_games=None, active_focus=None, active_index=None, *args, **kwargs):
-        super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
+        super().__init__(parent, fg_color=THEME["bg_panel"], corner_radius=0, *args, **kwargs)
 
         # Pull from isolated state immediately if arguments are empty
         if not filename and hasattr(state, "mixed_state"):
@@ -84,7 +84,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
-        self.active_engine_mode = "standard"
+        self.active_engine_mode = state.mixed_state.get("active_engine_mode") if hasattr(state, "mixed_state") else None
         self.analysis_rows = {}
 
         # Initialize the full UI shell layout first
@@ -108,21 +108,22 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             state.mixed_state["active_focus"] = None
             state.mixed_state["active_index"] = None
             state.mixed_state["current_filename"] = None
+            state.mixed_state["active_engine_mode"] = None
 
-            # Wire up engine mode buttons securely
-            self._bind_engine_buttons()
+        # Wire up engine mode buttons securely
+        self._bind_engine_buttons()
 
-            # Bind keyboard shortcuts to the top-level window so they always catch inputs when active
-            top = self.winfo_toplevel()
-            top.bind("<Left>", self.on_prev_move)
-            top.bind("<Right>", self.on_next_move)
-            top.bind("<Home>", self.on_first_move)
-            top.bind("<End>", self.on_last_move)
-            top.bind("f", self.on_flip_board)
-            top.bind("F", self.on_flip_board)
+        # Bind keyboard shortcuts to the top-level window so they always catch inputs when active
+        top = self.winfo_toplevel()
+        top.bind("<Left>", self.on_prev_move)
+        top.bind("<Right>", self.on_next_move)
+        top.bind("<Home>", self.on_first_move)
+        top.bind("<End>", self.on_last_move)
+        top.bind("f", self.on_flip_board)
+        top.bind("F", self.on_flip_board)
 
-            # Force focus after the UI has fully settled
-            self.after(100, self.focus_set)
+        # Force focus after the UI has fully settled
+        self.after(100, self.focus_set)
 
     def _find_and_cache_analysis_box(self):
         """Scans once during startup to list all available text widgets."""
@@ -150,38 +151,36 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         print("[DIAGNOSTIC WARNING] No text-inserting widget found on MixedAnalysis!")
 
     def _bind_engine_buttons(self):
-        """Binds UI buttons to engine mode triggers with debug checks."""
-        bound_count = 0
+        """Binds UI buttons to engine mode triggers."""
         for btn_name in ("btn_review", "btn_review_mode"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("review"))
-                print(f"[DEBUG] Successfully bound {btn_name} to review mode.")
-                bound_count += 1
+                btn.configure(command=lambda: self.trigger_engine_mode("review"), hover_color=THEME["btn_hover"])
 
         for btn_name in ("btn_candidates", "btn_candidate_moves"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("candidates"))
-                print(f"[DEBUG] Successfully bound {btn_name} to candidates mode.")
-                bound_count += 1
+                btn.configure(command=lambda: self.trigger_engine_mode("candidates"), hover_color=THEME["btn_hover"])
 
         for btn_name in ("btn_standard", "btn_standard_mode"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("standard"))
-                print(f"[DEBUG] Successfully bound {btn_name} to standard mode.")
-                bound_count += 1
+                btn.configure(command=lambda: self.trigger_engine_mode("standard"), hover_color=THEME["btn_hover"])
 
-        if bound_count == 0:
-            print("[DEBUG WARNING] No engine buttons were found during binding! Check their attribute names.")
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                btn.configure(hover_color=THEME["btn_hover"])
+
+        if self.active_engine_mode:
+            self.trigger_engine_mode(self.active_engine_mode)
 
     def update_engine_display(self, text):
         """Handles standard mode streaming text output."""
         target_box = self.analysis_textbox
         if target_box:
             try:
-                target_box.configure(state="normal")
+                target_box.configure(state="normal", fg_color=THEME["bg_surface"])
                 target_box.delete("1.0", "end")
                 target_box.insert("end", text)
                 target_box.configure(state="disabled")
@@ -372,7 +371,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
                 exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
                 pgn_text_export = game_obj.accept(exporter)
 
-                self.pgn_data_text.configure(state="normal")
+                self.pgn_data_text.configure(state="normal", fg_color=THEME["bg_surface"])
                 self.pgn_data_text.delete("1.0", "end")
                 self.pgn_data_text.insert("end", pgn_text_export)
                 self.pgn_data_text.configure(state="disabled")
@@ -382,7 +381,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         # 3. Update main moves view textbox notation with clean movement tracking and interactive red tracker tags
         if hasattr(self, "moves_textbox") and self.moves_textbox:
             try:
-                self.moves_textbox.configure(state="normal")
+                self.moves_textbox.configure(state="normal", fg_color=THEME["bg_surface"])
                 self.moves_textbox.delete("1.0", "end")
 
                 temp_node = game_obj
@@ -428,7 +427,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             return
 
         try:
-            self.moves_textbox.configure(state="normal")
+            self.moves_textbox.configure(state="normal", fg_color=THEME["bg_surface"])
             self.moves_textbox.tag_remove("active_move", "1.0", "end")
 
             if self.board_node and self.board_node != self.current_game:
@@ -486,21 +485,32 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
         return "break"
 
     def trigger_engine_mode(self, mode):
-        """Routes engine mode changes directly to the appropriate mixin handler."""
+        """Routes engine mode changes and correctly highlights only the active mode's buttons and frames."""
         self.active_engine_mode = mode
 
-        for name in ("btn_review", "btn_review_mode"):
-            if hasattr(self, name) and getattr(self, name):
-                getattr(self, name).configure(fg_color="#2e4a8c" if mode == "review" else "#1e293b",
-                                              hover_color="#4870cd" if mode == "review" else "#334155")
-        for name in ("btn_candidates", "btn_candidate_moves"):
-            if hasattr(self, name) and getattr(self, name):
-                getattr(self, name).configure(fg_color="#2e4a8c" if mode == "candidates" else "#1e293b",
-                                              hover_color="#4870cd" if mode == "candidates" else "#334155")
-        for name in ("btn_standard", "btn_standard_mode"):
-            if hasattr(self, name) and getattr(self, name):
-                getattr(self, name).configure(fg_color="#2e4a8c" if mode == "standard" else "#1e293b",
-                                              hover_color="#4870cd" if mode == "standard" else "#334155")
+        mode_buttons = {
+            "review": ("btn_review", "btn_review_mode"),
+            "candidates": ("btn_candidates", "btn_candidate_moves"),
+            "standard": ("btn_standard", "btn_standard_mode")
+        }
+
+        for m, btn_names in mode_buttons.items():
+            is_active = (mode == m)
+            for name in btn_names:
+                btn = getattr(self, name, None)
+                if btn is not None:
+                    btn.configure(
+                        fg_color=THEME["btn_hover"] if is_active else THEME["btn_initial"],
+                        hover_color=THEME["btn_hover"],
+                        text_color=THEME["text_primary"],
+                    )
+
+        if hasattr(self, "frame_review") and self.frame_review:
+            self.frame_review.configure(border_width=0 if mode == "review" else 1)
+        if hasattr(self, "frame_candidates") and self.frame_candidates:
+            self.frame_candidates.configure(border_width=0 if mode == "candidates" else 1)
+        if hasattr(self, "frame_standard") and self.frame_standard:
+            self.frame_standard.configure(border_width=0 if mode == "standard" else 1)
 
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
@@ -508,6 +518,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, EngineCan
             EngineCandidateMixin.trigger_engine_mode(self, "candidates")
         elif mode == "standard":
             EngineStandardMixin.trigger_engine_mode(self, "standard")
+
 
 def create_workspace(master, initial_games=None, filename=None, active_focus=None, active_index=None, **kwargs):
     """Instantiates MixedAnalysis, utilizing filtered games and files from the PGN folder structure."""

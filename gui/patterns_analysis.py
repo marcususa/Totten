@@ -5,7 +5,7 @@ import chess
 import chess.pgn
 import gui.app_state as state
 
-from core.constants import CONFIG_FILE
+from core.constants import CONFIG_FILE, THEME
 from gui.catalog_init_mixin import CatalogInitMixin
 from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
 from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
@@ -22,7 +22,7 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         kwargs.pop('target_game', None)
         kwargs.pop('active_index', None)
 
-        super().__init__(parent, fg_color="#172134", corner_radius=0, *args, **kwargs)
+        super().__init__(parent, fg_color=THEME["bg_panel"], corner_radius=0, *args, **kwargs)
 
         self.filename = filename or "personal_catalog.pgn"
 
@@ -139,17 +139,33 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         for btn_name in ("btn_review", "btn_review_mode"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("review"))
+                btn.configure(
+                    command=lambda: self.trigger_engine_mode("review"),
+                    hover_color=THEME["btn_hover"]
+                )
 
         for btn_name in ("btn_candidates", "btn_candidate_moves"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("candidates"))
+                btn.configure(
+                    command=lambda: self.trigger_engine_mode("candidates"),
+                    hover_color=THEME["btn_hover"]
+                )
 
         for btn_name in ("btn_standard", "btn_standard_mode"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
-                btn.configure(command=lambda: self.trigger_engine_mode("standard"))
+                btn.configure(
+                    command=lambda: self.trigger_engine_mode("standard"),
+                    hover_color=THEME["btn_hover"]
+                )
+
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                btn.configure(hover_color=THEME["btn_hover"])
+
+        self.trigger_engine_mode(self.active_engine_mode)
 
     def update_engine_display(self, text):
         target_box = getattr(self, "analysis_textbox", None)
@@ -158,7 +174,7 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
 
         if target_box:
             try:
-                target_box.configure(state="normal")
+                target_box.configure(state="normal", fg_color=THEME["bg_surface"])
                 target_box.delete("1.0", "end")
                 target_box.insert("end", text)
                 target_box.configure(state="disabled")
@@ -325,7 +341,7 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
                 exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
                 pgn_text_export = resolved.accept(exporter)
 
-                self.pgn_data_text.configure(state="normal")
+                self.pgn_data_text.configure(state="normal", fg_color=THEME["bg_surface"])
                 self.pgn_data_text.delete("1.0", "end")
                 self.pgn_data_text.insert("end", pgn_text_export)
                 self.pgn_data_text.configure(state="disabled")
@@ -334,8 +350,11 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
 
         if hasattr(self, "moves_textbox") and self.moves_textbox:
             try:
-                self.moves_textbox.configure(state="normal")
-                self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
+                self.moves_textbox.configure(state="normal", fg_color=THEME["bg_surface"])
+                bg_active = THEME.get("active_tracker_bg", "#660000")
+                fg_active = THEME.get("active_tracker_fg", "#ffffff")
+                self.moves_textbox.tag_config("active_move", background=bg_active, foreground=fg_active)
+                self.moves_textbox.tag_config("default", foreground=THEME["text_primary"])
                 self.moves_textbox.delete("1.0", "end")
 
                 temp_node = resolved
@@ -381,8 +400,10 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
             return
 
         try:
-            self.moves_textbox.configure(state="normal")
-            self.moves_textbox.tag_config("active_move", background="#660000", foreground="#ffffff")
+            self.moves_textbox.configure(state="normal", fg_color=THEME["bg_surface"])
+            bg_active = THEME.get("active_tracker_bg", "#660000")
+            fg_active = THEME.get("active_tracker_fg", "#ffffff")
+            self.moves_textbox.tag_config("active_move", background=bg_active, foreground=fg_active)
             self.moves_textbox.tag_remove("active_move", "1.0", "end")
 
             if self.board_node and self.board_node != self.current_game:
@@ -447,34 +468,37 @@ class PatternsAnalysis(ctk.CTkFrame, CatalogInitMixin, EngineReviewMixin, Engine
         if hasattr(self, "board_widget") and self.board_widget:
             if hasattr(self.board_widget, "flip_board"):
                 self.board_widget.flip_board()
-            elif hasattr(self, "board_widget") and hasattr(self.board_widget, "toggle_flip"):
+            elif hasattr(self.board_widget, "toggle_flip"):
                 self.board_widget.toggle_flip()
         return "break"
 
     def trigger_engine_mode(self, mode):
+        """Routes engine mode changes and correctly highlights only the active mode's buttons and frames."""
         self.active_engine_mode = mode
 
-        for name in ("btn_review", "btn_review_mode"):
-            if hasattr(self, name) and getattr(self, name):
-                try:
-                    getattr(self, name).configure(fg_color="#2e4a8c" if mode == "review" else "#1e293b",
-                                                  hover_color="#4870cd" if mode == "review" else "#334155")
-                except Exception:
-                    pass
-        for name in ("btn_candidates", "btn_candidate_moves"):
-            if hasattr(self, name) and getattr(self, name):
-                try:
-                    getattr(self, name).configure(fg_color="#2e4a8c" if mode == "candidates" else "#1e293b",
-                                                  hover_color="#4870cd" if mode == "candidates" else "#334155")
-                except Exception:
-                    pass
-        for name in ("btn_standard", "btn_standard_mode"):
-            if hasattr(self, name) and getattr(self, name):
-                try:
-                    getattr(self, name).configure(fg_color="#2e4a8c" if mode == "standard" else "#1e293b",
-                                                  hover_color="#4870cd" if mode == "standard" else "#334155")
-                except Exception:
-                    pass
+        mode_buttons = {
+            "review": ("btn_review", "btn_review_mode"),
+            "candidates": ("btn_candidates", "btn_candidate_moves"),
+            "standard": ("btn_standard", "btn_standard_mode")
+        }
+
+        for m, btn_names in mode_buttons.items():
+            is_active = (mode == m)
+            for name in btn_names:
+                btn = getattr(self, name, None)
+                if btn is not None:
+                    btn.configure(
+                        fg_color=THEME["btn_hover"] if is_active else THEME["btn_initial"],
+                        hover_color=THEME["btn_hover"],
+                        text_color=THEME["text_primary"],
+                    )
+
+        if hasattr(self, "frame_review") and self.frame_review:
+            self.frame_review.configure(border_width=0 if mode == "review" else 1)
+        if hasattr(self, "frame_candidates") and self.frame_candidates:
+            self.frame_candidates.configure(border_width=0 if mode == "candidates" else 1)
+        if hasattr(self, "frame_standard") and self.frame_standard:
+            self.frame_standard.configure(border_width=0 if mode == "standard" else 1)
 
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
