@@ -58,6 +58,7 @@ class Sidebar(ctk.CTkFrame):
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
 
+
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
@@ -75,7 +76,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_mixed = ctk.CTkButton(
             self, text="Mixed Collections", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            command=lambda: state.show_workspace("mixed_search")
+            command=lambda: state.show_workspace("mixed")
         )
         self.btn_mixed.pack(fill="x", padx=4, pady=5)
 
