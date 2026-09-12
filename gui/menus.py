@@ -1,9 +1,52 @@
+import sys
+import os
+from pathlib import Path
 import tkinter as tk
 import customtkinter as ctk
 import gui.app_state as state
 from pgn.importer import import_pgn, import_fen, reset_importer_state
-from catalog.catalog_manager import clear_catalog
 from gui.sidebar import toggle_sidebar
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+
+try:
+    from catalog.catalog_manager import clear_catalog
+except ImportError:
+    try:
+        from gui.catalog.catalog_manager import clear_catalog
+    except ImportError:
+        def clear_catalog():
+            """Direct fallback implementation to guarantee catalog clearing if module import fails."""
+            print("[MENU] Executing direct root catalog cleanup fallback...")
+
+            targets = [
+                ROOT_DIR / "personal_catalog.duckdb",
+                ROOT_DIR / "personal_catalog.json",
+                ROOT_DIR / "personal_catalog.pgn"
+            ]
+
+            try:
+                import duckdb
+                duckdb.sql("CLOSE DATABASE").fetchall()
+            except Exception:
+                try:
+                    duckdb.default_connection.close()
+                except Exception:
+                    pass
+
+            for file_path in targets:
+                if file_path.exists():
+                    try:
+                        os.remove(file_path)
+                        print(f"[CLEANUP] Successfully deleted: {file_path}")
+                    except Exception as e:
+                        print(f"[CLEANUP] Error deleting {file_path}: {e}")
+                        if "pgn" in str(file_path):
+                            try:
+                                with open(file_path, "w", encoding="utf-8") as f:
+                                    f.write("")
+                            except Exception:
+                                pass
 
 
 def get_workspace_parent():
@@ -51,11 +94,9 @@ def show_about_dialog():
     y = (top.winfo_screenheight() - top.winfo_reqheight()) // 2
     top.geometry(f"+{x}+{y}")
 
-    # Sleeker 1px border ring matching the app's theme (#344268)
     border_ring = ctk.CTkFrame(top, fg_color="#344268", corner_radius=11)
     border_ring.pack(fill="both", expand=True, padx=0, pady=0)
 
-    # Inner content card
     card = ctk.CTkFrame(border_ring, fg_color="#1e293b", corner_radius=10)
     card.pack(fill="both", expand=True, padx=1, pady=1)
 
@@ -69,7 +110,7 @@ def show_about_dialog():
         font=("Arial", 12), text_color="#94a3b8"
     ).pack(pady=(0, 10))
 
-    email_text = "progrockfrog@yahoo.com"
+    email_text = "progrockfrog@gmail.com"
 
     def copy_email(event=None):
         top.clipboard_clear()
@@ -108,13 +149,13 @@ def create_menu(app):
 
     # 2. Edit Menu
     edit_menu = tk.Menu(menubar, tearoff=0)
-    edit_menu.add_command(label="PGN & Engine", command=lambda: state.show_workspace("mixed_search"))
+    edit_menu.add_command(label="PGN & Engine", command=lambda: state.show_workspace("mixed"))
     menubar.add_cascade(label="Edit", menu=edit_menu)
 
     # 3. View Menu
     view_menu = tk.Menu(menubar, tearoff=0)
     view_menu.add_command(label="Catalog", command=lambda: state.show_workspace("search_catalog"))
-    view_menu.add_command(label="Mixed Collections", command=lambda: state.show_workspace("mixed_search"))
+    view_menu.add_command(label="Mixed Collections", command=lambda: state.show_workspace("mixed"))
     view_menu.add_command(label="Calendar", command=lambda: state.show_workspace("calendar"))
     view_menu.add_separator()
     view_menu.add_command(label="Show / Hide Sidebar", command=toggle_sidebar)
@@ -124,7 +165,7 @@ def create_menu(app):
     tools_menu = tk.Menu(menubar, tearoff=0)
     tools_menu.add_command(label="Analysis", command=lambda: state.show_workspace("analysis"))
     tools_menu.add_command(label="Patterns", command=lambda: state.show_workspace("patterns"))
-    tools_menu.add_command(label="Engines", command=lambda: state.show_workspace("mixed_search"))
+    tools_menu.add_command(label="Engines", command=lambda: state.show_workspace("mixed"))
     menubar.add_cascade(label="Tools", menu=tools_menu)
 
     # 5. Help Menu
