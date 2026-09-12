@@ -9,9 +9,12 @@ from core.constants import THEME
 from .catalog_init_mixin import CatalogInitMixin
 from .engine import CatalogEngineMixin
 from .navigation import CatalogNavigationMixin
+from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
+from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
+from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
-class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogEngineMixin, CatalogNavigationMixin):
+class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogEngineMixin, CatalogNavigationMixin, EngineCandidateMixin, EngineReviewMixin, EngineStandardMixin):
     """
     Dedicated self-contained workspace controller for Catalog Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
