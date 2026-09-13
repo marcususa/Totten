@@ -1,4 +1,10 @@
+import os
+import sys
+import time
+from pathlib import Path
+
 import customtkinter as ctk
+
 from gui.sidebar import create_sidebar
 from gui.catalog import create_workspace
 from gui.menus import create_menu
@@ -6,6 +12,10 @@ import gui.app_state as state
 from gui.chess_board import ChessBoardWidget
 from gui.mixed_collections.mixed_core import MixedAnalysis
 from gui.mixed_collections.edit_core import EditWorkspace
+from gui.splash import LoadingOverlay
+from core.chess_engine import ChessEngine
+from gui.statusbar import hide_progress, set_status_message
+
 
 class Totten(ctk.CTk):
     """
@@ -26,21 +36,22 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
-        # Show native loading overlay immediately
-        from gui.splash import LoadingOverlay
-        from core.chess_engine import ChessEngine
-        import os
-        import time
-
-        splash = LoadingOverlay(self, "Totten", "Loading ECO Database...")
+        # Show native loading overlay immediately for health/database checks
+        splash = LoadingOverlay(self, "Totten", "Loading https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/")
         self.update_idletasks()
 
-        # 1. ECO database check
-        eco_exists = os.path.exists("eco.pgn")
-        if not eco_exists:
-            splash.update_message("ECO database missing (fallback active)")
-            self.update_idletasks()
-            time.sleep(0.5)
+        # 1. ECO database check & credit recognition
+        root_dir = Path(__file__).resolve().parent
+        eco_path = root_dir / "eco.pgn"
+        eco_exists = eco_path.exists() or os.path.exists("eco.pgn")
+
+        if eco_exists:
+            splash.update_message("ECO Database Loaded (Chess Openings)")
+        else:
+            splash.update_message("ECO Database missing (Using Fallback)")
+
+        self.update_idletasks()
+        time.sleep(0.5)
 
         # 2. Engine verification
         splash.update_message("Verifying Engine Config...")
@@ -68,7 +79,6 @@ class Totten(ctk.CTk):
         splash.close()
 
         # Hide the status bar progress bar now that loading is complete
-        from gui.statusbar import hide_progress
         hide_progress()
 
     def _handle_global_navigation(self, target_view):
@@ -93,7 +103,6 @@ class Totten(ctk.CTk):
         state.left_frame = self.sidebar
 
         # 1. Default Catalog Workspace (Only load this on startup)
-        from gui.catalog import create_workspace
         initial_games = state.catalog_state.get("active_games")
         target_game = state.catalog_state.get("active_focus")
         active_index = state.catalog_state.get("active_index", 0)
@@ -186,9 +195,7 @@ class Totten(ctk.CTk):
             state.catalog_workspace.tkraise()
             state.workspace = state.catalog_workspace
 
-            from gui.statusbar import set_status_message
             set_status_message("Loaded Catalog Search")
-
 
         elif target == "mixed_analysis":
             initial_games = kwargs.get("initial_games") or state.mixed_state.get("active_games")
@@ -251,7 +258,6 @@ class Totten(ctk.CTk):
 
             self.after(50, _deferred_focus)
 
-            from gui.statusbar import set_status_message
             if initial_games:
                 set_status_message(f"Loaded {len(initial_games)} filtered games into Catalog Analysis")
             else:
@@ -268,7 +274,8 @@ class Totten(ctk.CTk):
             state.workspace = state.patterns_workspace
 
             if hasattr(state.patterns_workspace, "refresh_view"):
-                state.patterns_workspace.refresh_update() if hasattr(state.patterns_workspace, "refresh_update") else state.patterns_workspace.refresh_view()
+                state.patterns_workspace.refresh_update() if hasattr(state.patterns_workspace,
+                                                                     "refresh_update") else state.patterns_workspace.refresh_view()
 
         elif target == "patterns_analysis":
             initial_games = kwargs.get("initial_games") or state.patterns_state.get("active_games")
@@ -319,41 +326,5 @@ class Totten(ctk.CTk):
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
-
-    # 1. Show the standalone splash screen for early health/database checks
-    from gui.splash import StandaloneSplash
-    from core.chess_engine import ChessEngine
-    import os
-    import time
-
-    splash = StandaloneSplash(title_text="Totten", message="Starting up...")
-
-    try:
-        splash.update_message("Loading ECO Database...")
-        time.sleep(0.4)
-        eco_exists = os.path.exists("eco.pgn")
-        if not eco_exists:
-            splash.update_message("ECO database missing (fallback active)")
-            time.sleep(0.6)
-
-        splash.update_message("Verifying Engine Config...")
-        time.sleep(0.4)
-
-        engine = ChessEngine()
-        engine_ok = engine.verify_health()
-
-        if not engine_ok:
-            splash.update_message("Warning: Engine offline.")
-            time.sleep(0.8)
-        else:
-            splash.update_message("Engine ready.")
-            time.sleep(0.4)
-
-        splash.update_message("Launching workspace...")
-        time.sleep(0.4)
-    finally:
-        splash.close()
-
-    # 2. Start the main application window (which triggers its own LoadingOverlay internally)
     app = Totten()
     app.mainloop()
