@@ -8,8 +8,7 @@ import chess.pgn
 
 class ChessEngine:
     def __init__(self):
-        base_dir = Path(__file__).parent.parent / "engines"
-
+        base_dir = Path(__file__).resolve().parent.parent / "engines"
         system = platform.system()
 
         if system == "Windows":
@@ -38,6 +37,16 @@ class ChessEngine:
 
         if not self.engine_path:
             self.engine_path = possible_paths[0]
+
+    def verify_health(self):
+        """Verifies the discovered binary can complete a basic UCI handshake."""
+        if not self.engine_path or not Path(self.engine_path).exists():
+            return False
+        try:
+            with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
+                return engine.ping()
+        except Exception:
+            return False
 
     def analyze_position(self, board, depths=(10, 15, 20, 25), multipv=3, callback=None, worker_ref=None):
         """Analyzes a single board position incrementally across increasing depths."""
@@ -111,7 +120,6 @@ class ChessEngine:
                     ply = i + 1
                     move_num = (i // 2) + 1
                     is_white = (i % 2 == 0)
-
                     current_depth = 14
 
                     if running_score is None:
@@ -125,23 +133,19 @@ class ChessEngine:
                         score_before = running_score
 
                     played_san = board.san(move)
-
                     candidates_data = []
                     recs = []
+
                     if mode == "candidates":
                         info_recs = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=4, game=game)
-
                         if info_recs:
                             best_v = info_recs[0]["score"].relative.score(mate_score=10000) / 100.0
-
                             for v in info_recs:
                                 if "pv" in v and len(v["pv"]) > 0:
                                     cand = v["pv"][0]
                                     cand_san = board.san(cand)
                                     cand_score = v["score"].relative.score(mate_score=10000) / 100.0
-
                                     delta = cand_score - best_v
-
                                     candidates_data.append((cand_san, cand_score, delta))
                                     if cand != move:
                                         recs.append(cand_san)
@@ -157,7 +161,6 @@ class ChessEngine:
 
                     board.push(move)
                     info_after = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
-
                     score_obj_after = info_after[0]["score"].white()
 
                     if score_obj_after.is_mate():
@@ -179,21 +182,17 @@ class ChessEngine:
                             tag = "light_blue"
                         else:
                             tag = "default"
-
                     elif mode == "standard":
-                        # Standard Platform CPL Logic (No Green, pure Lichess/Chess.com thresholds)
                         cand_drop = max(0.0, (-eval_diff if is_white else eval_diff))
                         cpl_loss = cand_drop * 100.0
-
                         if cpl_loss >= 300.0:
-                            tag = "red"      # Blunder (>= 3.0 pawns)
+                            tag = "red"
                         elif cpl_loss >= 100.0:
-                            tag = "orange"   # Mistake (>= 1.0 pawn)
+                            tag = "orange"
                         elif cpl_loss >= 50.0:
-                            tag = "light_blue" # Inaccuracy (>= 0.5 pawns)
+                            tag = "light_blue"
                         else:
                             tag = "default"
-
                     elif mode == "review":
                         if is_white:
                             if -0.29 <= eval_diff <= 0.29:
@@ -206,11 +205,8 @@ class ChessEngine:
                                 tag = "orange"
                             elif eval_diff < -2.30:
                                 tag = "red"
-                            else:
-                                tag = "default"
                         else:
                             black_eval_gain = eval_diff
-
                             if -0.29 <= eval_diff <= 0.29:
                                 tag = "default"
                             elif 0.30 <= black_eval_gain <= 0.59:
@@ -221,8 +217,6 @@ class ChessEngine:
                                 tag = "orange"
                             elif black_eval_gain > 2.30:
                                 tag = "red"
-                            else:
-                                tag = "default"
 
                     result = {
                         "ply": ply,
