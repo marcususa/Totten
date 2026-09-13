@@ -287,5 +287,41 @@ class Totten(ctk.CTk):
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
+
+    # 1. Show the standalone splash screen for early health/database checks
+    from gui.splash import StandaloneSplash
+    from core.chess_engine import ChessEngine
+    import os
+    import time
+
+    splash = StandaloneSplash(title_text="Totten", message="Starting up...")
+
+    try:
+        splash.update_message("Loading ECO Database...")
+        time.sleep(0.4)
+        eco_exists = os.path.exists("eco.pgn")
+        if not eco_exists:
+            splash.update_message("ECO database missing (fallback active)")
+            time.sleep(0.6)
+
+        splash.update_message("Verifying Engine Config...")
+        time.sleep(0.4)
+
+        engine = ChessEngine()
+        engine_ok = engine.verify_health()
+
+        if not engine_ok:
+            splash.update_message("Warning: Engine offline.")
+            time.sleep(0.8)
+        else:
+            splash.update_message("Engine ready.")
+            time.sleep(0.4)
+
+        splash.update_message("Launching workspace...")
+        time.sleep(0.4)
+    finally:
+        splash.close()
+
+    # 2. Start the main application window (which triggers its own LoadingOverlay internally)
     app = Totten()
     app.mainloop()
