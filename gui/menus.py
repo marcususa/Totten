@@ -82,9 +82,9 @@ def handle_import_fen():
 
 
 def show_about_dialog():
-    """Displays application About information styled like the splash screen with a sleek accent border ring and click-to-copy email."""
+    """Displays application About information styled like the splash screen with credits, quotes, and references."""
     top = ctk.CTkToplevel()
-    top.geometry("342x262")
+    top.geometry("440x540")
     top.resizable(False, False)
     top.overrideredirect(True)
     top.configure(fg_color="#172134")
@@ -102,15 +102,15 @@ def show_about_dialog():
 
     ctk.CTkLabel(
         card, text="Totten",
-        font=("Arial", 48, "bold"), text_color="white"
-    ).pack(pady=(20, 5))
+        font=("Arial", 36, "bold"), text_color="white"
+    ).pack(pady=(15, 2))
 
     ctk.CTkLabel(
         card, text="Chess Catalog with Analysis",
-        font=("Arial", 12), text_color="#94a3b8"
-    ).pack(pady=(0, 10))
+        font=("Arial", 11, "bold"), text_color="#94a3b8"
+    ).pack(pady=(0, 5))
 
-    email_text = "progrockfrog@gmail.com"
+    email_text = "progrockfrog@yahoo.com"
 
     def copy_email(event=None):
         top.clipboard_clear()
@@ -120,16 +120,40 @@ def show_about_dialog():
 
     email_lbl = ctk.CTkLabel(
         card, text=email_text,
-        font=("Arial", 11, "underline"), text_color="#38bdf8",
+        font=("Arial", 10, "bold", "underline"), text_color="#38bdf8",
         cursor="hand2"
     )
-    email_lbl.pack(pady=(0, 10))
+    email_lbl.pack(pady=(0, 5))
     email_lbl.bind("<Button-1>", copy_email)
+
+    # Scrollable frame for credits, quotes, and attributions
+    scroll_frame = ctk.CTkScrollableFrame(card, width=400, height=260, fg_color="#1e293b")
+    scroll_frame.pack(pady=5, padx=10, fill="both", expand=True)
+
+    credits_text = (
+        "\"A credit to dementia\" — Dave Mustaine\n\n"
+        "Credits & References:\n"
+        "• ECO: https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/\n"
+        "• Engine: Stockfish\n"
+        "• Tarrasch: https://www.triplehappy.com/\n"
+        "• SCID vs. PC: https://scidvspc.sourceforge.net/\n"
+        "• Arena 3.5.1: http://www.playwitharena.de/\n"
+        "• Dan Heisman: https://www.danheisman.com/\n"
+        "• Finegold Ben - The King's Indian Attack, with GM Ben Finegold:\n"
+        "  https://www.youtube.com/watch?v=HoH2V650aTc\n\n"
+        "Seremy Jilman"
+    )
+
+    ctk.CTkLabel(
+        scroll_frame, text=credits_text,
+        font=("Arial", 10, "bold"), text_color="#cbd5e1",
+        justify="left", wraplength=370
+    ).pack(anchor="w", padx=5, pady=5)
 
     ctk.CTkButton(
         card, text="Close", width=100, fg_color="#334155", hover_color="#475569",
         command=top.destroy
-    ).pack(pady=(0, 15))
+    ).pack(pady=(10, 15))
 
 
 def create_menu(app):
