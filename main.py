@@ -26,10 +26,42 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
-        # Show native loading overlay before heavy UI initialization
+        # Show native loading overlay immediately
         from gui.splash import LoadingOverlay
-        splash = LoadingOverlay(self, "Totten", "Loading...")
+        from core.chess_engine import ChessEngine
+        import os
+        import time
+
+        splash = LoadingOverlay(self, "Totten", "Loading ECO Database...")
         self.update_idletasks()
+
+        # 1. ECO database check
+        eco_exists = os.path.exists("eco.pgn")
+        if not eco_exists:
+            splash.update_message("ECO database missing (fallback active)")
+            self.update_idletasks()
+            time.sleep(0.5)
+
+        # 2. Engine verification
+        splash.update_message("Verifying Engine Config...")
+        self.update_idletasks()
+        time.sleep(0.3)
+
+        self.chess_engine = ChessEngine()
+        engine_ok = self.chess_engine.verify_health()
+
+        if not engine_ok:
+            splash.update_message("Warning: Engine offline.")
+            self.update_idletasks()
+            time.sleep(0.6)
+        else:
+            splash.update_message("Engine ready.")
+            self.update_idletasks()
+            time.sleep(0.3)
+
+        splash.update_message("Launching workspace...")
+        self.update_idletasks()
+        time.sleep(0.3)
 
         self._init_ui()
 
