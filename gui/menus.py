@@ -131,17 +131,18 @@ def show_about_dialog():
     scroll_frame.pack(pady=5, padx=10, fill="both", expand=True)
 
     credits_text = (
-        "\"A credit to dementia\" — Dave Mustaine\n\n"
-        "Credits & References:\n"
-        "• ECO: https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/\n"
-        "• Engine: Stockfish\n"
-        "• Tarrasch: https://www.triplehappy.com/\n"
-        "• SCID vs. PC: https://scidvspc.sourceforge.net/\n"
-        "• Arena 3.5.1: http://www.playwitharena.de/\n"
-        "• Dan Heisman: https://www.danheisman.com/\n"
-        "• Finegold Ben - The King's Indian Attack, with GM Ben Finegold:\n"
-        "  https://www.youtube.com/watch?v=HoH2V650aTc\n\n"
-        "Seremy Jilman"
+        "\"A credit to dementia\" - Dave Mustaine\n\n"
+        "ECO - https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/\n"
+        "Engine - Stockfish\n"
+        "Tarrasch - https://www.triplehappy.com/\n"
+        "SCID vs. PC - https://scidvspc.sourceforge.net/\n"
+        "Arena 3.5.1 - http://www.playwitharena.de/\n"
+        "Dan Heisman - https://www.danheisman.com/\n"
+        "Finegold Ben - The King's Indian Attack, with GM Ben Finegold\n"
+        "https://www.youtube.com/watch?v=HoH2V650aTc\n\n"
+        "Seremy Jilman\n"
+        "Naniel Daroditsky\n\n"
+        "\"One more thing\" - Columbo (Peter Falk)"
     )
 
     ctk.CTkLabel(
