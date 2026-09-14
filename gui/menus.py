@@ -84,15 +84,16 @@ def handle_import_fen():
 def show_about_dialog():
     """Displays application About information styled like the splash screen with credits, quotes, and references."""
     top = ctk.CTkToplevel()
-    top.geometry("440x540")
+    width, height = 440, 420
     top.resizable(False, False)
     top.overrideredirect(True)
     top.configure(fg_color="#172134")
 
+    # Center the window properly by combining size and coordinates
     top.update_idletasks()
-    x = (top.winfo_screenwidth() - top.winfo_reqwidth()) // 2
-    y = (top.winfo_screenheight() - top.winfo_reqheight()) // 2
-    top.geometry(f"+{x}+{y}")
+    x = (top.winfo_screenwidth() - width) // 2
+    y = (top.winfo_screenheight() - height) // 2
+    top.geometry(f"{width}x{height}+{x}+{y}")
 
     border_ring = ctk.CTkFrame(top, fg_color="#344268", corner_radius=11)
     border_ring.pack(fill="both", expand=True, padx=0, pady=0)
@@ -102,8 +103,8 @@ def show_about_dialog():
 
     ctk.CTkLabel(
         card, text="Totten",
-        font=("Arial", 36, "bold"), text_color="white"
-    ).pack(pady=(15, 2))
+        font=("Arial", 32, "bold"), text_color="white"
+    ).pack(pady=(12, 2))
 
     ctk.CTkLabel(
         card, text="Chess Catalog with Analysis",
@@ -126,9 +127,9 @@ def show_about_dialog():
     email_lbl.pack(pady=(0, 5))
     email_lbl.bind("<Button-1>", copy_email)
 
-    # Scrollable frame for credits, quotes, and attributions
-    scroll_frame = ctk.CTkScrollableFrame(card, width=400, height=260, fg_color="#1e293b")
-    scroll_frame.pack(pady=5, padx=10, fill="both", expand=True)
+    # Scrollable frame with a fixed height and no expand=True so it doesn't force the window tall
+    scroll_frame = ctk.CTkScrollableFrame(card, width=400, height=140, fg_color="#1e293b")
+    scroll_frame.pack(pady=2, padx=10, fill="x", expand=False)
 
     credits_text = (
         "\"A credit to dementia\" - Dave Mustaine\n\n"
@@ -139,10 +140,6 @@ def show_about_dialog():
         "Arena 3.5.1 - http://www.playwitharena.de/\n"
         "Dan Heisman - https://www.danheisman.com/\n"
         "Finegold Ben - The King's Indian Attack, with GM Ben Finegold\n"
-        "https://www.youtube.com/watch?v=HoH2V650aTc\n\n"
-        "Seremy Jilman\n"
-        "Naniel Daroditsky\n\n"
-        "\"One more thing\" - Columbo (Peter Falk)"
     )
 
     ctk.CTkLabel(
