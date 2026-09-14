@@ -1,10 +1,6 @@
-import os
-import sys
-import time
+import platform
 from pathlib import Path
-
 import customtkinter as ctk
-
 from gui.sidebar import create_sidebar
 from gui.catalog import create_workspace
 from gui.menus import create_menu
@@ -12,9 +8,29 @@ import gui.app_state as state
 from gui.chess_board import ChessBoardWidget
 from gui.mixed_collections.mixed_core import MixedAnalysis
 from gui.mixed_collections.edit_core import EditWorkspace
-from gui.splash import LoadingOverlay
-from core.chess_engine import ChessEngine
-from gui.statusbar import hide_progress, set_status_message
+
+ROOT_DIR = Path(__file__).resolve().parent
+
+
+def _detect_platform_engines():
+    """Dynamically resolves valid chess engine paths based on the host OS to prevent cross-platform crashes."""
+    system = platform.system()
+    engines = {}
+
+    if system == "Windows":
+        potential_paths = [
+            ROOT_DIR / "engines" / "stockfish.exe",
+            ROOT_DIR / "stockfish.exe"
+        ]
+    else:  # Linux / macOS
+        potential_paths = [
+            ROOT_DIR / "engines" / "stockfish",
+            ROOT_DIR / "stockfish"
+        ]
+
+    valid_engines = [str(p) for p in potential_paths if p.is_file()]
+    engines["stockfish"] = valid_engines[0] if valid_engines else None
+    return engines
 
 
 class Totten(ctk.CTk):
@@ -36,49 +52,20 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
-        # Show native loading overlay immediately for health/database checks
-        splash = LoadingOverlay(self, "Totten", "Loading https://www.cs.kent.ac.uk/people/staff/djb/pgn-extract/")
+        # Safely bind cross-platform detected engines to global state
+        state.available_engines = _detect_platform_engines()
+
+        # Show native loading overlay before heavy UI initialization
+        from gui.splash import LoadingOverlay
+        splash = LoadingOverlay(self, "Totten", "Loading...")
         self.update_idletasks()
-
-        # 1. ECO database check & credit recognition
-        root_dir = Path(__file__).resolve().parent
-        eco_path = root_dir / "eco.pgn"
-        eco_exists = eco_path.exists() or os.path.exists("eco.pgn")
-
-        if eco_exists:
-            splash.update_message("ECO Database Loaded (Chess Openings)")
-        else:
-            splash.update_message("ECO Database missing (Using Fallback)")
-
-        self.update_idletasks()
-        time.sleep(0.5)
-
-        # 2. Engine verification
-        splash.update_message("Verifying Engine Config...")
-        self.update_idletasks()
-        time.sleep(0.3)
-
-        self.chess_engine = ChessEngine()
-        engine_ok = self.chess_engine.verify_health()
-
-        if not engine_ok:
-            splash.update_message("Warning: Engine offline.")
-            self.update_idletasks()
-            time.sleep(0.6)
-        else:
-            splash.update_message("Engine ready.")
-            self.update_idletasks()
-            time.sleep(0.3)
-
-        splash.update_message("Launching workspace...")
-        self.update_idletasks()
-        time.sleep(0.3)
 
         self._init_ui()
 
         splash.close()
 
         # Hide the status bar progress bar now that loading is complete
+        from gui.statusbar import hide_progress
         hide_progress()
 
     def _handle_global_navigation(self, target_view):
@@ -103,6 +90,7 @@ class Totten(ctk.CTk):
         state.left_frame = self.sidebar
 
         # 1. Default Catalog Workspace (Only load this on startup)
+        from gui.catalog import create_workspace
         initial_games = state.catalog_state.get("active_games")
         target_game = state.catalog_state.get("active_focus")
         active_index = state.catalog_state.get("active_index", 0)
@@ -195,7 +183,9 @@ class Totten(ctk.CTk):
             state.catalog_workspace.tkraise()
             state.workspace = state.catalog_workspace
 
+            from gui.statusbar import set_status_message
             set_status_message("Loaded Catalog Search")
+
 
         elif target == "mixed_analysis":
             initial_games = kwargs.get("initial_games") or state.mixed_state.get("active_games")
@@ -258,6 +248,7 @@ class Totten(ctk.CTk):
 
             self.after(50, _deferred_focus)
 
+            from gui.statusbar import set_status_message
             if initial_games:
                 set_status_message(f"Loaded {len(initial_games)} filtered games into Catalog Analysis")
             else:
