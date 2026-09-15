@@ -1,35 +1,111 @@
 import threading
 import chess
-from core.constants import THEME
 from core.chess_engine import ChessEngine
+from core.constants import THEME
+from ..engine_mixins.engine_review_mixin import EngineReviewMixin
+from ..engine_mixins.engine_candidate_mixin import EngineCandidateMixin
+from ..engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
-class CatalogEngineMixin:
-    """Mixin class to handle background engine workers and evaluation displays."""
+class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
+
+    """Manages background analysis workers, raw engine evaluation, and mode routing."""
+
+    def update_engine_display(self, text):
+        """Fallback display method for CatalogAnalysis / CatalogEngineMixin views."""
+        target_box = getattr(self, "pv_textbox", None)
+        if not target_box and hasattr(self, "_cached_analysis_box"):
+            target_box = self._cached_analysis_box
+
+        if target_box:
+            try:
+                target_box.configure(fg_color=THEME["bg_surface"])
+                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
+                inner_box.configure(state="normal")
+                inner_box.delete("1.0", "end")
+                inner_box.insert("end", text)
+                inner_box.configure(state="disabled")
+            except Exception as e:
+                print(f"[ENGINE DISPLAY ERROR] {e}")
 
     def toggle_engine_action(self):
-        """Controls the independent Engine button for raw live evaluation on the left."""
+        """Controls the independent Engine button for raw live evaluation on the left, with real-time thread state sync."""
         is_running = getattr(self, "_engine_running", False)
+        worker = getattr(self, "_current_raw_engine_worker", None)
+
+        # If the flag says True, but no active worker thread is running, force it to False
+        if is_running and (worker is None or not worker.is_alive()):
+            is_running = False
+            self._engine_running = False
+
+        print(f"[DEBUG] Engine button clicked! Synced _engine_running state: {is_running}")
+
         if is_running:
-            self.start_raw_engine_analysis()
-        else:
+            print("[DEBUG] Stopping raw engine analysis...")
             self.stop_raw_engine_analysis()
+        else:
+            print("[DEBUG] Starting raw engine analysis...")
+            self.start_raw_engine_analysis()
 
     def start_raw_engine_analysis(self):
-        """Runs a lightweight background worker for raw engine lines targeting only pv_textbox."""
-        if not hasattr(self, "current_node") or not self.current_node:
-            print("[RAW ENGINE] Error: No current_node found.")
+        """Runs a lightweight background worker for raw engine lines with full diagnostic logging."""
+        print("[DEBUG] start_raw_engine_analysis triggered.")
+
+        # Safeguard: If current_node is an integer (index) or missing, resolve it safely from the catalog list
+        if not hasattr(self, "current_node") or self.current_node is None or isinstance(self.current_node, int):
+            print(
+                f"[DEBUG] current_node is missing or an integer ({getattr(self, 'current_node', 'NONE')}). Resolving...")
+            game_obj = getattr(self, "current_game", None) or getattr(self, "active_game", None)
+
+            lists_to_check = ["game_list", "filtered_games", "current_games", "games"]
+            if not game_obj:
+                for lst_name in lists_to_check:
+                    lst = getattr(self, lst_name, None)
+                    if lst:
+                        print(f"[DEBUG] Found game list attribute '{lst_name}' with {len(lst)} items.")
+                        idx = self.current_node if isinstance(self.current_node, int) else 0
+                        if 0 <= idx < len(lst):
+                            game_obj = lst[idx]
+                            print(f"[DEBUG] Resolved game object from index {idx}.")
+                            break
+
+            if game_obj:
+                if hasattr(game_obj, "root"):
+                    self.current_node = game_obj.root()
+                elif hasattr(game_obj, "board"):
+                    self.current_node = game_obj
+                else:
+                    if isinstance(game_obj, dict) and "game" in game_obj:
+                        g = game_obj["game"]
+                        self.current_node = g.root() if hasattr(g, "root") else g
+
+        print(f"[DEBUG] Final evaluated current_node type: {type(getattr(self, 'current_node', None))}")
+
+        if not hasattr(self, "current_node") or self.current_node is None or isinstance(self.current_node, int):
+            print("[RAW ENGINE] Error: No valid current_node or game object found after resolution.")
             self.update_engine_display("[No active position to evaluate.]\n")
             return
 
         try:
             board_obj = self.current_node.board()
+            print("[DEBUG] Successfully extracted board object from current_node.")
         except Exception as e:
             print(f"[RAW ENGINE] Error getting board from node: {e}")
+            self.update_engine_display(f"[Error evaluating position: {e}]\n")
             return
 
         if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
             self._current_raw_engine_worker.cancel = True
+
+        # Set running state and update button appearance immediately
+        self._engine_running = True
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(fg_color=THEME["btn_hover"], text="Stop Engine")
+                except Exception:
+                    pass
 
         class RawEngineWorker(threading.Thread):
             def __init__(self, board_state, outer):
@@ -60,7 +136,6 @@ class CatalogEngineMixin:
                         if isinstance(pv_lines, list) and pv_lines:
                             formatted_lines = []
                             for idx, line in enumerate(pv_lines, start=1):
-                                # Format moves with proper numbering starting from current position
                                 temp_board = self.board_state.copy()
                                 move_tokens = line.strip().split()
                                 numbered_pv = []
@@ -106,27 +181,14 @@ class CatalogEngineMixin:
             self._current_raw_engine_worker.cancel = True
             self._current_raw_engine_worker = None
 
-        if hasattr(self, "btn_engine_action") and self.btn_engine_action:
-            try:
-                self.btn_engine_action.configure(text="Engine")
-            except Exception:
-                pass
-
-        # Intentionally left without clearing display text so results remain frozen on screen.
-
-    def update_engine_display(self, text):
-        """Strictly controls the left-column pv_textbox for raw engine outputs."""
-        target_box = getattr(self, "pv_textbox", None)
-        if target_box:
-            try:
-                target_box.configure(fg_color=THEME["bg_surface"])
-                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-                inner_box.configure(state="normal")
-                inner_box.delete("1.0", "end")
-                inner_box.insert("end", text)
-                inner_box.configure(state="disabled")
-            except Exception as e:
-                print(f"[ENGINE DISPLAY ERROR] {e}")
+        self._engine_running = False
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(fg_color=THEME["btn_initial"], text="Engine")
+                except Exception:
+                    pass
 
     def start_game_review(self, target_game):
         self._run_analysis_worker(target_game, mode="review")
@@ -161,7 +223,6 @@ class CatalogEngineMixin:
                         played_san = res['played_san']
 
                         steps = move_num * 2 - 1 if is_white else move_num * 2
-                        target_node = self.game_obj
                         curr_n = self.game_obj
                         for _ in range(steps):
                             if curr_n.variations:
@@ -244,7 +305,7 @@ class CatalogEngineMixin:
         self._current_analysis_worker.start()
 
     def _sync_analysis_selection(self):
-        """Renders the analysis panel completely like a continuous book, letting the textbox handle native word-wrapping."""
+        """Renders the analysis panel completely like a continuous book."""
         if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
             return
 
@@ -275,7 +336,6 @@ class CatalogEngineMixin:
                 row = self.analysis_rows[move_num]
                 target_box.insert("end", f"{move_num}. ")
 
-                # White move formatting
                 w_text = row.get("white", "")
                 w_tag = row.get("white_tag", "default")
                 w_node = row.get("white_node")
@@ -295,7 +355,6 @@ class CatalogEngineMixin:
                 else:
                     target_box.insert("end", "... ")
 
-                # Black move formatting
                 b_text = row.get("black", "")
                 b_tag = row.get("black_tag", "default")
                 b_node = row.get("black_node")
@@ -318,3 +377,55 @@ class CatalogEngineMixin:
             target_box.configure(state="disabled")
         except Exception as e:
             print(f"[SYNC ANALYSIS ERROR] {e}")
+
+    def trigger_engine_mode(self, mode):
+        """Routes engine mode changes, updates button/frame highlights, and delegates to mixin handlers."""
+        self.active_engine_mode = mode
+        self._selected_mode_button = mode
+
+        mode_buttons = {
+            "review": ("btn_review", "btn_review_mode"),
+            "candidates": ("btn_candidates", "btn_candidate_moves"),
+            "standard": ("btn_standard", "btn_standard_mode", "btn_engines")
+        }
+
+        def _apply_styles():
+            for m, btn_names in mode_buttons.items():
+                is_active = (mode == m)
+                for name in btn_names:
+                    btn = getattr(self, name, None)
+                    if btn is not None:
+                        try:
+                            btn.configure(
+                                fg_color=THEME["btn_hover"] if is_active else THEME["btn_initial"],
+                                hover_color=THEME["btn_hover"],
+                                text_color=THEME["text_primary"],
+                            )
+                        except Exception:
+                            pass
+
+        _apply_styles()
+        self.after_idle(_apply_styles)
+
+        if hasattr(self, "frame_review") and self.frame_review:
+            try:
+                self.frame_review.configure(border_width=0 if mode == "review" else 1)
+            except Exception:
+                pass
+        if hasattr(self, "frame_candidates") and self.frame_candidates:
+            try:
+                self.frame_candidates.configure(border_width=0 if mode == "candidates" else 1)
+            except Exception:
+                pass
+        if hasattr(self, "frame_standard") and self.frame_standard:
+            try:
+                self.frame_standard.configure(border_width=0 if mode == "standard" else 1)
+            except Exception:
+                pass
+
+        if mode == "review":
+            EngineReviewMixin.trigger_engine_mode(self, "review")
+        elif mode == "candidates":
+            EngineCandidateMixin.trigger_engine_mode(self, "candidates")
+        elif mode == "standard":
+            EngineStandardMixin.trigger_engine_mode(self, "standard")
