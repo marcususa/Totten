@@ -317,5 +317,10 @@ class Totten(ctk.CTk):
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
+
+    # Force standard 1:1 pixel scaling for Linux/KDE
+    ctk.set_widget_scaling(1.0)
+    ctk.set_window_scaling(1.0)
+
     app = Totten()
     app.mainloop()
