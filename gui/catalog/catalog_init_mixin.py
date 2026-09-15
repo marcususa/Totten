@@ -1,6 +1,6 @@
 import customtkinter as ctk
-from core.constants import THEME
 from gui.chess_board import ChessBoardWidget
+from core.constants import THEME, LAYOUT
 
 
 class CatalogInitMixin:
@@ -76,7 +76,7 @@ class CatalogInitMixin:
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.main_container.grid_columnconfigure(0, weight=0, minsize=500)
+        self.main_container.grid_columnconfigure(0, weight=0, minsize=LAYOUT["board_width"])
         self.main_container.grid_columnconfigure(1, weight=3)
         self.main_container.grid_rowconfigure(0, weight=1)
 
@@ -88,12 +88,13 @@ class CatalogInitMixin:
                                              border_color=THEME.get("border_color", THEME["bg_surface"]))
         self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
-        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color=THEME["bg_surface"], width=570, height=500,
+        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color=THEME["bg_surface"],
+                                         width=LAYOUT["board_width"], height=LAYOUT["board_height"],
                                          corner_radius=0)
         self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
         self.board_holder.pack_propagate(False)
 
-        self.board_widget = ChessBoardWidget(self.board_holder, square_size=47)
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=LAYOUT["square_size"])
         self.board_widget.pack(fill="both", expand=True)
 
         if hasattr(self, "on_prev_move"):
@@ -249,8 +250,9 @@ class CatalogInitMixin:
             text_color=THEME["text_primary"],
             font=ctk.CTkFont(family="Arial", size=11),
             wrap="word",
-            height=120
+            height=LAYOUT["pv_box_height"]
         )
+
         self.pv_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
         self.pv_textbox.tag_config("active_move", background=THEME["active_tracker_bg"],
                                    foreground=THEME["active_tracker_fg"])
@@ -376,8 +378,9 @@ class CatalogInitMixin:
             text_color=THEME["text_primary"],
             font=ctk.CTkFont(family="Arial", size=11),
             wrap="word",
-            height=90
+            height=LAYOUT["analysis_box_height"]
         )
+
         self.analysis_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
