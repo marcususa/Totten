@@ -1,5 +1,2 @@
-from .core import CatalogAnalysis
-from .navigation import create_workspace
-from .catalog_view import SearchCatalogWorkspace, on_group_selected
-
-__all__ = ["CatalogAnalysis", "create_workspace", "SearchCatalogWorkspace", "on_group_selected"]
+from gui.patterns.patterns_analysis import PatternsAnalysis, create_patterns_analysis_workspace
+from gui.patterns.patterns_workspace import PatternsWorkspace
