@@ -4,7 +4,7 @@ CONFIG_FILE = "config.json"
 LAYOUT = {
     "square_size": 47,
     "board_width": 570,
-    "board_height": 500,
+    "board_height": 400,
     "pv_box_height": 120,
     "analysis_box_height": 90,
 }
@@ -14,7 +14,7 @@ THEME = {
     "bg_surface": "#1e293b",        # Text field box background
     "btn_hover": "#2e4a8c",          # Hover over / active state color
     "btn_initial": "#344268",        # Resting / initial state color
-    "btn_bg": "#344268",            
+    "btn_bg": "#344268",
     "text_primary": "#f8fafc",
     "text_secondary": "#94a3b8",
     "status_text": "#ddddff",
