@@ -14,7 +14,8 @@ from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
 from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
-class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogEngineMixin, CatalogNavigationMixin, EngineCandidateMixin, EngineReviewMixin, EngineStandardMixin):
+class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, CatalogEngineMixin):
+
     """
     Dedicated self-contained workspace controller for Catalog Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
