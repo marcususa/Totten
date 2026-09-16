@@ -19,6 +19,8 @@ THEME = {
     "text_secondary": "#94a3b8",
     "status_text": "#ddddff",
     "border_color": "#344268",
+    "divider": "#344268",  # Divider color
+    "border_ring": "#344268",
     "progress_bg": "#0f172a",
     "progress_fill": "#ff0000",
     "eval_red": "#de3d35",
