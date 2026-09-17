@@ -332,8 +332,8 @@ class CatalogInitMixin:
         self.pgn_tree.heading("result", text="Res")
 
         self.pgn_tree.column("no", width=30, anchor="center")
-        self.pgn_tree.column("white", width=145, anchor="w")
-        self.pgn_tree.column("black", width=145, anchor="w")
+        self.pgn_tree.column("white", width=135, anchor="w")
+        self.pgn_tree.column("black", width=135, anchor="w")
         self.pgn_tree.column("result", width=45, anchor="center")
 
         def _on_tree_selection(event):
