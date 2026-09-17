@@ -9,7 +9,7 @@ from gui.mixed_collections.edit_constants import load_categories_config
 
 
 class CategoryListAdapter:
-    """Adapter to mimic get/set behavior for the category list view."""
+    """Adapter to mimic get/set and configure behavior for the category list view."""
     def __init__(self, workspace):
         self._workspace = workspace
 
@@ -20,15 +20,22 @@ class CategoryListAdapter:
         if hasattr(self._workspace, "_set_category_val"):
             self._workspace._set_category_val(val)
 
+    def configure(self, **kwargs):
+        """Intercepts dropdown configuration calls (like values=...) and refreshes the list view."""
+        if "values" in kwargs and hasattr(self._workspace, "_refresh_categories_list"):
+            self._workspace._refresh_categories_list()
+
 
 class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
     def __init__(self, master, initial_games=None, filename=None, *args, **kwargs):
-        super().__init__(master, fg_color="#172134", corner_radius=0)
+        super().__init__(master, fg_color="#0f172a", corner_radius=0)
 
         self.categories = load_categories_config()
+        print(f"[DEBUG INIT] EditWorkspace loaded categories: {self.categories}")
+
         self.collection_files = {}
-        self.selected_files = {}
+        self.selected_files = []
         self.tree_map = {}
         self.cat_item_map = {}
 
@@ -84,7 +91,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         )
         style.map(
             "Borderless.Treeview",
-            background=[("selected", "#334155"), ("focus", "#1e293b"), ("active", "#1e293b")],
+            background=[("selected", "#344268"), ("focus", "#1e293b"), ("active", "#1e293b")],
             foreground=[("selected", "#ffffff"), ("focus", "#f8fafc"), ("active", "#f8fafc")],
             borderwidth=[("focus", 0), ("active", 0)]
         )
@@ -111,7 +118,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         self.grid_columnconfigure(1, weight=2)
 
         # Left Column: Structured Game Table View
-        left_box = ctk.CTkFrame(self, fg_color="#172134", corner_radius=8, border_color="#334155", border_width=1)
+        left_box = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=8, border_color="#344268", border_width=1)
         left_box.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         left_box.grid_rowconfigure(0, weight=1)
         left_box.grid_columnconfigure(0, weight=1)
@@ -149,13 +156,13 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         col_scroll.grid(row=0, column=1, sticky="ns", padx=(2, 0))
 
         # Right Column: Control Panel
-        right_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#334155", border_width=1)
+        right_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#344268", border_width=1)
         right_box.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
         right_box.grid_columnconfigure(0, weight=1)
 
         header_box = ctk.CTkFrame(right_box, fg_color="transparent")
         header_box.pack(fill="x", padx=10, pady=(15, 5))
-        ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color="white").pack(anchor="w")
+        ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color="#f8fafc").pack(anchor="w")
         ctk.CTkLabel(header_box, text="Select category first.", font=("Arial", 12), text_color="#94a3b8").pack(anchor="w")
 
         # Adapter setup for category selection compatibility
@@ -172,7 +179,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
         self._set_category_val = _set_category_val
 
-        # Category List Box (Matching left column style)
+        # Category List Box
         cat_list_frame = ctk.CTkFrame(right_box, fg_color="transparent")
         cat_list_frame.pack(fill="x", padx=10, pady=5)
 
@@ -213,14 +220,12 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         # Populate categories tree view
         self._refresh_categories_list()
 
-        # "+ Category" button placed immediately below the list
         btn_add_cat = ctk.CTkButton(
             right_box,
             text="+ Category",
             fg_color="#344268",
             hover_color="#2e4a8c",
-            border_width=2,
-            border_color="#475569",
+            border_width=0,
             height=28,
             font=("Arial", 12),
             command=self._add_category
@@ -230,11 +235,11 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         move_row = ctk.CTkFrame(right_box, fg_color="transparent")
         move_row.pack(fill="x", padx=10, pady=(5, 2))
         move_row.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(move_row, text="Up", fg_color="#334155", hover_color="#475569", border_width=1,
-                      border_color="#64748b", height=28, font=("Arial", 12),
+        ctk.CTkButton(move_row, text="Up", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+                      height=28, font=("Arial", 12),
                       command=lambda: self._move_category(-1)).grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        ctk.CTkButton(move_row, text="Down", fg_color="#334155", hover_color="#475569", border_width=1,
-                      border_color="#64748b", height=28, font=("Arial", 12),
+        ctk.CTkButton(move_row, text="Down", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+                      height=28, font=("Arial", 12),
                       command=lambda: self._move_category(1)).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         info_row = ctk.CTkFrame(right_box, fg_color="transparent")
@@ -247,59 +252,65 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         action_row.pack(fill="x", padx=10, pady=(2, 10))
 
         self.btn_undo_pgn = ctk.CTkButton(
-            action_row, text="✕", fg_color="#dd0000", hover_color="#b91c1c",
-            border_width=2, border_color="#660000", width=26, height=30, font=("Arial", 12, "bold"),
-            text_color="white", command=self._undo_last_pgn
+            action_row, text="✕", fg_color="#344268", hover_color="#2e4a8c",
+            border_width=0, width=26, height=30, font=("Arial", 12, "bold"),
+            text_color="#f8fafc", command=self._undo_last_pgn
         )
 
         self.btn_select_pgns = ctk.CTkButton(
             action_row, text="Select PGNs", fg_color="#344268", hover_color="#2e4a8c",
-            border_width=2, border_color="#475569", width=95, height=30, font=("Arial", 12),
+            border_width=0, width=95, height=30, font=("Arial", 12),
             command=self._select_pgn_files
         )
         self.btn_select_pgns.pack(side="left", padx=(0, 3))
 
         ctk.CTkButton(
             action_row, text="+ Collection", fg_color="#344268", hover_color="#2e4a8c",
-            border_width=2, border_color="#475569", width=125, height=30, font=("Arial", 12, "bold"),
+            border_width=0, width=125, height=30, font=("Arial", 12, "bold"),
             command=self._create_collection
         ).pack(side="left", padx=(3, 0))
 
-        separator1 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
+        separator1 = ctk.CTkFrame(right_box, fg_color="#344268", height=2)
         separator1.pack(fill="x", padx=10, pady=10)
 
         del_header = ctk.CTkFrame(right_box, fg_color="transparent")
         del_header.pack(fill="x", padx=10, pady=(0, 4))
         ctk.CTkLabel(del_header, text="Use with caution when deleting", font=("Arial", 11, "bold"),
-                         text_color="#f87171").pack(anchor="w")
+                     text_color="#94a3b8").pack(anchor="w")
 
         del_row = ctk.CTkFrame(right_box, fg_color="transparent")
         del_row.pack(fill="x", padx=10, pady=2)
         del_row.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(del_row, text="Delete Category", fg_color="#334155", hover_color="#475569", border_width=1,
-                      border_color="#64748b", height=28, font=("Arial", 12), command=self._delete_category).grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        ctk.CTkButton(del_row, text="Delete PGN File", fg_color="#334155", hover_color="#475569", border_width=1,
-                      border_color="#64748b", height=28, font=("Arial", 12),
-                      command=self._delete_selected_pgn_file).grid(row=0, column=1, sticky="ew", padx=(2, 0))
+        ctk.CTkButton(
+            del_row,
+            text="Delete Category",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            border_width=0,
+            height=28,
+            font=("Arial", 12),
+            anchor="center",
+            command=self._delete_category
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
 
-        separator2 = ctk.CTkFrame(right_box, fg_color="#334155", height=2)
+        separator2 = ctk.CTkFrame(right_box, fg_color="#344268", height=2)
         separator2.pack(fill="x", padx=10, pady=10)
 
         eco_box = ctk.CTkFrame(right_box, fg_color="transparent")
         eco_box.pack(fill="x", padx=10, pady=2)
-        ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color="white").pack(anchor="w")
-        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color="#344268", hover_color="#2e4a8c", border_width=2,
-                          border_color="#475569", height=30, font=("Arial", 12), command=self._repair_eco_tags).pack(fill="x", pady=(4, 0))
+        ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color="#f8fafc").pack(anchor="w")
+        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+                      height=30, font=("Arial", 12), command=self._repair_eco_tags).pack(fill="x", pady=(4, 0))
 
         engine_box = ctk.CTkFrame(right_box, fg_color="transparent")
         engine_box.pack(fill="x", padx=10, pady=(12, 5))
-        ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color="white").pack(anchor="w")
+        ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color="#f8fafc").pack(anchor="w")
         eng_row = ctk.CTkFrame(engine_box, fg_color="transparent")
         eng_row.pack(fill="x", pady=(4, 0))
-        ctk.CTkButton(eng_row, text="Browse Engine", fg_color="#344268", hover_color="#2e4a8c", border_width=2,
-                      border_color="#475569", height=30, font=("Arial", 12), command=self._browse_engine).pack(side="left", fill="x", expand=True, padx=(0, 2))
-        ctk.CTkButton(eng_row, text="Save Settings", fg_color="#334155", hover_color="#475569", border_width=1,
-                      border_color="#64748b", height=30, font=("Arial", 12), command=self._save_engine_settings).pack(side="right", fill="x", expand=True, padx=(2, 0))
+        ctk.CTkButton(eng_row, text="Browse Engine", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+                      height=30, font=("Arial", 12), command=self._browse_engine).pack(side="left", fill="x", expand=True, padx=(0, 2))
+        ctk.CTkButton(eng_row, text="Save Settings", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+                      height=30, font=("Arial", 12), command=self._save_engine_settings).pack(side="right", fill="x", expand=True, padx=(2, 0))
 
     def _refresh_categories_list(self):
         """Populates the category Treeview list to mirror the left column style."""
@@ -316,7 +327,6 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
             item_id = self.cat_tree.insert("", "end", values=(cat_item,))
             self.cat_item_map[item_id] = cat_item
 
-        # Select the active category if present
         if self._selected_category:
             for item_id, cat_name in self.cat_item_map.items():
                 if cat_name == self._selected_category:
