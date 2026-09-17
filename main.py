@@ -38,8 +38,8 @@ class Totten(ctk.CTk):
         super().__init__(*args, **kwargs)
         self.title("Totten")
 
-        self.geometry("1280x850")
-        self.minsize(1000, 700)
+        self.geometry("1200x720")
+        self.minsize( 900, 600)
 
         self.resizable(True, True)
 
