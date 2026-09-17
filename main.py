@@ -8,6 +8,7 @@ import gui.app_state as state
 from gui.chess_board import ChessBoardWidget
 from gui.mixed_collections.mixed_core import MixedAnalysis
 from gui.mixed_collections.edit_core import EditWorkspace
+from gui.mixed_collections.edit_constants import load_categories_config
 
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -39,7 +40,7 @@ class Totten(ctk.CTk):
         self.title("Totten")
 
         self.geometry("1200x720")
-        self.minsize( 900, 600)
+        self.minsize(900, 600)
 
         self.resizable(True, True)
 
@@ -158,6 +159,11 @@ class Totten(ctk.CTk):
         if target == "mixed":
             if not getattr(state, "edit_workspace", None):
                 state.edit_workspace = EditWorkspace(self)
+            else:
+                # Reload categories from disk and refresh UI every time we navigate back here
+                state.edit_workspace.categories = load_categories_config()
+                if hasattr(state.edit_workspace, "_refresh_categories_list"):
+                    state.edit_workspace._refresh_categories_list()
 
             state.edit_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
             state.edit_workspace.tkraise()
@@ -185,7 +191,6 @@ class Totten(ctk.CTk):
 
             from gui.statusbar import set_status_message
             set_status_message("Loaded Catalog Search")
-
 
         elif target == "mixed_analysis":
             initial_games = kwargs.get("initial_games") or state.mixed_state.get("active_games")
