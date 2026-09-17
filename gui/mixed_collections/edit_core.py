@@ -8,6 +8,19 @@ from gui.mixed_collections.edit_engine import EditEngineMixin
 from gui.mixed_collections.edit_constants import load_categories_config
 
 
+class CategoryListAdapter:
+    """Adapter to mimic get/set behavior for the category list view."""
+    def __init__(self, workspace):
+        self._workspace = workspace
+
+    def get(self):
+        return getattr(self._workspace, "_selected_category", "")
+
+    def set(self, val):
+        if hasattr(self._workspace, "_set_category_val"):
+            self._workspace._set_category_val(val)
+
+
 class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
     def __init__(self, master, initial_games=None, filename=None, *args, **kwargs):
@@ -15,8 +28,13 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
         self.categories = load_categories_config()
         self.collection_files = {}
-        self.selected_files = []
+        self.selected_files = {}
         self.tree_map = {}
+        self.cat_item_map = {}
+
+        # Initialize base state values before UI building
+        numbered_cats = self._get_numbered_categories()
+        self._selected_category = numbered_cats[0] if numbered_cats else ""
 
         # Build all UI components first so attributes exist
         self._configure_styles()
@@ -140,24 +158,74 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color="white").pack(anchor="w")
         ctk.CTkLabel(header_box, text="Select category first.", font=("Arial", 12), text_color="#94a3b8").pack(anchor="w")
 
-        col_ctrl = ctk.CTkFrame(right_box, fg_color="transparent")
-        col_ctrl.pack(fill="x", padx=10, pady=5)
+        # Adapter setup for category selection compatibility
+        self.opt_category = CategoryListAdapter(self)
 
-        opt_border = ctk.CTkFrame(col_ctrl, fg_color="transparent", border_width=2, border_color="#475569", corner_radius=0)
-        opt_border.pack(side="left", padx=(0, 4))
+        def _set_category_val(val):
+            self._selected_category = val
+            if hasattr(self, "cat_tree"):
+                for item_id, cat_name in self.cat_item_map.items():
+                    if cat_name == val:
+                        self.cat_tree.selection_set(item_id)
+                        self.cat_tree.see(item_id)
+                        break
 
-        numbered_cats = self._get_numbered_categories()
-        default_cat = numbered_cats[0] if numbered_cats else ""
-        self.opt_category = ctk.CTkOptionMenu(
-            opt_border, values=numbered_cats, width=130, corner_radius=0,
-            fg_color="#344268", button_color="#344268", button_hover_color="#2e4a8c",
-            dropdown_hover_color="#2e4a8c", dropdown_fg_color="#344268", command=self._on_category_changed
+        self._set_category_val = _set_category_val
+
+        # Category List Box (Matching left column style)
+        cat_list_frame = ctk.CTkFrame(right_box, fg_color="transparent")
+        cat_list_frame.pack(fill="x", padx=10, pady=5)
+
+        cat_container = ctk.CTkFrame(cat_list_frame, fg_color="transparent")
+        cat_container.pack(fill="x", expand=True)
+        cat_container.grid_rowconfigure(0, weight=1)
+        cat_container.grid_columnconfigure(0, weight=1)
+
+        self.cat_tree = ttk.Treeview(
+            cat_container,
+            columns=("category",),
+            show="headings",
+            selectmode="browse",
+            takefocus=False,
+            style="Borderless.Treeview",
+            height=6
         )
-        self.opt_category.set(default_cat)
-        self.opt_category.pack(padx=1, pady=1)
+        self.cat_tree.heading("category", text="Categories", anchor="w")
+        self.cat_tree.column("category", width=220, anchor="w")
 
-        ctk.CTkButton(col_ctrl, text="+ Category", fg_color="#344268", hover_color="#2e4a8c", border_width=2,
-                      border_color="#475569", width=75, height=28, font=("Arial", 12), command=self._add_category).pack(side="right")
+        def _on_cat_tree_select(event):
+            selection = self.cat_tree.selection()
+            if selection:
+                item_id = selection[0]
+                if item_id in self.cat_item_map:
+                    cat_val = self.cat_item_map[item_id]
+                    self._selected_category = cat_val
+                    self._on_category_changed(cat_val)
+
+        self.cat_tree.bind("<<TreeviewSelect>>", _on_cat_tree_select)
+
+        cat_scroll = ttk.Scrollbar(cat_container, orient="vertical", command=self.cat_tree.yview)
+        self.cat_tree.configure(yscrollcommand=cat_scroll.set)
+
+        self.cat_tree.grid(row=0, column=0, sticky="nsew")
+        cat_scroll.grid(row=0, column=1, sticky="ns", padx=(2, 0))
+
+        # Populate categories tree view
+        self._refresh_categories_list()
+
+        # "+ Category" button placed immediately below the list
+        btn_add_cat = ctk.CTkButton(
+            right_box,
+            text="+ Category",
+            fg_color="#344268",
+            hover_color="#2e4a8c",
+            border_width=2,
+            border_color="#475569",
+            height=28,
+            font=("Arial", 12),
+            command=self._add_category
+        )
+        btn_add_cat.pack(fill="x", padx=10, pady=(4, 5))
 
         move_row = ctk.CTkFrame(right_box, fg_color="transparent")
         move_row.pack(fill="x", padx=10, pady=(5, 2))
@@ -232,6 +300,33 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
                       border_color="#475569", height=30, font=("Arial", 12), command=self._browse_engine).pack(side="left", fill="x", expand=True, padx=(0, 2))
         ctk.CTkButton(eng_row, text="Save Settings", fg_color="#334155", hover_color="#475569", border_width=1,
                       border_color="#64748b", height=30, font=("Arial", 12), command=self._save_engine_settings).pack(side="right", fill="x", expand=True, padx=(2, 0))
+
+    def _refresh_categories_list(self):
+        """Populates the category Treeview list to mirror the left column style."""
+        if not hasattr(self, "cat_tree"):
+            return
+
+        for item in self.cat_tree.get_children():
+            self.cat_tree.delete(item)
+
+        self.cat_item_map.clear()
+        numbered_cats = self._get_numbered_categories()
+
+        for cat_item in numbered_cats:
+            item_id = self.cat_tree.insert("", "end", values=(cat_item,))
+            self.cat_item_map[item_id] = cat_item
+
+        # Select the active category if present
+        if self._selected_category:
+            for item_id, cat_name in self.cat_item_map.items():
+                if cat_name == self._selected_category:
+                    self.cat_tree.selection_set(item_id)
+                    self.cat_tree.see(item_id)
+                    break
+        elif numbered_cats:
+            first_id = list(self.cat_item_map.keys())[0]
+            self.cat_tree.selection_set(first_id)
+            self._selected_category = self.cat_item_map[first_id]
 
     def _on_tree_select(self, event):
         pass
