@@ -170,34 +170,12 @@ def show_about_dialog():
 
 
 def create_menu(app):
-    """Creates and configures the application's menu bar using centralized constants without separators."""
-    menubar = tk.Menu(
-        app,
-        background=THEME["bg_surface"],
-        foreground=THEME["text_secondary"],
-        activebackground=THEME["btn_hover"],
-        activeforeground=THEME["text_primary"],
-        bd=0,
-        borderwidth=0,
-        activeborderwidth=0,
-        relief="flat"
-    )
+    """Creates and configures the application's menu bar using default native menu styling."""
+    menubar = tk.Menu(app, tearoff=0)
     app.config(menu=menubar)
 
-    menu_style = {
-        "tearoff": 0,
-        "background": THEME["bg_surface"],
-        "foreground": THEME["text_secondary"],
-        "activebackground": THEME["btn_hover"],
-        "activeforeground": THEME["text_primary"],
-        "bd": 0,
-        "borderwidth": 0,
-        "activeborderwidth": 0,
-        "relief": "flat"
-    }
-
     # 1. File Menu
-    file_menu = tk.Menu(menubar, **menu_style)
+    file_menu = tk.Menu(menubar, tearoff=0)
     file_menu.add_command(label="Import PGN...", command=handle_import_pgn)
     file_menu.add_command(label="Import FEN...", command=handle_import_fen)
     file_menu.add_command(label="Clear Catalog", command=handle_clear_catalog)
@@ -205,12 +183,12 @@ def create_menu(app):
     menubar.add_cascade(label="File", menu=file_menu)
 
     # 2. Edit Menu
-    edit_menu = tk.Menu(menubar, **menu_style)
+    edit_menu = tk.Menu(menubar, tearoff=0)
     edit_menu.add_command(label="PGN & Engine", command=lambda: state.show_workspace("mixed"))
     menubar.add_cascade(label="Edit", menu=edit_menu)
 
     # 3. View Menu
-    view_menu = tk.Menu(menubar, **menu_style)
+    view_menu = tk.Menu(menubar, tearoff=0)
     view_menu.add_command(label="Catalog", command=lambda: state.show_workspace("search_catalog"))
     view_menu.add_command(label="Mixed Collections", command=lambda: state.show_workspace("mixed"))
     view_menu.add_command(label="Calendar", command=lambda: state.show_workspace("calendar"))
@@ -218,14 +196,14 @@ def create_menu(app):
     menubar.add_cascade(label="View", menu=view_menu)
 
     # 4. Tools Menu
-    tools_menu = tk.Menu(menubar, **menu_style)
+    tools_menu = tk.Menu(menubar, tearoff=0)
     tools_menu.add_command(label="Analysis", command=lambda: state.show_workspace("analysis"))
     tools_menu.add_command(label="Patterns", command=lambda: state.show_workspace("patterns"))
     tools_menu.add_command(label="Engines", command=lambda: state.show_workspace("mixed"))
     menubar.add_cascade(label="Tools", menu=tools_menu)
 
     # 5. Help Menu
-    help_menu = tk.Menu(menubar, **menu_style)
+    help_menu = tk.Menu(menubar, tearoff=0)
     help_menu.add_command(label="About", command=show_about_dialog)
     menubar.add_cascade(label="Help", menu=help_menu)
 
