@@ -34,15 +34,15 @@ def _detect_platform_engines():
 
 
 class Totten(ctk.CTk):
-    """
-    Main application window for Totten, initializing the core root container,
-    top-level application menus, sidebar switchboard, and default startup catalog analysis view.
-    """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("Totten")
-        self.geometry("1200x800")
+
+        self.geometry("1280x850")
+        self.minsize(1000, 700)
+
+        self.resizable(True, True)
+
         self.configure(fg_color="#172134")
 
         self.grid_rowconfigure(0, weight=1)
@@ -318,7 +318,6 @@ if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
 
-    # Force standard 1:1 pixel scaling for Linux/KDE
     ctk.set_widget_scaling(1.0)
     ctk.set_window_scaling(1.0)
 
