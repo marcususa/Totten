@@ -7,10 +7,8 @@ import gui.app_state as state
 
 from core.constants import THEME
 from core.chess_engine import ChessEngine
-from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
-from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
-from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
-from gui.catalog.catalog_init_mixin import CatalogInitMixin
+from gui.patterns.patterns_init_mixin import PatternsInitMixin
+from gui.engine_mixins.engine_piece_mixin import EnginePieceMixin
 
 from gui.patterns.patterns_analysis_navigation import PatternsAnalysisNavigationMixin
 from gui.patterns.patterns_analysis_board import PatternsAnalysisBoardMixin
@@ -18,21 +16,23 @@ from gui.patterns.patterns_analysis_board import PatternsAnalysisBoardMixin
 
 class PatternsAnalysis(
     ctk.CTkFrame,
-    CatalogInitMixin,
-    EngineReviewMixin,
-    EngineCandidateMixin,
-    EngineStandardMixin,
+    PatternsInitMixin,
     PatternsAnalysisNavigationMixin,
     PatternsAnalysisBoardMixin,
+    EnginePieceMixin,
 ):
+
+
     """
     Dedicated self-contained workspace controller for Patterns Analysis.
-    Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
+    Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and pattern evaluation.
     """
 
-    def __init__(self, parent, filename=None, initial_games=None, target_game=None, active_index=None, *args, **kwargs):
+    def __init__(self, parent, filename=None, initial_games=None, target_game=None, active_index=None,
+                 target_piece=None, *args, **kwargs):
         kwargs.pop('target_game', None)
         kwargs.pop('active_index', None)
+        kwargs.pop('target_piece', None)
 
         super().__init__(parent, fg_color=THEME["bg_panel"], corner_radius=0, *args, **kwargs)
 
@@ -52,9 +52,19 @@ class PatternsAnalysis(
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
-        self.active_engine_mode = None  # Start idle with no engine mode active
+        self.active_engine_mode = None
         self.analysis_rows = {}
         self._cached_analysis_box = None
+
+        resolved_piece = (
+                target_piece or
+                (state.patterns_state.get("target_piece") if hasattr(state, "patterns_state") and isinstance(
+                    state.patterns_state, dict) else None) or
+                getattr(state, "selected_piece", None) or
+                "N"
+        )
+        self.target_piece = resolved_piece
+        self.active_sequence = []
 
         self.init_layout()
         self._find_and_cache_analysis_box()
@@ -148,41 +158,33 @@ class PatternsAnalysis(
             print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _bind_engine_buttons(self):
-        for btn_name in ("btn_review", "btn_review_mode"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=lambda: self.trigger_engine_mode("review"),
-                    hover_color=THEME["btn_hover"]
-                )
+        # --- BUTTON 1: PV Engine (Standalone) ---
+        if hasattr(self, "btn_pv") and self.btn_pv:
+            self.btn_pv.configure(
+                text="PV Engine",
+                command=self.toggle_engine_action,
+                hover_color=THEME["btn_hover"]
+            )
 
-        for btn_name in ("btn_candidates", "btn_candidate_moves"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=lambda: self.trigger_engine_mode("candidates"),
-                    hover_color=THEME["btn_hover"]
-                )
+        # --- BUTTON 2: Piece Analysis ---
+        if hasattr(self, "btn_piece") and self.btn_piece:
+            self.btn_piece.configure(
+                text="Piece Analysis",
+                command=lambda: self.trigger_engine_mode("piece_pattern_mode"),
+                hover_color=THEME["btn_hover"]
+            )
 
-        for btn_name in ("btn_standard", "btn_standard_mode"):
+        # --- BUTTONS 3 & 4: Blank Placeholders ---
+        for btn_name in ("btn_placeholder_3", "btn_placeholder_4"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
                 btn.configure(
-                    command=lambda: self.trigger_engine_mode("standard"),
-                    hover_color=THEME["btn_hover"]
-                )
-
-        # Properly bind the raw engine action buttons here:
-        for btn_name in ("btn_engine_action", "btn_engines"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=self.toggle_engine_action,
-                    hover_color=THEME["btn_hover"]
+                    text="",
+                    state="disabled",
+                    fg_color=THEME["bg_panel"]
                 )
 
     def toggle_engine_action(self):
-        """Controls the independent Engine button for raw live evaluation on the left."""
         is_running = getattr(self, "_engine_running", False)
         if is_running:
             self.stop_raw_engine_analysis()
@@ -190,22 +192,18 @@ class PatternsAnalysis(
             self.start_raw_engine_analysis()
 
     def start_raw_engine_analysis(self):
-        """Runs a lightweight background worker for raw engine lines targeting only pv_textbox."""
         if not hasattr(self, "current_node") or not self.current_node:
-            print("[RAW ENGINE] Error: No current_node found.")
             self.update_engine_display("[No active position to evaluate.]\n")
             return
 
         try:
             board_obj = self.current_node.board()
-        except Exception as e:
-            print(f"[RAW ENGINE] Error getting board from node: {e}")
+        except Exception:
             return
 
         if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
             self._current_raw_engine_worker.cancel = True
 
-        # Mark as running and update button appearance immediately
         self._engine_running = True
         for btn_name in ("btn_engine_action", "btn_engines"):
             btn = getattr(self, btn_name, None)
@@ -224,21 +222,16 @@ class PatternsAnalysis(
                 self.daemon = True
 
             def run(self):
-                print("[RAW ENGINE WORKER] Starting thread analysis...")
                 try:
                     engine = ChessEngine()
 
                     def callback(res):
                         if self.cancel:
                             return
-                        print(f"[RAW ENGINE WORKER] Received result callback: {res}")
                         current_depth = res.get('depth', 25)
                         raw_eval = res.get('eval', 0.0)
-
-                        if isinstance(raw_eval, str) and "M" in raw_eval:
-                            eval_str = raw_eval
-                        else:
-                            eval_str = f"{float(raw_eval):+.2f}"
+                        eval_str = raw_eval if isinstance(raw_eval,
+                                                          str) and "M" in raw_eval else f"{float(raw_eval):+.2f}"
 
                         pv_lines = res.get('pv_lines', [])
                         if isinstance(pv_lines, list) and pv_lines:
@@ -298,9 +291,7 @@ class PatternsAnalysis(
                 except Exception:
                     pass
 
-
     def update_engine_display(self, text):
-        """Strictly controls the left-column pv_textbox for raw engine outputs without touching the right analysis column."""
         target_box = getattr(self, "pv_textbox", None)
         if target_box:
             try:
@@ -323,190 +314,176 @@ class PatternsAnalysis(
         self.update_engine_display(text)
 
     def start_game_review(self, target_game):
-        self._run_analysis_worker(target_game, mode="review")
+        self.run_patterns_1_analysis(target_game)
 
-    def _run_analysis_worker(self, target_game, mode="review"):
-        self.analysis_rows = {}
+    def run_piece_pattern_analysis(self, target_game):
+        target_box = getattr(self, "analysis_textbox", None) or getattr(self, "_cached_analysis_box", None)
+        if target_box:
+            try:
+                target_box.configure(state="normal", fg_color=THEME["bg_surface"])
+                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
+                inner_box.delete("1.0", "end")
+                inner_box.insert("end", f"[{self.target_piece} Patterns: Ready to evaluate active game...]\n")
+                inner_box.configure(state="disabled")
+            except Exception as e:
+                print(f"[PATTERNS DISPLAY ERROR] {e}")
 
-        if hasattr(self, '_current_analysis_worker') and self._current_analysis_worker:
-            self._current_analysis_worker.cancel = True
+    def analyze_piece_sequence(self, game_obj, piece_id):
+        """Accurately parses moves from move 1, matching the exact color and piece type from two-letter codes."""
+        resolved_game = self._resolve_game_obj(game_obj)
+        if not resolved_game:
+            return []
 
-        class WorkerThread(threading.Thread):
-            def __init__(self, game_obj, outer, analysis_mode):
-                super().__init__()
-                self.game_obj = game_obj
-                self.outer = outer
-                self.analysis_mode = analysis_mode
-                self.cancel = False
-                self.daemon = True
-                self.white_streak = 0
-                self.black_streak = 0
-                self.last_eval = 0.0
+        try:
+            board = resolved_game.board()
+        except Exception:
+            return []
 
-            def run(self):
-                def stream_callback(res):
-                    if self.cancel:
-                        return
+        # Normalize piece_id (e.g., 'wb' -> color='w', type_char='b')
+        p_id = str(piece_id).strip().lower()
 
-                    try:
-                        move_num = res['move_num']
-                        is_white = res['is_white']
-                        curr_eval = res.get('eval_after', 0.0)
-                        played_san = res['played_san']
+        target_color = None
+        target_type_char = None
 
-                        steps = move_num * 2 - 1 if is_white else move_num * 2
-                        curr_n = self.game_obj
-                        for _ in range(steps):
-                            if curr_n.variations:
-                                curr_n = curr_n.variation(0)
+        if len(p_id) == 2:
+            target_color = chess.WHITE if p_id[0] == 'w' else chess.BLACK
+            target_type_char = p_id[1]
+        elif len(p_id) == 1:
+            # Fallback if a single character is passed
+            target_type_char = p_id
+            target_color = None
 
-                        if move_num < 8:
-                            move_display = played_san
-                            tag_to_apply = "default"
-                            self.last_eval = curr_eval
-                        else:
-                            if is_white:
-                                loss = self.last_eval - curr_eval
-                            else:
-                                loss = curr_eval - self.last_eval
+        expected_piece_type = {
+            "p": chess.PAWN,
+            "n": chess.KNIGHT,
+            "b": chess.BISHOP,
+            "r": chess.ROOK,
+            "q": chess.QUEEN,
+            "k": chess.KING
+        }.get(target_type_char, chess.PAWN)
 
-                            self.last_eval = curr_eval
+        sequence = []
+        for move_num, move in enumerate(resolved_game.mainline_moves(), start=1):
+            san_move = board.san(move)
+            piece_type = board.piece_type_at(move.from_square)
+            piece_color = board.color_at(move.from_square)
 
-                            tag_to_apply = "default"
-                            eval_str = ""
-                            comment_str = ""
+            # Match piece type
+            type_matches = (piece_type == expected_piece_type)
 
-                            if loss >= 2.6:
-                                tag_to_apply = "red"
-                                eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ??"
-                                self.white_streak = 0
-                                self.black_streak = 0
-                            elif 1.0 <= loss <= 2.5:
-                                tag_to_apply = "orange"
-                                eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ?"
-                                self.white_streak = 0
-                                self.black_streak = 0
-                            elif 0.3 <= loss < 1.0:
-                                comment_str = " ?!"
-                                if is_white:
-                                    if self.black_streak > 0:
-                                        self.black_streak -= 1
-                                    else:
-                                        self.white_streak += 1
-                                    tag_to_apply = "green" if self.white_streak >= 3 else "light_blue"
-                                else:
-                                    if self.white_streak > 0:
-                                        self.white_streak -= 1
-                                    else:
-                                        self.black_streak += 1
-                                    tag_to_apply = "green" if self.black_streak >= 3 else "light_blue"
+            # Match color if specified by a two-letter code
+            color_matches = (target_color is None) or (piece_color == target_color)
 
-                            move_display = f"{played_san}{eval_str}{comment_str}"
+            if type_matches and color_matches:
+                sequence.append((board.fullmove_number, san_move))
 
-                        if move_num not in self.outer.analysis_rows:
-                            self.outer.analysis_rows[move_num] = {
-                                "white": "", "black": "",
-                                "white_tag": "default", "black_tag": "default",
-                                "white_node": None, "black_node": None
-                            }
+            board.push(move)
 
-                        if is_white:
-                            self.outer.analysis_rows[move_num]["white"] = move_display
-                            self.outer.analysis_rows[move_num]["white_tag"] = tag_to_apply
-                            self.outer.analysis_rows[move_num]["white_node"] = curr_n
-                        else:
-                            self.outer.analysis_rows[move_num]["black"] = move_display
-                            self.outer.analysis_rows[move_num]["black_tag"] = tag_to_apply
-                            self.outer.analysis_rows[move_num]["black_node"] = curr_n
-
-                        self.outer.after(0, self.outer._sync_analysis_selection)
-
-                    except Exception as ex:
-                        print(f"[STREAM CALLBACK ERROR] {ex}")
-
-                try:
-                    print(f"[ENGINE WORKER] Starting analysis for mode: {self.analysis_mode}")
-                    engine_worker = ChessEngine()
-                    engine_worker.analyze_game(self.game_obj, mode=self.analysis_mode, callback=stream_callback)
-                except Exception as e:
-                    print(f"[ENGINE WORKER CRASH] Mode {self.analysis_mode} failed: {e}")
-
-        self._current_analysis_worker = WorkerThread(target_game, self, mode)
-        self._current_analysis_worker.start()
+        return sequence
 
     def _sync_analysis_selection(self):
-        """Renders the analysis panel completely like a continuous book horizontally."""
-        target_box = getattr(self, "analysis_textbox", None)
-        if not target_box and hasattr(self, "_cached_analysis_box"):
-            target_box = self._cached_analysis_box
+        """Renders the analysis panel completely, dynamically pulling the live game and piece filter for all panels."""
+        # --- 1. RESOLVE PIECE FROM ALL POSSIBLE SOURCES ---
+        if hasattr(state, "patterns_state") and isinstance(state.patterns_state, dict):
+            p_state_val = state.patterns_state.get("target_piece")
+            if p_state_val:
+                self.target_piece = p_state_val
+        if hasattr(state, "selected_piece") and state.selected_piece:
+            self.target_piece = state.selected_piece
 
-        if not target_box:
+        # --- 2. TARGET ONLY THE AUTHORIZED ANALYSIS TEXTBOX ---
+        target_boxes = []
+        for name in ("analysis_textbox", "analysis_box", "patterns_textbox"):
+            box = getattr(self, name, None)
+            if box and box not in target_boxes:
+                target_boxes.append(box)
+
+        if not target_boxes and self._cached_analysis_box:
+            target_boxes.append(self._cached_analysis_box)
+
+        if not target_boxes:
+            print("[SYNC ERROR] No analysis text boxes found to render into.")
             return
 
         try:
-            target_box.configure(state="normal", fg_color=THEME["bg_surface"])
-            inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-            inner_box.delete("1.0", "end")
+            for target_box in target_boxes:
+                target_box.configure(state="normal", fg_color=THEME["bg_surface"])
+                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
+                inner_box.delete("1.0", "end")
 
-            eval_tag_colors = {
-                "red": THEME["eval_red"],
-                "orange": THEME["eval_orange"],
-                "green": THEME["eval_green"],
-                "light_blue": THEME["eval_light_blue"],
-                "default": THEME["eval_default"]
-            }
-
-            for tag_name, color in eval_tag_colors.items():
-                inner_box.tag_config(tag_name, foreground=color)
-
-            inner_box.tag_config("active_tracker", background=THEME["active_tracker_bg"], foreground=THEME["active_tracker_fg"])
-
-            sorted_moves = sorted(self.analysis_rows.keys())
-            for move_num in sorted_moves:
-                row = self.analysis_rows[move_num]
-                inner_box.insert("end", f"{move_num}. ")
-
-                w_text = row.get("white", "")
-                w_tag = row.get("white_tag", "default")
-                w_node = row.get("white_node")
-
-                if w_text:
-                    w_tag_name = f"w_{move_num}_{id(w_node)}" if w_node else f"w_{move_num}"
-                    is_active_white = (
-                            (hasattr(self, "current_node") and self.current_node == w_node) or
-                            (hasattr(self, "board_node") and self.board_node == w_node)
-                    )
-                    applied_tag = "active_tracker" if is_active_white else (
-                        w_tag if w_tag in eval_tag_colors else "default")
-
-                    inner_box.insert("end", f"{w_text} ", (applied_tag, w_tag_name))
-                    if w_node:
-                        inner_box.tag_bind(w_tag_name, "<Button-1>", lambda e, n=w_node: self.jump_to_node(n))
+                # Insert the target piece sequence header
+                if self.current_game:
+                    self.active_sequence = self.analyze_piece_sequence(self.current_game, self.target_piece)
+                    if self.active_sequence:
+                        formatted_seq = " -> ".join([f"{num}. {san}" for num, san in self.active_sequence])
+                        inner_box.insert("end",
+                                         f"Selected Piece [{self.target_piece}] Moves:\n{formatted_seq}\n\n" + "=" * 50 + "\n\n")
+                    else:
+                        inner_box.insert("end",
+                                         f"Selected Piece [{self.target_piece}] Moves:\n(No movements found for [{self.target_piece}] in this specific game)\n\n" + "=" * 50 + "\n\n")
                 else:
-                    inner_box.insert("end", "... ")
+                    inner_box.insert("end",
+                                     f"Selected Piece [{self.target_piece}] Moves:\n(No active game loaded)\n\n" + "=" * 50 + "\n\n")
 
-                b_text = row.get("black", "")
-                b_tag = row.get("black_tag", "default")
-                b_node = row.get("black_node")
+                # Render standard move book contents
+                eval_tag_colors = {
+                    "red": THEME["eval_red"],
+                    "orange": THEME["eval_orange"],
+                    "green": THEME["eval_green"],
+                    "light_blue": THEME["eval_light_blue"],
+                    "default": THEME["eval_default"]
+                }
 
-                if b_text:
-                    b_tag_name = f"b_{move_num}_{id(b_node)}" if b_node else f"b_{move_num}"
-                    is_active_black = (
-                            (hasattr(self, "current_node") and self.current_node == b_node) or
-                            (hasattr(self, "board_node") and self.board_node == b_node)
-                    )
-                    applied_tag = "active_tracker" if is_active_black else (
-                        b_tag if b_tag in eval_tag_colors else "default")
+                for tag_name, color in eval_tag_colors.items():
+                    inner_box.tag_config(tag_name, foreground=color)
 
-                    inner_box.insert("end", f"{b_text} ", (applied_tag, b_tag_name))
-                    if b_node:
-                        inner_box.tag_bind(b_tag_name, "<Button-1>", lambda e, n=b_node: self.jump_to_node(n))
+                inner_box.tag_config("active_tracker", background=THEME["active_tracker_bg"],
+                                     foreground=THEME["active_tracker_fg"])
 
-                inner_box.insert("end", "    ")
+                sorted_moves = sorted(self.analysis_rows.keys())
+                for move_num in sorted_moves:
+                    row = self.analysis_rows[move_num]
+                    inner_box.insert("end", f"{move_num}. ")
 
-            inner_box.configure(state="disabled")
+                    w_text = row.get("white", "")
+                    w_tag = row.get("white_tag", "default")
+                    w_node = row.get("white_node")
+
+                    if w_text:
+                        w_tag_name = f"w_{move_num}_{id(w_node)}" if w_node else f"w_{move_num}"
+                        is_active_white = (
+                                (hasattr(self, "current_node") and self.current_node == w_node) or
+                                (hasattr(self, "board_node") and self.board_node == w_node)
+                        )
+                        applied_tag = "active_tracker" if is_active_white else (
+                            w_tag if w_tag in eval_tag_colors else "default")
+
+                        inner_box.insert("end", f"{w_text} ", (applied_tag, w_tag_name))
+                        if w_node:
+                            inner_box.tag_bind(w_tag_name, "<Button-1>", lambda e, n=w_node: self.jump_to_node(n))
+                    else:
+                        inner_box.insert("end", "... ")
+
+                    b_text = row.get("black", "")
+                    b_tag = row.get("black_tag", "default")
+                    b_node = row.get("black_node")
+
+                    if b_text:
+                        b_tag_name = f"b_{move_num}_{id(b_node)}" if b_node else f"b_{move_num}"
+                        is_active_black = (
+                                (hasattr(self, "current_node") and self.current_node == b_node) or
+                                (hasattr(self, "board_node") and self.board_node == b_node)
+                        )
+                        applied_tag = "active_tracker" if is_active_black else (
+                            b_tag if b_tag in eval_tag_colors else "default")
+
+                        inner_box.insert("end", f"{b_text} ", (applied_tag, b_tag_name))
+                        if b_node:
+                            inner_box.tag_bind(b_tag_name, "<Button-1>", lambda e, n=b_node: self.jump_to_node(n))
+
+                    inner_box.insert("end", "    ")
+
+                inner_box.configure(state="disabled")
         except Exception as e:
             print(f"[SYNC ANALYSIS ERROR] {e}")
 
@@ -528,66 +505,40 @@ class PatternsAnalysis(
 
     def load_game(self, game_node, category_source=None):
         resolved = self._resolve_game_obj(game_node)
-        if hasattr(self, "load_game_hardwired"):
-            return self.load_game_hardwired(resolved, category_source=category_source)
-        return self.load_game_from_state(resolved, category_source=category_source)
+        self.current_game = resolved
+        self.active_game = resolved  # Ensure active_game is set for the mixin
+
+        res = None
+        if hasattr(self, "load_game_hardwired") and callable(self.load_game_hardwired):
+            res = self.load_game_hardwired(resolved, category_source=category_source)
+        elif hasattr(self, "load_game_from_state") and callable(self.load_game_from_state):
+            res = self.load_game_from_state(resolved, category_source=category_source)
+        elif hasattr(super(), "load_game"):
+            res = super().load_game(resolved, category_source=category_source)
+
+        self._sync_analysis_selection()
+        return res
 
     def trigger_engine_mode(self, mode):
-        """Routes engine mode changes, updates button/frame highlights, and delegates to mixin handlers."""
         self.active_engine_mode = mode
         self._selected_mode_button = mode
 
-        mode_buttons = {
-            "review": ("btn_review", "btn_review_mode"),
-            "candidates": ("btn_candidates", "btn_candidate_moves"),
-            "standard": ("btn_standard", "btn_standard_mode", "btn_engines")
-        }
-
-        def _apply_styles():
-            for m, btn_names in mode_buttons.items():
-                is_active = (mode == m)
-                for name in btn_names:
-                    btn = getattr(self, name, None)
-                    if btn is not None:
-                        try:
-                            btn.configure(
-                                fg_color=THEME["btn_hover"] if is_active else THEME["btn_initial"],
-                                hover_color=THEME["btn_hover"],
-                                text_color=THEME["text_primary"],
-                            )
-                        except Exception:
-                            pass
-
-        # Apply styles immediately and re-apply after the idle queue settles
-        # to outlast CTk's internal button-release reset and mixin callbacks
-        _apply_styles()
-        self.after_idle(_apply_styles)
-
-        # Update frame border highlights if present
-        if hasattr(self, "frame_review") and self.frame_review:
+        if hasattr(self, "btn_piece") and self.btn_piece:
+            is_active = (mode == "piece_pattern_mode")
             try:
-                self.frame_review.configure(border_width=0 if mode == "review" else 1)
-            except Exception:
-                pass
-        if hasattr(self, "frame_candidates") and self.frame_candidates:
-            try:
-                self.frame_candidates.configure(border_width=0 if mode == "candidates" else 1)
-            except Exception:
-                pass
-        if hasattr(self, "frame_standard") and self.frame_standard:
-            try:
-                self.frame_standard.configure(border_width=0 if mode == "standard" else 1)
+                self.btn_piece.configure(
+                    fg_color=THEME["btn_hover"] if is_active else THEME["btn_initial"],
+                    hover_color=THEME["btn_hover"],
+                    text_color=THEME["text_primary"],
+                )
             except Exception:
                 pass
 
-        # Delegate directly to the respective mixin handler
-        if mode == "review":
-            EngineReviewMixin.trigger_engine_mode(self, "review")
-        elif mode == "candidates":
-            EngineCandidateMixin.trigger_engine_mode(self, "candidates")
-        elif mode == "standard":
-            EngineStandardMixin.trigger_engine_mode(self, "standard")
-
+        if mode == "piece_pattern_mode":
+            if hasattr(self, "active_game") and self.active_game:
+                self.start_piece_pattern_analysis(self.active_game)
+            else:
+                print("[ANALYSIS ERROR] No active game loaded to analyze.")
 
 def create_workspace(master, initial_games=None, **kwargs):
     import gui.app_state as state_mod
@@ -609,11 +560,22 @@ def create_workspace(master, initial_games=None, **kwargs):
             getattr(state_mod, "active_focus_game", None)
     )
 
-    if initial_games and 0 <= active_index < len(initial_games) and not defocus:
-        defocus = initial_games[active_index]
+    target_piece = (
+            kwargs.get("target_piece") or
+            (state_mod.patterns_state.get("target_piece") if hasattr(state_mod, "patterns_state") and isinstance(
+                state_mod_patterns_state := state_mod.patterns_state, dict) else None) or
+            getattr(state_mod, "selected_piece", None) or
+            "N"
+    )
 
-    instance = PatternsAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games, target_game=defocus,
-                                active_index=active_index)
+    instance = PatternsAnalysis(
+        master,
+        filename="personal_catalog.pgn",
+        initial_games=initial_games,
+        target_game=defocus,
+        active_index=active_index,
+        target_piece=target_piece
+    )
     state_mod.workspace = instance
     return instance
 

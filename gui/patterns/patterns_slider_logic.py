@@ -19,6 +19,7 @@ class PatternsSliderLogicMixin:
 
     def _init_slider_state(self):
         self.selected_piece_filter = None
+        self.selected_piece = None
         self.svg_image_cache = {}
 
         self._slider_timer = None
@@ -70,11 +71,13 @@ class PatternsSliderLogicMixin:
     def on_piece_clicked(self, piece_code):
         if self.selected_piece_filter == piece_code:
             self.selected_piece_filter = None
+            self.selected_piece = None
             self.piece_buttons[piece_code].configure(fg_color="#334155")
         else:
             if self.selected_piece_filter and self.selected_piece_filter in self.piece_buttons:
                 self.piece_buttons[self.selected_piece_filter].configure(fg_color="#334155")
             self.selected_piece_filter = piece_code
+            self.selected_piece = piece_code  # Carries over the exact two-letter piece code (e.g. 'wb', 'wn')
             self.piece_buttons[piece_code].configure(fg_color="#2563eb")
 
         self.recalculate_tiers()

@@ -31,6 +31,9 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self.aggregated_tiers = {}
         self.tier_collapsed = {"tier1": False, "tier2": False, "tier3": False}
 
+        # Starts unselected until the user clicks a piece
+        self.selected_piece = None
+
         self._init_slider_state()
         self._init_db()
         self._build_ui()
@@ -288,21 +291,32 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             for idx, g in enumerate(full_tier_games):
                 if g == game_data or (
                         isinstance(g, dict) and isinstance(game_data, dict) and g.get("game_object") == game_data.get(
-                        "game_object")):
+                    "game_object")):
                     active_index = idx
                     break
+
+        # Pass active games, focused game, and active piece selection only if chosen
+        selected_piece = getattr(self, "selected_piece", None)
 
         state.patterns_state["active_games"] = full_tier_games
         state.patterns_state["active_focus"] = target_game
         state.patterns_state["active_index"] = active_index
 
+        if selected_piece:
+            state.patterns_state["target_piece"] = selected_piece
+        else:
+            state.patterns_state.pop("target_piece", None)
+
+        workspace_kwargs = {
+            "initial_games": full_tier_games,
+            "target_game": target_game,
+            "active_index": active_index
+        }
+        if selected_piece:
+            workspace_kwargs["target_piece"] = selected_piece
+
         if hasattr(state, "show_workspace"):
-            state.show_workspace(
-                "patterns_analysis",
-                initial_games=full_tier_games,
-                target_game=target_game,
-                active_index=active_index
-            )
+            state.show_workspace("patterns_analysis", **workspace_kwargs)
         else:
             self.app_state.set_active_patterns_collection(full_tier_games, focused_game=target_game)
 
@@ -314,10 +328,22 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             f"{tier_info.get('label', tier_key)} to Analysis Section..."
         )
 
+        selected_piece = getattr(self, "selected_piece", None)
+
         state.patterns_state["active_games"] = games
         state.patterns_state["active_focus"] = None
+
+        if selected_piece:
+            state.patterns_state["target_piece"] = selected_piece
+        else:
+            state.patterns_state.pop("target_piece", None)
+
+        workspace_kwargs = {"initial_games": games}
+        if selected_piece:
+            workspace_kwargs["target_piece"] = selected_piece
+
         if hasattr(state, "show_workspace"):
-            state.show_workspace("patterns_analysis", initial_games=games)
+            state.show_workspace("patterns_analysis", **workspace_kwargs)
         else:
             self.app_state.set_active_patterns_collection(games)
 
