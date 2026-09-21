@@ -123,7 +123,8 @@ class ChessEngine:
                     current_depth = 14
 
                     if running_score is None:
-                        info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
+                        info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1,
+                                                     game=game)
                         score_obj_before = info_before[0]["score"].white()
                         if score_obj_before.is_mate():
                             score_before = 100.0 if score_obj_before.mate() > 0 else -100.0
@@ -135,12 +136,13 @@ class ChessEngine:
                     played_san = board.san(move)
                     candidates_data = []
                     recs = []
+                    top_alt_pv_san = []  # Properly initialized here
 
                     if mode == "candidates":
                         info_recs = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=4, game=game)
                         if info_recs:
                             best_v = info_recs[0]["score"].relative.score(mate_score=10000) / 100.0
-                            for v in info_recs:
+                            for alt_idx, v in enumerate(info_recs):
                                 if "pv" in v and len(v["pv"]) > 0:
                                     cand = v["pv"][0]
                                     cand_san = board.san(cand)
@@ -150,9 +152,17 @@ class ChessEngine:
                                     if cand != move:
                                         recs.append(cand_san)
 
+                                    # Extract up to 10-ply continuation for the top-ranked alternative
+                                    if alt_idx == 0:
+                                        temp_b = board.copy()
+                                        for pv_m in v["pv"][:10]:
+                                            top_alt_pv_san.append(temp_b.san(pv_m))
+                                            temp_b.push(pv_m)
+
                     pv_line = []
                     if mode == "standard":
-                        info_before_pv = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
+                        info_before_pv = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1,
+                                                        game=game)
                         if "pv" in info_before_pv[0]:
                             temp_b = board.copy()
                             for pv_move in info_before_pv[0]["pv"][:4]:
@@ -228,6 +238,7 @@ class ChessEngine:
                         "tag": tag,
                         "candidates": candidates_data,
                         "recs": recs,
+                        "top_alt_pv": top_alt_pv_san,
                         "pv_line": " ".join(pv_line),
                         "mode": mode,
                         "board": board.copy(),
