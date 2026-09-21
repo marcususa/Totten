@@ -66,6 +66,34 @@ class CatalogInitMixin:
                 self.on_last_move()
         return "break"
 
+    def render_catalog_analysis_moves(self, analysis_data):
+        """Renders analyzed catalog moves into the analysis textbox utilizing evaluation color tags."""
+        if not hasattr(self, "analysis_textbox"):
+            return
+
+        self.analysis_textbox.configure(state="normal")
+        self.analysis_textbox.delete("1.0", "end")
+
+        for m_num in sorted(analysis_data.keys()):
+            entry = analysis_data[m_num]
+
+            # Insert white move text using its designated evaluation tag
+            w_txt = entry.get("white_text", "")
+            w_tag = entry.get("white_tag", "default")
+            if w_txt:
+                self.analysis_textbox.insert("end", f"{m_num}. {w_txt}   ", w_tag)
+
+            # Insert black move text using its designated evaluation tag
+            b_txt = entry.get("black_text", "")
+            b_tag = entry.get("black_tag", "default")
+            if b_txt:
+                self.analysis_textbox.insert("end", f"{b_txt}\n", b_tag)
+            else:
+                if w_txt:
+                    self.analysis_textbox.insert("end", "\n")
+
+        self.analysis_textbox.configure(state="disabled")
+
     def init_layout(self):
         import gui.app_state as state
         from tkinter import ttk
@@ -127,7 +155,7 @@ class CatalogInitMixin:
         if not hasattr(self, "_engine_running"):
             self._engine_running = False
 
-        # Track the active analysis button selection state (None initially)
+            # Track the active analysis button selection state (None initially)
         if not hasattr(self, "_selected_mode_button"):
             self._selected_mode_button = None
 
@@ -169,6 +197,58 @@ class CatalogInitMixin:
                     fg_color=THEME["btn_hover"] if is_selected else THEME["btn_initial"]
                 )
                 frm.configure(border_width=0 if is_selected else 1)
+
+        def display_candidate_move_threats(self, candidate_data_list):
+            """
+            Updates ONLY the analysis panel UI with alternative candidate moves,
+            preserving color tags and formatting opponent threat sequences and explanations
+            for moves that weren't played in the actual game.
+            """
+            textbox = getattr(self, 'analysis_textbox', None)
+            if not textbox and hasattr(self, 'analysis_panel'):
+                textbox = getattr(self.analysis_panel, 'analysis_textbox', None)
+
+            if not textbox:
+                return
+
+            textbox.configure(state="normal")
+
+            # Insert clean header
+            textbox.insert("end", "\n=== Candidate Move & Threat Analysis ===\n", "header_tag")
+
+            if not candidate_data_list:
+                textbox.insert("end", "No alternative candidate moves found outside top evaluation.\n", "comment_tag")
+                textbox.configure(state="disabled")
+                return
+
+            for entry in candidate_data_list:
+                # Handle cases where entry might be a string instead of a dict
+                if isinstance(entry, str):
+                    move = entry
+                    eval_drop = 0.0
+                    explanation = "Alternative candidate move"
+                    threat_sequence = []
+                elif isinstance(entry, dict):
+                    # Fallback across various key naming styles
+                    move = entry.get("move") or entry.get("san") or entry.get("candidate", "")
+                    eval_drop = entry.get("eval_drop") or entry.get("drop", 0.0)
+                    explanation = entry.get("explanation") or entry.get("desc", "Alternative evaluation analysis")
+                    threat_sequence = entry.get("threat_sequence") or entry.get("threats", [])
+                else:
+                    continue
+
+                if not move:
+                    continue
+
+                threats_str = " ".join(threat_sequence) if threat_sequence else "No immediate tactical sequence"
+
+                pgn_comment = f"{{ {explanation} | Move {move} drops eval by {eval_drop:.2f}. Threats: {threats_str} }}"
+
+                # Insert with designated tags
+                textbox.insert("end", f"• {move} ", "move_tag")
+                textbox.insert("end", f"{pgn_comment}\n", "comment_tag")
+
+            textbox.configure(state="disabled")
 
         def on_btn_enter(btn, mode, frm):
             if self._selected_mode_button != mode:
@@ -230,7 +310,8 @@ class CatalogInitMixin:
                 btn.pack()
                 return btn, frm
 
-            # 2. Game Review Button
+                # 2. Game Review Button
+
             self.btn_review, self.frame_review = create_mode_button("Game Review", 75, "review")
 
             # 3. Candidate Moves Button
@@ -382,6 +463,17 @@ class CatalogInitMixin:
         )
 
         self.analysis_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
+
+        # Configure evaluation color tags on the underlying text widget
+        self.analysis_textbox.tag_config("green", foreground="#2b8a3e")
+        self.analysis_textbox.tag_config("light_blue", foreground="#1c7ed6")
+        self.analysis_textbox.tag_config("orange", foreground="#f59f00")
+        self.analysis_textbox.tag_config("red", foreground="#c92a2a")
+        self.analysis_textbox.tag_config("default", foreground=THEME["text_primary"])
+        self.analysis_textbox.tag_config("header_tag", foreground=THEME.get("text_secondary", "#94a3b8"))
+        self.analysis_textbox.tag_config("move_tag", foreground=THEME["text_primary"])
+        self.analysis_textbox.tag_config("comment_tag", foreground=THEME.get("text_secondary", "#94a3b8"))
+
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
         self.pgn_data_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
