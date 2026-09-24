@@ -199,10 +199,10 @@ class EngineReviewMixin:
                             self.last_eval = curr_eval
                             if loss >= 2.6:
                                 tag_to_apply = "red"
-                                move_display = f"{played_san} {{{curr_eval:+.2f}}} ??"
+                                move_display = f"{played_san} {{{curr_eval:+.2f}}}"
                             elif 1.0 <= loss <= 2.5:
                                 tag_to_apply = "orange"
-                                move_display = f"{played_san} {{{curr_eval:+.2f}}} ?"
+                                move_display = f"{played_san} {{{curr_eval:+.2f}}}"
 
                         if move_num not in self.outer.analysis_rows:
                             self.outer.analysis_rows[move_num] = {
