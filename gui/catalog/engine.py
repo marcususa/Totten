@@ -247,17 +247,17 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
                             if loss >= 2.6:
                                 tag_to_apply = "red"
                                 eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ??"
+                                comment_str = ""
                                 self.white_streak = 0
                                 self.black_streak = 0
                             elif 1.0 <= loss <= 2.5:
                                 tag_to_apply = "orange"
                                 eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ?"
+                                comment_str = ""
                                 self.white_streak = 0
                                 self.black_streak = 0
                             elif 0.3 <= loss < 1.0:
-                                comment_str = " ?!"
+                                comment_str = ""
                                 if is_white:
                                     if self.black_streak > 0:
                                         self.black_streak -= 1
@@ -270,7 +270,6 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
                                     else:
                                         self.black_streak += 1
                                     tag_to_apply = "green" if self.black_streak >= 3 else "light_blue"
-
                             move_display = f"{played_san}{eval_str}{comment_str}"
 
                         if move_num not in self.outer.analysis_rows:
