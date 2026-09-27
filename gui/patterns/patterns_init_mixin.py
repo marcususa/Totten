@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
+from core.piecepatterns import fetch_patterns_by_color
 
 
 class PatternsInitMixin:
@@ -9,7 +10,36 @@ class PatternsInitMixin:
     def _safe_load_game(self, game_node, category_source=None):
         if category_source and category_source != "patterns":
             return
-        self.load_game(game_node, category_source=category_source)
+        # Force global state index to 0 immediately to prevent late overrides
+        import gui.app_state as state
+        if hasattr(state, "patterns_state"):
+            state.patterns_state["active_index"] = 0
+            state.patterns_state["active_focus"] = None
+
+        # Poll until children populate so we can pin to the top reliably
+        self._auto_select_first_game(retries=10)
+
+    def _auto_select_first_game(self, retries=10):
+        """Pins the tree view and selection strictly to the top item, with retries if loading is delayed."""
+        if hasattr(self, "pgn_tree") and self.pgn_tree:
+            children = self.pgn_tree.get_children()
+            if children:
+                first_item = children[0]
+
+                # Select only the absolute first item
+                self.pgn_tree.selection_set(first_item)
+                self.pgn_tree.focus(first_item)
+
+                # Lock scroll to top
+                self.pgn_tree.yview_moveto(0.0)
+                self.after_idle(lambda: self.pgn_tree.yview_moveto(0.0))
+
+                self._on_tree_selection_event(None)
+                return
+
+        # If children aren't loaded yet and we have retries left, try again shortly
+        if retries > 0:
+            self.after(50, lambda: self._auto_select_first_game(retries - 1))
 
     def toggle_pgn_data_panel(self):
         if self.pgn_data_panel.winfo_ismapped():
@@ -65,6 +95,34 @@ class PatternsInitMixin:
             except TypeError:
                 self.on_last_move()
         return "break"
+
+    def trigger_engine_mode(self, mode):
+        """Queries patterns.duckdb and populates the left-side pv_textbox with error trapping."""
+        if not hasattr(self, "pv_textbox"):
+            print("[DEBUG] pv_textbox missing!")
+            return
+
+        self.pv_textbox.delete("1.0", "end")
+
+        try:
+            # Handle pattern fetching based on the active mode
+            if mode == "white_patterns_mode":
+                patterns = fetch_patterns_by_color("white")
+            elif mode == "black_patterns_mode":
+                patterns = fetch_patterns_by_color("black")
+            elif mode == "opening_pattern_mode":
+                patterns = "Loading opening patterns..."
+            elif mode == "calculation_pattern_mode":
+                patterns = "Loading calculation patterns..."
+            else:
+                patterns = f"Active mode: {mode}"
+
+            self.pv_textbox.insert("end", str(patterns) + "\n")
+
+        except Exception as e:
+            print(f"[ERROR in trigger_engine_mode]: {e}")
+            self.pv_textbox.insert("end", f"Error loading patterns: {e}\n")
+
 
     def init_layout(self):
         import gui.app_state as state
@@ -140,19 +198,28 @@ class PatternsInitMixin:
                 self.toggle_engine_action()
 
         def set_analysis_mode(mode):
-            # Keep the mode locked on even if clicked again
+            print(f"[DEBUG CLICK] set_analysis_mode called with: {mode}")
+
+            # Update internal selection state
             self._selected_mode_button = mode
             self._active_engine_mode = mode
             self.active_engine_mode = mode
 
+            # Visually update button highlights and borders
             update_analysis_buttons_state()
 
+            # Trigger the pattern loading logic in patterns_analysis.py
             if hasattr(self, "trigger_engine_mode"):
                 self.trigger_engine_mode(mode)
+            else:
+                print("[DEBUG CLICK] Error: trigger_engine_mode not found!")
 
         def update_analysis_buttons_state():
             buttons_map = {
-                "piece_pattern_mode": (self.btn_piece, self.frame_piece)
+                "white_patterns_mode": (self.btn_white, self.frame_white),
+                "black_patterns_mode": (self.btn_black, self.frame_black),
+                "opening_pattern_mode": (self.btn_opening, self.frame_opening),
+                "calculation_pattern_mode": (self.btn_calculation, self.frame_calculation)
             }
             for m, (btn, frm) in buttons_map.items():
                 is_selected = (self._selected_mode_button == m)
@@ -221,17 +288,18 @@ class PatternsInitMixin:
                 btn.pack()
                 return btn, frm
 
-            # --- BUTTON 2: Piece Analysis ---
-            self.btn_piece, self.frame_piece = create_mode_button("Piece Analysis", 90, "piece_pattern_mode")
+            # --- BUTTON 2: White Patterns ---
+            self.btn_white, self.frame_white = create_mode_button("White Patterns", 95, "white_patterns_mode")
 
-            # --- BUTTONS 3 & 4: Nullified / Disabled Placeholders ---
-            self.btn_placeholder_3, self.frame_placeholder_3 = create_mode_button("", 20, "placeholder_3")
-            self.btn_placeholder_3.configure(state="disabled")
-            self.frame_placeholder_3.configure(border_width=0)
+            # --- BUTTON 3: Black Patterns ---
+            self.btn_black, self.frame_black = create_mode_button("Black Patterns", 95, "black_patterns_mode")
 
-            self.btn_placeholder_4, self.frame_placeholder_4 = create_mode_button("", 20, "placeholder_4")
-            self.btn_placeholder_4.configure(state="disabled")
-            self.frame_placeholder_4.configure(border_width=0)
+            # --- BUTTON 4: Opening ---
+            self.btn_opening, self.frame_opening = create_mode_button("Opening", 75, "opening_pattern_mode")
+
+            # --- BUTTON 5: Calculation ---
+            self.btn_calculation, self.frame_calculation = create_mode_button("Calculation", 80,
+                                                                              "calculation_pattern_mode")
 
         init_buttons_ui()
 
@@ -319,7 +387,7 @@ class PatternsInitMixin:
             takefocus=False,
             style="Borderless.Treeview"
         )
-        self.pgn_tree.heading("no", text="No.")
+        self.pgn_tree.heading("no", text=" ")
         self.pgn_tree.heading("white", text="White Player", anchor="w")
         self.pgn_tree.heading("black", text="Black Player", anchor="w")
         self.pgn_tree.heading("result", text="Res")
@@ -330,16 +398,7 @@ class PatternsInitMixin:
         self.pgn_tree.column("result", width=45, anchor="center")
 
         def _on_tree_selection(event):
-            selected_items = self.pgn_tree.selection()
-            if not selected_items:
-                return
-            item_id = selected_items[0]
-            if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
-                game = self.preview_lookup[item_id]
-                if hasattr(self, "on_hardwired_tree_select"):
-                    self.on_hardwired_tree_select(game)
-                else:
-                    self.load_game(game)
+            self._on_tree_selection_event(event)
 
         self.pgn_tree.bind("<<TreeviewSelect>>", _on_tree_selection)
 
@@ -419,3 +478,21 @@ class PatternsInitMixin:
 
         self.bind("<Map>", _bind_keys)
         self.after(100, _bind_keys)
+
+    def _on_tree_selection_event(self, event):
+        selected_items = self.pgn_tree.selection()
+        if not selected_items:
+            return
+        item_id = selected_items[0]
+        if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
+            game = self.preview_lookup[item_id]
+
+            if hasattr(self, "analysis_textbox"):
+                self.analysis_textbox.delete("1.0", "end")
+            if hasattr(self, "pgn_data_text"):
+                self.pgn_data_text.delete("1.0", "end")
+
+            if hasattr(self, "on_hardwired_tree_select"):
+                self.on_hardwired_tree_select(game)
+            else:
+                self.load_game(game)
