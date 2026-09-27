@@ -1,5 +1,6 @@
 # gui/patterns/patterns_analysis_navigation.py
 
+from collections import Counter
 import chess
 import chess.pgn
 from pathlib import Path
@@ -55,17 +56,42 @@ class PatternsAnalysisNavigationMixin:
             except Exception:
                 pass
 
-        resolved_active = self._resolve_game_obj(active_game)
-        target = resolved_active or (self._resolve_game_obj(games_to_display[0]) if games_to_display else None)
+        # Step 1: Count frequency of each ECO code
+        eco_counts = Counter(
+            (getattr(self._resolve_game_obj(g), "headers", {}) or {}).get("ECO", "Unclassified")
+            for g in games_to_display
+        )
 
-        for idx, g_raw in enumerate(games_to_display, start=1):
+        # Step 2: Multi-level sort: Primary by frequency (descending), Secondary by ECO string (alphabetical)
+        sorted_games = sorted(
+            games_to_display,
+            key=lambda g: (
+                -eco_counts[(getattr(self._resolve_game_obj(g), "headers", {}) or {}).get("ECO", "Unclassified")],
+                (getattr(self._resolve_game_obj(g), "headers", {}) or {}).get("ECO", "Unclassified")
+            )
+        )
+
+        resolved_active = self._resolve_game_obj(active_game)
+        target = resolved_active or (self._resolve_game_obj(sorted_games[0]) if sorted_games else None)
+
+        seen_ecos = set()
+
+        for g_raw in sorted_games:
             g_obj = self._resolve_game_obj(g_raw)
             headers = getattr(g_obj, "headers", {})
             white = headers.get("White", "Unknown") if hasattr(headers, "get") else "Unknown"
             black = headers.get("Black", "Unknown") if hasattr(headers, "get") else "Unknown"
             result = headers.get("Result", "*") if hasattr(headers, "get") else "*"
+            eco = headers.get("ECO", "???") if hasattr(headers, "get") else "???"
 
-            item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
+            # First instance shows ECO code; subsequent instances leave the first column blank for easy scanning
+            if eco not in seen_ecos:
+                seen_ecos.add(eco)
+                display_label = eco
+            else:
+                display_label = ""
+
+            item_id = self.pgn_tree.insert("", "end", values=(display_label, white, black, result))
             self.preview_lookup[item_id] = g_raw
 
             if target and (g_obj == target or g_raw == active_game):
@@ -73,8 +99,9 @@ class PatternsAnalysisNavigationMixin:
                 self.pgn_tree.see(item_id)
 
         if target:
-            self.load_game_from_state(target)
-        self.after(50, self.focus_set)
+            self.pgn_tree.yview_moveto(0.0)
+            self.after_idle(lambda: self.pgn_tree.yview_moveto(0.0))
+            self.after(50, self.focus_set)
 
     def load_games_by_eco(self, eco_code, active_game=None):
         if not eco_code:
