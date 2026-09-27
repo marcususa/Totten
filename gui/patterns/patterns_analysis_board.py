@@ -1,5 +1,3 @@
-# gui/patterns/patterns_analysis_board.py
-
 import chess
 import chess.pgn
 from core.constants import THEME
@@ -30,6 +28,32 @@ class PatternsAnalysisBoardMixin:
         self.active_game = resolved
         self.root_game_node = resolved
         self.current_node = resolved
+
+        # --- BUILD ANALYSIS ROWS FOR THE NEW GAME ---
+        self.analysis_rows = {}
+        try:
+            curr = resolved
+            while curr.variations:
+                next_node = curr.variation(0)
+                board_at_curr = curr.board()
+                move = next_node.move
+                san = board_at_curr.san(move)
+                move_num = board_at_curr.fullmove_number
+                is_white = (board_at_curr.turn == chess.WHITE)
+
+                if move_num not in self.analysis_rows:
+                    self.analysis_rows[move_num] = {}
+
+                if is_white:
+                    self.analysis_rows[move_num]["white"] = san
+                    self.analysis_rows[move_num]["white_node"] = next_node
+                else:
+                    self.analysis_rows[move_num]["black"] = san
+                    self.analysis_rows[move_num]["black_node"] = next_node
+
+                curr = next_node
+        except Exception as e:
+            print(f"[ANALYSIS ROWS BUILD ERROR] {e}")
 
         if hasattr(self, "board_widget") and self.board_widget:
             try:
@@ -81,6 +105,21 @@ class PatternsAnalysisBoardMixin:
                 self.update_active_move_highlight()
             except Exception as e:
                 print(f"[MOVES POPULATION ERROR] {e}")
+
+        # Ensure the analysis panel syncs its view with the newly loaded game data
+        if hasattr(self, "_sync_analysis_selection"):
+            try:
+                self._sync_analysis_selection()
+            except Exception:
+                pass
+
+        # --- AUTO-TRIGGER ANALYSIS ---
+        if hasattr(self, "trigger_engine_mode"):
+            try:
+                target_mode = getattr(self, "active_engine_mode", None) or "piece_pattern_mode"
+                self.trigger_engine_mode(target_mode)
+            except Exception as e:
+                print(f"[AUTO-ANALYZE ERROR] {e}")
 
         if hasattr(self, "_load_plain_game_moves"):
             try:
