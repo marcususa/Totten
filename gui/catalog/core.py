@@ -206,21 +206,66 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             return
 
         source_games = []
-        catalog_path = self.filename
+        target_file = Path(self.filename) if Path(self.filename).exists() else Path("personal_catalog.pgn")
+        offset_file = Path("catalog_offset.txt")
 
-        if Path(catalog_path).exists():
+        chunk_size = 100
+        current_offset = 0
+
+        # Read the current fridge offset
+        if offset_file.exists():
             try:
-                with open(catalog_path, "r", encoding="utf-8", errors="replace") as f:
-                    while True:
+                current_offset = int(offset_file.read_text().strip())
+            except Exception:
+                current_offset = 0
+
+        if target_file.exists():
+            try:
+                import io
+                print(f"[CATALOG ANALYSIS] Fridge approach: Grabbing 100 games starting at offset {current_offset}...")
+                with open(target_file, "r", encoding="utf-8", errors="replace") as f:
+                    # Skip to the current offset position
+                    skipped = 0
+                    while skipped < current_offset:
+                        g = chess.pgn.read_game(f)
+                        if g is None:
+                            # Reached end of file early, wrap around to start
+                            current_offset = 0
+                            f.seek(0)
+                            break
+                        skipped += 1
+
+                    # Read the batch of 100
+                    while len(source_games) < chunk_size:
                         g = chess.pgn.read_game(f)
                         if g is None:
                             break
                         source_games.append(g)
-                self.game_list = source_games
-                if hasattr(state, "all_games"):
-                    state.all_games = source_games
+
+                # Handle wrap-around if we hit the end of the file completely empty
+                if not source_games and current_offset > 0:
+                    current_offset = 0
+                    with open(target_file, "r", encoding="utf-8", errors="replace") as f:
+                        while len(source_games) < chunk_size:
+                            g = chess.pgn.read_game(f)
+                            if g is None:
+                                break
+                            source_games.append(g)
+
+                # Determine next session's offset (wrap to 0 if we reached the end)
+                next_offset = current_offset + len(source_games)
+                if len(source_games) < chunk_size:
+                    next_offset = 0
+
+                offset_file.write_text(str(next_offset))
+                print(f"[CATALOG ANALYSIS] Loaded {len(source_games)} games. Next session offset: {next_offset}")
+
             except Exception as e:
                 print(f"[CATALOG ANALYSIS DEBUG] Error reading catalog file: {e}")
+
+        self.game_list = source_games
+        if hasattr(state, "all_games"):
+            state.all_games = source_games
 
         if self.game_list and hasattr(self, "pgn_tree"):
             self.populate_catalog_tree(self.game_list)
