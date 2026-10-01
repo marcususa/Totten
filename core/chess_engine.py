@@ -1,5 +1,7 @@
 import io
 import platform
+import sys
+import traceback
 from pathlib import Path
 import chess
 import chess.engine
@@ -48,50 +50,10 @@ class ChessEngine:
         except Exception:
             return False
 
-    def analyze_position(self, board, depths=(10, 15, 20, 25), multipv=3, callback=None, worker_ref=None):
-        """Analyzes a single board position incrementally across increasing depths."""
-        try:
-            with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
-                engine.configure({"Hash": 64, "Threads": 2})
+    def analyze_game(self, pgn_input, mode="review", game_index=0, callback=None, start_move=1, end_move=200):
+        print(f"[CHESS_ENGINE] analyze_game called: mode={mode}, start_move={start_move}, end_move={end_move}")
+        sys.stdout.flush()
 
-                for d in depths:
-                    if worker_ref and getattr(worker_ref, "cancel", False):
-                        break
-
-                    info = engine.analyse(board, chess.engine.Limit(depth=d), multipv=multipv)
-
-                    pv_lines = []
-                    primary_eval = 0.0
-
-                    for idx, entry in enumerate(info):
-                        score_obj = entry["score"].white()
-                        if score_obj.is_mate():
-                            eval_val = 100.0 if score_obj.mate() > 0 else -100.0
-                        else:
-                            eval_val = (score_obj.score() or 0) / 100.0
-
-                        if idx == 0:
-                            primary_eval = eval_val
-
-                        if "pv" in entry:
-                            temp_b = board.copy()
-                            san_moves = []
-                            for m in entry["pv"][:20]:
-                                san_moves.append(temp_b.san(m))
-                                temp_b.push(m)
-                            pv_lines.append(" ".join(san_moves))
-
-                    result = {
-                        "depth": d,
-                        "eval": primary_eval,
-                        "pv_lines": pv_lines
-                    }
-                    if callback:
-                        callback(result)
-        except Exception as e:
-            print(f"[Position Engine Error]: {e}")
-
-    def analyze_game(self, pgn_input, mode="review", game_index=0, callback=None):
         game = None
         if isinstance(pgn_input, str):
             pgn_io = io.StringIO(pgn_input)
@@ -103,28 +65,44 @@ class ChessEngine:
             game = pgn_input
         else:
             print("[Engine Error]: Invalid PGN input type provided.")
+            sys.stdout.flush()
             return
 
         if not game:
             print(f"[Engine Error]: Could not find game at index {game_index} in PGN input.")
+            sys.stdout.flush()
             return
 
         board = game.board()
         running_score = None
 
         try:
+            print(f"[CHESS_ENGINE] Spawning engine via popen_uci at: {self.engine_path}")
+            sys.stdout.flush()
+
             with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
+                print(f"[CHESS_ENGINE] Engine spawned successfully. Configuring...")
+                sys.stdout.flush()
                 engine.configure({"Hash": 256, "Threads": 4})
 
                 for i, move in enumerate(game.mainline_moves()):
                     ply = i + 1
                     move_num = (i // 2) + 1
                     is_white = (i % 2 == 0)
-                    current_depth = 14
+
+                    if move_num < start_move:
+                        board.push(move)
+                        continue
+                    if move_num > end_move:
+                        break
+
+                    print(f"[CHESS_ENGINE] Analyzing move {move_num} (Ply {ply}, White={is_white})...")
+                    sys.stdout.flush()
+
+                    current_depth = 12
 
                     if running_score is None:
-                        info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1,
-                                                     game=game)
+                        info_before = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1)
                         score_obj_before = info_before[0]["score"].white()
                         if score_obj_before.is_mate():
                             score_before = 100.0 if score_obj_before.mate() > 0 else -100.0
@@ -136,10 +114,10 @@ class ChessEngine:
                     played_san = board.san(move)
                     candidates_data = []
                     recs = []
-                    top_alt_pv_san = []  # Properly initialized here
+                    top_alt_pv_san = []
 
                     if mode == "candidates":
-                        info_recs = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=4, game=game)
+                        info_recs = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=4)
                         if info_recs:
                             best_v = info_recs[0]["score"].relative.score(mate_score=10000) / 100.0
                             for alt_idx, v in enumerate(info_recs):
@@ -152,7 +130,6 @@ class ChessEngine:
                                     if cand != move:
                                         recs.append(cand_san)
 
-                                    # Extract up to 10-ply continuation for the top-ranked alternative
                                     if alt_idx == 0:
                                         temp_b = board.copy()
                                         for pv_m in v["pv"][:10]:
@@ -161,8 +138,7 @@ class ChessEngine:
 
                     pv_line = []
                     if mode == "standard":
-                        info_before_pv = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1,
-                                                        game=game)
+                        info_before_pv = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1)
                         if "pv" in info_before_pv[0]:
                             temp_b = board.copy()
                             for pv_move in info_before_pv[0]["pv"][:4]:
@@ -170,7 +146,7 @@ class ChessEngine:
                                 temp_b.push(pv_move)
 
                     board.push(move)
-                    info_after = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1, game=game)
+                    info_after = engine.analyse(board, chess.engine.Limit(depth=current_depth), multipv=1)
                     score_obj_after = info_after[0]["score"].white()
 
                     if score_obj_after.is_mate():
@@ -246,9 +222,12 @@ class ChessEngine:
 
                     if callback:
                         callback(result)
+                        sys.stdout.flush()
 
         except Exception as e:
             print(f"[Engine Analysis Error]: {e}")
+            sys.stdout.flush()
+            traceback.print_exc()
 
     def generate_review_pgn(self, move_results, max_width=80):
         tokens = []
