@@ -195,14 +195,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                         active_game = self.game_list[idx]
 
                 self.populate_catalog_tree(self.game_list, active_game=active_game)
-
-            if self.game_list:
-                target_game = self.game_list[0]
-                if hasattr(state, "catalog_state") and "active_index" in state.catalog_state:
-                    idx = state.catalog_state.get("active_index", 0)
-                    if 0 <= idx < len(self.game_list):
-                        target_game = self.game_list[idx]
-                self.load_game(target_game)
             return
 
         source_games = []
@@ -212,7 +204,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         chunk_size = 100
         current_offset = 0
 
-        # Read the current fridge offset
         if offset_file.exists():
             try:
                 current_offset = int(offset_file.read_text().strip())
@@ -221,28 +212,22 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
         if target_file.exists():
             try:
-                import io
-                print(f"[CATALOG ANALYSIS] Fridge approach: Grabbing 100 games starting at offset {current_offset}...")
                 with open(target_file, "r", encoding="utf-8", errors="replace") as f:
-                    # Skip to the current offset position
                     skipped = 0
                     while skipped < current_offset:
                         g = chess.pgn.read_game(f)
                         if g is None:
-                            # Reached end of file early, wrap around to start
                             current_offset = 0
                             f.seek(0)
                             break
                         skipped += 1
 
-                    # Read the batch of 100
                     while len(source_games) < chunk_size:
                         g = chess.pgn.read_game(f)
                         if g is None:
                             break
                         source_games.append(g)
 
-                # Handle wrap-around if we hit the end of the file completely empty
                 if not source_games and current_offset > 0:
                     current_offset = 0
                     with open(target_file, "r", encoding="utf-8", errors="replace") as f:
@@ -252,14 +237,11 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                                 break
                             source_games.append(g)
 
-                # Determine next session's offset (wrap to 0 if we reached the end)
                 next_offset = current_offset + len(source_games)
                 if len(source_games) < chunk_size:
                     next_offset = 0
 
                 offset_file.write_text(str(next_offset))
-                print(f"[CATALOG ANALYSIS] Loaded {len(source_games)} games. Next session offset: {next_offset}")
-
             except Exception as e:
                 print(f"[CATALOG ANALYSIS DEBUG] Error reading catalog file: {e}")
 
@@ -269,7 +251,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
         if self.game_list and hasattr(self, "pgn_tree"):
             self.populate_catalog_tree(self.game_list)
-            self.load_game(self.game_list[0])
 
     def populate_catalog_tree(self, games_to_display, active_game=None):
         if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
@@ -337,8 +318,33 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
     def on_hardwired_tree_select(self, game):
         self.load_game_from_state(game)
 
+    def jump_to_node(self, node):
+        """Safely navigates to a specific move node when clicked without wiping text."""
+        if not node:
+            return
+
+        self.board_node = node
+        self.current_node = node
+
+        if hasattr(self, "board_widget") and self.board_widget:
+            try:
+                fen_str = node.board().fen()
+                self.board_widget.set_position_fen(fen_str)
+            except Exception:
+                pass
+
+        if hasattr(self, "update_active_move_highlight"):
+            try:
+                self.update_active_move_highlight()
+            except Exception:
+                pass
+
     def load_game_from_state(self, game_obj, category_source=None):
         if not game_obj:
+            return
+
+        # Prevent redundant re-loads/wipes if this game is already active
+        if getattr(self, "current_game", None) == game_obj and hasattr(self, "moves_textbox") and self.moves_textbox:
             return
 
         self.current_game = game_obj
@@ -365,7 +371,8 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                 pgn_text_export = game_obj.accept(exporter)
 
                 self.pgn_data_text.configure(fg_color=THEME["bg_surface"])
-                inner_pgn = getattr(self.pgn_data_text, "_textbox", getattr(self.pgn_data_text, "textbox", self.pgn_data_text))
+                inner_pgn = getattr(self.pgn_data_text, "_textbox",
+                                    getattr(self.pgn_data_text, "textbox", self.pgn_data_text))
                 inner_pgn.configure(state="normal")
                 inner_pgn.delete("1.0", "end")
                 inner_pgn.insert("end", pgn_text_export)
@@ -379,17 +386,14 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             except Exception:
                 pass
 
-        if self.active_engine_mode == "review":
-            self.start_game_review(game_obj)
-
     def _load_plain_game_moves(self, game_obj):
         """Renders plain game moves into the Moves panel in correct order."""
         if not game_obj:
             return
 
         try:
-            game = game_obj
-            temp_board = game.board()
+            root_game = game_obj.root() if hasattr(game_obj, "root") else game_obj
+            temp_board = root_game.board()
 
             if hasattr(self, "moves_textbox") and self.moves_textbox:
                 box = self.moves_textbox
@@ -398,7 +402,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                 moves_box.configure(state="normal")
                 moves_box.delete("1.0", "end")
 
-                node = game
+                node = root_game
                 move_num = 1
 
                 while node.variations:
