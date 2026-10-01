@@ -105,7 +105,6 @@ def create_workspace(master, initial_games=None, **kwargs):
 
     workspace_name = kwargs.get("name") or kwargs.get("workspace_name")
 
-    # If explicitly requested via sidebar or router
     if workspace_name in ("search_catalog", "catalog") or initial_games in ("search_catalog", "catalog"):
         clean_kwargs = kwargs.copy()
         for k in ["target_game", "active_index", "initial_games", "name", "workspace_name"]:
@@ -122,23 +121,7 @@ def create_workspace(master, initial_games=None, **kwargs):
             getattr(state_mod, "active_category_source", None)
         )
 
-    active_index = kwargs.get("active_index") or getattr(state_mod, "catalog_state", {}).get("active_index", 0)
-
-    focus = (
-        kwargs.get("target_game") or
-        getattr(state_mod, "catalog_state", {}).get("active_focus") or
-        getattr(state_mod, "active_focus_game", None)
-    )
-
-    if initial_games and 0 <= active_index < len(initial_games) and not focus:
-        focus = initial_games[active_index]
-
     instance = CatalogAnalysis(master, filename="personal_catalog.pgn", initial_games=initial_games)
-
-    if focus and hasattr(instance, "load_game"):
-        instance.load_game(focus)
-    elif initial_games and hasattr(instance, "load_game"):
-        instance.load_game(initial_games[0])
 
     state_mod.workspace = instance
     return instance
