@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from tkinter import ttk
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
 
@@ -9,7 +10,26 @@ class CatalogInitMixin:
     def _safe_load_game(self, game_node, category_source=None):
         if category_source and category_source != "catalog":
             return
+
+        # If the analysis textbox already contains text, do not wipe it out
+        if hasattr(self, "analysis_textbox") and self.analysis_textbox:
+            current_text = self.analysis_textbox.get("1.0", "end").strip()
+            if current_text and current_text != "[No game selected...]" and not current_text.startswith("[No"):
+                return
+
         self.load_game(game_node, category_source=category_source)
+        import gui.app_state as state
+        if hasattr(state, "catalog_state") and isinstance(state.catalog_state, dict):
+            state.catalog_state["active_focus"] = game_node
+        if hasattr(state, "catalog_state") and state.catalog_state.get("active_focus"):
+            self.current_node = state.catalog_state["active_focus"]
+            if hasattr(self, "_update_active_boards"):
+                self._update_active_boards(self.current_node.board())
+
+        if hasattr(self, "analysis_data") and self.analysis_data:
+            self.render_catalog_analysis_moves(self.analysis_data)
+        elif hasattr(self, "_last_catalog_analysis_data") and self._last_catalog_analysis_data:
+            self.render_catalog_analysis_moves(self._last_catalog_analysis_data)
 
     def toggle_pgn_data_panel(self):
         if self.pgn_data_panel.winfo_ismapped():
@@ -66,40 +86,115 @@ class CatalogInitMixin:
                 self.on_last_move()
         return "break"
 
+    def _init_analysis_tags(self):
+        """Configures CustomTkinter/Tkinter text box tags using central THEME colors and vertical spacing."""
+        if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
+            return
+
+        box = self.analysis_textbox
+        target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
+
+        target_box.tag_config("red", foreground=THEME.get("eval_red", "#c92a2a"), spacing3=6)
+        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#f59f00"), spacing3=6)
+        target_box.tag_config("green", foreground=THEME.get("eval_green", "#2b8a3e"), spacing3=6)
+        target_box.tag_config("light_blue", foreground=THEME.get("eval_light_blue", "#1c7ed6"), spacing3=6)
+        target_box.tag_config("default", foreground=THEME["text_primary"], spacing3=6)
+        target_box.tag_config("comment_tag", foreground=THEME.get("text_secondary", "#94a3b8"), spacing3=6)
+        target_box.tag_config("header_tag", foreground=THEME.get("text_secondary", "#94a3b8"), spacing3=6)
+        target_box.tag_config("move_tag", foreground=THEME["text_primary"], spacing3=6)
+        target_box.tag_config("active_tracker", background=THEME["active_tracker_bg"],
+                              foreground=THEME["active_tracker_fg"])
+
     def render_catalog_analysis_moves(self, analysis_data):
-        """Renders analyzed catalog moves into the analysis textbox utilizing evaluation color tags."""
+        """Bridges catalog analysis data into self.analysis_rows and uses _sync_analysis_selection to prevent wiping on click."""
         if not hasattr(self, "analysis_textbox"):
             return
 
-        self.analysis_textbox.configure(state="normal")
-        self.analysis_textbox.delete("1.0", "end")
+        self.analysis_data = analysis_data
+        self._last_catalog_analysis_data = analysis_data
+
+        if not hasattr(self, "analysis_rows"):
+            self.analysis_rows = {}
 
         for m_num in sorted(analysis_data.keys()):
             entry = analysis_data[m_num]
 
-            # Insert white move text using its designated evaluation tag
-            w_txt = entry.get("white_text", "")
+            w_txt = entry.get("white_text", entry.get("white", ""))
+            b_txt = entry.get("black_text", entry.get("black", ""))
             w_tag = entry.get("white_tag", "default")
-            if w_txt:
-                self.analysis_textbox.insert("end", f"{m_num}. {w_txt}   ", w_tag)
-
-            # Insert black move text using its designated evaluation tag
-            b_txt = entry.get("black_text", "")
             b_tag = entry.get("black_tag", "default")
-            if b_txt:
-                self.analysis_textbox.insert("end", f"{b_txt}\n", b_tag)
-            else:
-                if w_txt:
-                    self.analysis_textbox.insert("end", "\n")
+            w_node = entry.get("white_node")
+            b_node = entry.get("black_node")
 
-        self.analysis_textbox.configure(state="disabled")
+            self.analysis_rows[m_num] = {
+                "white": w_txt,
+                "black": b_txt,
+                "white_tag": w_tag,
+                "black_tag": b_tag,
+                "white_node": w_node,
+                "black_node": b_node
+            }
+
+        if hasattr(self, "_sync_analysis_selection"):
+            self._sync_analysis_selection()
+
+    def _update_analysis_buttons_state(self):
+        """Updates the visual selection state of all engine and mode buttons."""
+        is_running = getattr(self, "_engine_running", False)
+
+        if hasattr(self, "btn_engine_action") and self.btn_engine_action:
+            try:
+                self.btn_engine_action.configure(
+                    fg_color=THEME["btn_hover"] if is_running else THEME["btn_initial"],
+                    text="Stop" if is_running else "Engine"
+                )
+                if not is_running and hasattr(self.btn_engine_action, "_on_leave"):
+                    self.btn_engine_action._on_leave(None)
+            except Exception:
+                pass
+        if hasattr(self, "frame_engine_action") and self.frame_engine_action:
+            try:
+                self.frame_engine_action.configure(border_width=0 if is_running else 1)
+            except Exception:
+                pass
+
+        selected_mode = getattr(self, "active_engine_mode", getattr(self, "_selected_mode_button", None))
+        self._selected_mode_button = selected_mode
+
+        buttons_map = {
+            "review": (getattr(self, "btn_review", None), getattr(self, "frame_review", None)),
+            "candidates": (getattr(self, "btn_candidates", None), getattr(self, "frame_candidates", None)),
+            "standard": (getattr(self, "btn_standard", None), getattr(self, "frame_standard", None))
+        }
+
+        for m, (btn, frm) in buttons_map.items():
+            is_selected = (selected_mode == m)
+            if btn is not None:
+                try:
+                    btn.configure(
+                        fg_color=THEME["btn_hover"] if is_selected else THEME["btn_initial"]
+                    )
+                    # Force CTkButton to drop internal hover state if deselected under the cursor
+                    if not is_selected and hasattr(btn, "_on_leave"):
+                        btn._on_leave(None)
+                except Exception:
+                    pass
+            if frm is not None:
+                try:
+                    frm.configure(border_width=0 if is_selected else 1)
+                except Exception:
+                    pass
 
     def init_layout(self):
         import gui.app_state as state
-        from tkinter import ttk
 
         if hasattr(state, "register_analysis_callback"):
             state.register_analysis_callback(self._safe_load_game)
+
+        if hasattr(state, "catalog_state") and state.catalog_state.get("active_focus"):
+            self.current_node = state.catalog_state["active_focus"]
+            if hasattr(self, "_update_active_boards"):
+                self._update_active_boards(self.current_node.board())
 
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -146,123 +241,49 @@ class CatalogInitMixin:
         self.row_analysis_btns = ctk.CTkFrame(self.engine_results_header_frame, fg_color="transparent")
         self.row_analysis_btns.pack(side="left", padx=0)
 
-        # Synchronize engine mode state cleanly with host class if present
-        if hasattr(self, "active_engine_mode"):
-            self._active_engine_mode = self.active_engine_mode
-        elif not hasattr(self, "_active_engine_mode"):
-            self._active_engine_mode = None
+        if not hasattr(self, "active_engine_mode"):
+            self.active_engine_mode = None
 
         if not hasattr(self, "_engine_running"):
             self._engine_running = False
 
-            # Track the active analysis button selection state (None initially)
-        if not hasattr(self, "_selected_mode_button"):
-            self._selected_mode_button = None
+        self._selected_mode_button = self.active_engine_mode
 
         def toggle_engine_state():
-            self._engine_running = not self._engine_running
-            if hasattr(self, "btn_engine_action"):
-                self.btn_engine_action.configure(
-                    fg_color=THEME["btn_hover"] if self._engine_running else THEME["btn_initial"],
-                    text="Stop" if self._engine_running else "Engine"
-                )
             if hasattr(self, "toggle_engine_action"):
                 self.toggle_engine_action()
+            self._engine_running = getattr(self, "_engine_running", False)
+            self._update_analysis_buttons_state()
 
         def set_analysis_mode(mode):
-            if self._selected_mode_button == mode:
-                self._selected_mode_button = None
+            current_mode = getattr(self, "active_engine_mode", None)
+            if current_mode == mode:
                 mode_to_trigger = None
             else:
-                self._selected_mode_button = mode
                 mode_to_trigger = mode
 
-            self._active_engine_mode = mode_to_trigger
             self.active_engine_mode = mode_to_trigger
-
-            update_analysis_buttons_state()
+            self._selected_mode_button = mode_to_trigger
+            self._update_analysis_buttons_state()
 
             if hasattr(self, "trigger_engine_mode"):
                 self.trigger_engine_mode(mode_to_trigger)
 
-        def update_analysis_buttons_state():
-            buttons_map = {
-                "review": (self.btn_review, self.frame_review),
-                "candidates": (self.btn_candidates, self.frame_candidates),
-                "standard": (self.btn_standard, self.frame_standard)
-            }
-            for m, (btn, frm) in buttons_map.items():
-                is_selected = (self._selected_mode_button == m)
-                btn.configure(
-                    fg_color=THEME["btn_hover"] if is_selected else THEME["btn_initial"]
-                )
-                frm.configure(border_width=0 if is_selected else 1)
-
-        def display_candidate_move_threats(self, candidate_data_list):
-            """
-            Updates ONLY the analysis panel UI with alternative candidate moves,
-            preserving color tags and formatting opponent threat sequences and explanations
-            for moves that weren't played in the actual game.
-            """
-            textbox = getattr(self, 'analysis_textbox', None)
-            if not textbox and hasattr(self, 'analysis_panel'):
-                textbox = getattr(self.analysis_panel, 'analysis_textbox', None)
-
-            if not textbox:
-                return
-
-            textbox.configure(state="normal")
-
-            # Insert clean header
-            textbox.insert("end", "\n=== Candidate Move & Threat Analysis ===\n", "header_tag")
-
-            if not candidate_data_list:
-                textbox.insert("end", "No alternative candidate moves found outside top evaluation.\n", "comment_tag")
-                textbox.configure(state="disabled")
-                return
-
-            for entry in candidate_data_list:
-                # Handle cases where entry might be a string instead of a dict
-                if isinstance(entry, str):
-                    move = entry
-                    eval_drop = 0.0
-                    explanation = "Alternative candidate move"
-                    threat_sequence = []
-                elif isinstance(entry, dict):
-                    # Fallback across various key naming styles
-                    move = entry.get("move") or entry.get("san") or entry.get("candidate", "")
-                    eval_drop = entry.get("eval_drop") or entry.get("drop", 0.0)
-                    explanation = entry.get("explanation") or entry.get("desc", "Alternative evaluation analysis")
-                    threat_sequence = entry.get("threat_sequence") or entry.get("threats", [])
-                else:
-                    continue
-
-                if not move:
-                    continue
-
-                threats_str = " ".join(threat_sequence) if threat_sequence else "No immediate tactical sequence"
-
-                pgn_comment = f"{{ {explanation} | Move {move} drops eval by {eval_drop:.2f}. Threats: {threats_str} }}"
-
-                # Insert with designated tags
-                textbox.insert("end", f"• {move} ", "move_tag")
-                textbox.insert("end", f"{pgn_comment}\n", "comment_tag")
-
-            textbox.configure(state="disabled")
-
         def on_btn_enter(btn, mode, frm):
-            if self._selected_mode_button != mode:
-                btn.configure(fg_color=THEME["btn_hover"])
+            current_selected = getattr(self, "active_engine_mode", getattr(self, "_selected_mode_button", None))
+            if current_selected != mode:
                 frm.configure(border_width=0)
 
         def on_btn_leave(btn, mode, frm):
-            if self._selected_mode_button != mode:
-                btn.configure(fg_color=THEME["btn_initial"])
+            current_selected = getattr(self, "active_engine_mode", getattr(self, "_selected_mode_button", None))
+            if current_selected != mode:
                 frm.configure(border_width=1)
 
         def init_buttons_ui():
             for widget in self.row_analysis_btns.winfo_children():
                 widget.destroy()
+
+            self.row_analysis_btns.pack_configure(side="left", fill="none", expand=False)
 
             btn_height = 20
             btn_corner = 6
@@ -272,53 +293,49 @@ class CatalogInitMixin:
             text_color = THEME["text_primary"]
             border_color = THEME.get("border_color", THEME["bg_surface"])
 
-            # 1. Engine Action Button
-            self.frame_engine_action = ctk.CTkFrame(
-                self.row_analysis_btns, fg_color="transparent", corner_radius=btn_corner,
-                border_width=0, border_color=border_color
-            )
-            self.frame_engine_action.pack(side="left", padx=(2, 8))
-
-            self.btn_engine_action = ctk.CTkButton(
-                self.frame_engine_action, text="Stop" if self._engine_running else "Engine", width=55,
-                height=btn_height,
-                corner_radius=btn_corner,
-                border_width=0,
-                fg_color=btn_hover if self._engine_running else btn_initial,
-                hover_color=btn_hover,
-                text_color=text_color, font=btn_font,
-                command=toggle_engine_state
-            )
-            self.btn_engine_action.pack()
-
-            def create_mode_button(text, width, mode_key):
+            def create_compact_mode_button(text, mode_key=None, is_action=False):
                 frm = ctk.CTkFrame(
                     self.row_analysis_btns, fg_color="transparent", corner_radius=btn_corner,
-                    border_width=1, border_color=border_color
+                    border_width=0 if is_action and self._engine_running else 1, border_color=border_color
                 )
-                frm.pack(side="left", padx=2)
-                btn = ctk.CTkButton(
-                    frm, text=text, width=width, height=btn_height, corner_radius=btn_corner,
-                    border_width=0,
-                    fg_color=btn_initial,  # Explicitly forced to btn_initial on creation
-                    hover_color=btn_hover,
-                    text_color=text_color, font=btn_font,
-                    command=lambda: set_analysis_mode(mode_key)
-                )
-                btn.bind("<Enter>", lambda e, b=btn, m=mode_key, f=frm: on_btn_enter(b, m, f))
-                btn.bind("<Leave>", lambda e, b=btn, m=mode_key, f=frm: on_btn_leave(b, m, f))
-                btn.pack()
-                return btn, frm
+                frm.pack(side="left", padx=2, pady=0)
 
-                # 2. Game Review Button
+                if is_action:
+                    btn = ctk.CTkButton(
+                        frm, text="Stop" if self._engine_running else text, width=65, height=btn_height,
+                        corner_radius=btn_corner, border_width=0,
+                        fg_color=btn_hover if self._engine_running else btn_initial,
+                        hover_color=btn_hover, text_color=text_color, font=btn_font,
+                        command=toggle_engine_state
+                    )
+                    self.btn_engine_action = btn
+                    self.frame_engine_action = frm
+                else:
+                    current_selected = getattr(self, "active_engine_mode", getattr(self, "_selected_mode_button", None))
+                    is_selected = (current_selected == mode_key)
+                    btn = ctk.CTkButton(
+                        frm, text=text, width=80, height=btn_height, corner_radius=btn_corner,
+                        border_width=0, fg_color=btn_hover if is_selected else btn_initial,
+                        hover_color=btn_hover, text_color=text_color, font=btn_font,
+                        command=lambda m=mode_key: set_analysis_mode(m)
+                    )
+                    btn.bind("<Enter>", lambda e, b=btn, m=mode_key, f=frm: on_btn_enter(b, m, f))
+                    btn.bind("<Leave>", lambda e, b=btn, m=mode_key, f=frm: on_btn_leave(b, m, f))
 
-            self.btn_review, self.frame_review = create_mode_button("Game Review", 75, "review")
+                    if mode_key == "review":
+                        self.btn_review, self.frame_review = btn, frm
+                    elif mode_key == "candidates":
+                        self.btn_candidates, self.frame_candidates = btn, frm
+                    elif mode_key == "standard":
+                        self.btn_standard, self.frame_standard = btn, frm
 
-            # 3. Candidate Moves Button
-            self.btn_candidates, self.frame_candidates = create_mode_button("Candidate Moves", 85, "candidates")
+                btn.pack(fill="both", expand=True)
+                return btn
 
-            # 4. Standard Button
-            self.btn_standard, self.frame_standard = create_mode_button("Standard", 55, "standard")
+            create_compact_mode_button("Engine", is_action=True)
+            create_compact_mode_button("Review", mode_key="review")
+            create_compact_mode_button("Candidates", mode_key="candidates")
+            create_compact_mode_button("Standard", mode_key="standard")
 
         init_buttons_ui()
 
@@ -391,7 +408,6 @@ class CatalogInitMixin:
         self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
         self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
-        # Create the scrollbar first and pack it to the right so it reserves its layout space permanently
         self.pgn_scrollbar = ttk.Scrollbar(
             self.tree_frame,
             orient="vertical"
@@ -431,11 +447,9 @@ class CatalogInitMixin:
 
         self.pgn_tree.bind("<<TreeviewSelect>>", _on_tree_selection)
 
-        # Wire up the scrollbar command and configuration after tree creation
         self.pgn_scrollbar.configure(command=self.pgn_tree.yview)
         self.pgn_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
 
-        # Pack the treeview to the left filling the remaining space
         self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
         self.analysis_container_frame = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"],
@@ -444,11 +458,47 @@ class CatalogInitMixin:
                                                      border_color=THEME.get("border_color", THEME["bg_surface"]))
         self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
+        self.analysis_header_frame = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
+        self.analysis_header_frame.pack(fill="x", padx=10, pady=(6, 2))
+
         self.lbl_analysis_title = ctk.CTkLabel(
-            self.analysis_container_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
+            self.analysis_header_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
             text_color=THEME.get("text_secondary", "#94a3b8")
         )
-        self.lbl_analysis_title.pack(anchor="w", padx=10, pady=(6, 2))
+        self.lbl_analysis_title.pack(side="left", anchor="w")
+
+        self.chunk_btn_frame = ctk.CTkFrame(self.analysis_header_frame, fg_color="transparent")
+        self.chunk_btn_frame.pack(side="left", padx=(10, 0))
+
+        btn_height = 20
+        btn_corner = 6
+        btn_font = ctk.CTkFont(size=10, weight="bold")
+        btn_hover = THEME["btn_hover"]
+        btn_initial = THEME["btn_initial"]
+        text_color = THEME["text_primary"]
+        border_color = THEME.get("border_color", THEME["bg_surface"])
+
+        def create_chunk_mode_button(text, command_func):
+            frm = ctk.CTkFrame(
+                self.chunk_btn_frame, fg_color="transparent", corner_radius=btn_corner,
+                border_width=1, border_color=border_color
+            )
+            frm.pack(side="left", padx=2, pady=0)
+
+            btn = ctk.CTkButton(
+                frm, text=text, width=36, height=btn_height, corner_radius=btn_corner,
+                border_width=0, fg_color=btn_initial,
+                hover_color=btn_hover, text_color=text_color, font=btn_font,
+                command=command_func
+            )
+            btn.bind("<Enter>", lambda e, b=btn, f=frm: b.configure(fg_color=btn_hover))
+            btn.bind("<Leave>", lambda e, b=btn, f=frm: b.configure(fg_color=btn_initial))
+            btn.pack(fill="both", expand=True)
+            return btn
+
+        self.btn_plus_10 = create_chunk_mode_button("+10", lambda: self.load_candidate_extension(10))
+        self.btn_plus_20 = create_chunk_mode_button("+20", lambda: self.load_candidate_extension(20))
+        self.btn_plus_30 = create_chunk_mode_button("+30", lambda: self.load_candidate_extension(30))
 
         self.analysis_wrapper = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
         self.analysis_wrapper.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -463,17 +513,7 @@ class CatalogInitMixin:
         )
 
         self.analysis_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
-
-        # Configure evaluation color tags on the underlying text widget
-        self.analysis_textbox.tag_config("green", foreground="#2b8a3e")
-        self.analysis_textbox.tag_config("light_blue", foreground="#1c7ed6")
-        self.analysis_textbox.tag_config("orange", foreground="#f59f00")
-        self.analysis_textbox.tag_config("red", foreground="#c92a2a")
-        self.analysis_textbox.tag_config("default", foreground=THEME["text_primary"])
-        self.analysis_textbox.tag_config("header_tag", foreground=THEME.get("text_secondary", "#94a3b8"))
-        self.analysis_textbox.tag_config("move_tag", foreground=THEME["text_primary"])
-        self.analysis_textbox.tag_config("comment_tag", foreground=THEME.get("text_secondary", "#94a3b8"))
-
+        self._init_analysis_tags()
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
         self.pgn_data_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
