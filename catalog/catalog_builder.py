@@ -3,11 +3,10 @@ from pathlib import Path
 import threading
 import chess.pgn
 import duckdb
-from gui.statusbar import update_progress, set_status_message
+from gui.statusbar import set_status_message
 
 DB_Path = Path("personal_catalog.duckdb")
 PGN_Path = Path("personal_catalog.pgn")
-JSON_Path = Path("personal_catalog.json")
 
 
 def get_header(headers, key, default="Unknown"):
@@ -37,24 +36,17 @@ def catalog_pgns(filename, progress_callback=None):
 
     con = duckdb.connect(str(DB_Path))
     con.execute("""
-                CREATE TABLE IF NOT EXISTS catalog_headers
-                (
-                    game_index
-                    INTEGER,
-                    eco
-                    VARCHAR,
-                    opening
-                    VARCHAR,
-                    variation
-                    VARCHAR,
-                    white
-                    VARCHAR,
-                    black
-                    VARCHAR,
-                    headers_json
-                    VARCHAR
-                )
-                """)
+        CREATE TABLE IF NOT EXISTS catalog_headers
+        (
+            game_index INTEGER,
+            eco VARCHAR,
+            opening VARCHAR,
+            variation VARCHAR,
+            white VARCHAR,
+            black VARCHAR,
+            headers_json VARCHAR
+        )
+    """)
 
     # Get current max index to append properly
     max_idx_res = con.execute("SELECT MAX(game_index) FROM catalog_headers").fetchone()
@@ -105,9 +97,9 @@ def catalog_pgns(filename, progress_callback=None):
     if games_to_insert:
         set_status_message("Saving to database...")
         con.executemany("""
-                        INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """, games_to_insert)
+            INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, games_to_insert)
 
     con.close()
 
@@ -123,7 +115,6 @@ def run_import_in_background(filename, tk_root=None, on_complete_callback=None, 
     Runs catalog_pgns in a background daemon thread with smooth progress callbacks
     after shifting the active view to the search catalog workspace.
     """
-    # Local import to prevent circular dependency on startup, checking the file you provided previously
     try:
         from gui.catalog_workspace import show_workspace
         show_workspace("search_catalog")
