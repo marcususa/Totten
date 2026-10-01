@@ -163,6 +163,14 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
 
                         self.outer.after(0, lambda: self.outer.update_engine_display(display_text))
 
+                        # Automatically reset the engine button/state when it finishes depth 25
+                        try:
+                            if int(current_depth) >= 25:
+                                print("[ENGINE] Reached max depth 25. Resetting engine state.")
+                                self.outer.after(0, self.outer.stop_raw_engine_analysis)
+                        except Exception as ex:
+                            print(f"[ENGINE DEBUG] Depth check error: {ex}")
+
                     engine.analyze_position(
                         self.board_state,
                         depths=(10, 15, 20, 25),
