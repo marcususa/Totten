@@ -343,7 +343,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         if not game_obj:
             return
 
-        # Prevent redundant re-loads/wipes if this game is already active
         if getattr(self, "current_game", None) == game_obj and hasattr(self, "moves_textbox") and self.moves_textbox:
             return
 
