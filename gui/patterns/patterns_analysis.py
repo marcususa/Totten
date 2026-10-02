@@ -1,7 +1,11 @@
 # gui/patterns/patterns_analysis.py
 
 import threading
+import os
+import platform
+from pathlib import Path
 import chess
+import chess.engine
 import customtkinter as ctk
 import gui.app_state as state
 
@@ -154,10 +158,10 @@ class PatternsAnalysis(
             print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _bind_engine_buttons(self):
-        # --- ONLY bind the standalone PV Engine button here ---
+        # --- ONLY bind the standalone Engine button here (renamed from PV Engine) ---
         if hasattr(self, "btn_pv") and self.btn_pv:
             self.btn_pv.configure(
-                text="PV Engine",
+                text="Engine",
                 command=self.toggle_engine_action,
                 hover_color=THEME["btn_hover"]
             )
@@ -205,15 +209,32 @@ class PatternsAnalysis(
             )
 
     def toggle_engine_action(self):
+        """Controls the independent Engine button with start/stop/pause depth-30 state management."""
         is_running = getattr(self, "_engine_running", False)
-        if is_running:
-            self.stop_raw_engine_analysis()
-        else:
+        pausing_state = getattr(self, "_engine_pausing_to_depth_30", False)
+        worker = getattr(self, "_current_raw_engine_worker", None)
+
+        if is_running and (worker is None or not worker.is_alive()):
+            is_running = False
+            self._engine_running = False
+            self._engine_pausing_to_depth_30 = False
+
+        if not is_running:
+            self._engine_running = True
+            self._engine_pausing_to_depth_30 = False
             # Clear pattern mode so engine takes exclusive control
             self.active_engine_mode = None
             self.start_raw_engine_analysis()
+        elif is_running and not pausing_state:
+            self._engine_pausing_to_depth_30 = True
+            if worker:
+                worker.pausing_to_depth_30 = True
+        else:
+            self.stop_raw_engine_analysis()
+            self.update_engine_display("[No active position to evaluate.]\n")
 
     def start_raw_engine_analysis(self):
+        """Runs background worker for raw engine lines with MultiPV=5 and depth 30 limit using dynamic engine discovery."""
         if not hasattr(self, "current_node") or not self.current_node:
             self.update_engine_display("[No active position to evaluate.]\n")
             return
@@ -227,7 +248,9 @@ class PatternsAnalysis(
             self._current_raw_engine_worker.cancel = True
 
         self._engine_running = True
-        for btn_name in ("btn_engine_action", "btn_engines"):
+        self._engine_pausing_to_depth_30 = False
+
+        for btn_name in ("btn_engine_action", "btn_engines", "btn_pv"):
             btn = getattr(self, btn_name, None)
             if btn is not None:
                 try:
@@ -235,66 +258,110 @@ class PatternsAnalysis(
                 except Exception:
                     pass
 
+        outer_self = self
+
         class RawEngineWorker(threading.Thread):
             def __init__(self, board_state, outer):
                 super().__init__()
                 self.board_state = board_state
                 self.outer = outer
                 self.cancel = False
+                self.pausing_to_depth_30 = False
                 self.daemon = True
 
             def run(self):
+                engine = None
                 try:
-                    engine = ChessEngine()
+                    # Dynamically look for an engine binary inside local /engine or /engines directories
+                    engine_path = "stockfish"
+                    exe_filename = "stockfish.exe" if platform.system() == "Windows" else "stockfish"
 
-                    def callback(res):
-                        if self.cancel:
-                            return
-                        current_depth = res.get('depth', 25)
-                        raw_eval = res.get('eval', 0.0)
-                        eval_str = raw_eval if isinstance(raw_eval,
-                                                          str) and "M" in raw_eval else f"{float(raw_eval):+.2f}"
+                    for folder_name in ("engine", "engines"):
+                        folder_path = Path(folder_name)
+                        if folder_path.exists() and folder_path.is_dir():
+                            candidate = folder_path / exe_filename
+                            if candidate.exists():
+                                engine_path = str(candidate.resolve())
+                                break
+                            for file_path in folder_path.iterdir():
+                                if file_path.is_file():
+                                    if platform.system() == "Windows" and file_path.suffix.lower() == ".exe":
+                                        engine_path = str(file_path.resolve())
+                                        break
+                                    elif platform.system() != "Windows":
+                                        engine_path = str(file_path.resolve())
+                                        break
 
-                        pv_lines = res.get('pv_lines', [])
-                        if isinstance(pv_lines, list) and pv_lines:
-                            formatted_lines = []
-                            for idx, line in enumerate(pv_lines, start=1):
-                                temp_board = self.board_state.copy()
-                                move_tokens = line.strip().split()
-                                numbered_pv = []
+                    engine = chess.engine.SimpleEngine.popen_uci(engine_path)
+                    limit = chess.engine.Limit(depth=30)
 
-                                for move_str in move_tokens:
-                                    try:
-                                        move = temp_board.parse_san(move_str)
+                    with engine.analysis(self.board_state, limit, multipv=5) as analysis:
+                        latest_lines = {}
+                        for info in analysis:
+                            if self.cancel:
+                                break
+
+                            current_depth = info.get("depth", 0)
+                            multipv_idx = info.get("multipv", 1)
+                            score = info.get("score")
+                            pv = info.get("pv", [])
+
+                            if score and pv:
+                                score_cp = score.white().score(mate_score=10000)
+                                if score.is_mate():
+                                    mate_val = score.white().mate()
+                                    eval_str = f"M{abs(mate_val)}" if mate_val != 0 else "M0"
+                                    if mate_val < 0:
+                                        eval_str = f"-{eval_str}"
+                                    else:
+                                        eval_str = f"+{eval_str}"
+                                else:
+                                    eval_str = f"{score_cp / 100.0:+.2f}"
+
+                                latest_lines[multipv_idx] = {
+                                    "depth": current_depth,
+                                    "eval": eval_str,
+                                    "pv": pv
+                                }
+
+                                formatted_lines = []
+                                for idx in sorted(latest_lines.keys()):
+                                    line_data = latest_lines[idx]
+                                    d = line_data["depth"]
+                                    e = line_data["eval"]
+                                    moves = line_data["pv"]
+
+                                    temp_board = self.board_state.copy()
+                                    numbered_pv = []
+                                    for move in moves:
+                                        san_move = temp_board.san(move)
                                         if temp_board.turn == chess.WHITE:
-                                            numbered_pv.append(f"{temp_board.fullmove_number}. {move_str}")
+                                            numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
                                         else:
                                             if len(numbered_pv) == 0:
-                                                numbered_pv.append(f"{temp_board.fullmove_number}... {move_str}")
+                                                numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
                                             else:
-                                                numbered_pv.append(move_str)
+                                                numbered_pv.append(san_move)
                                         temp_board.push(move)
-                                    except Exception:
-                                        numbered_pv.append(move_str)
 
-                                moves_str = " ".join(numbered_pv)
-                                formatted_lines.append(f"{idx}. {current_depth} | Eval: {eval_str} {moves_str}")
+                                    moves_str = " ".join(numbered_pv)
+                                    formatted_lines.append(f"{idx}. Depth {d}  Eval: {e}  {moves_str}")
 
-                            display_text = "\n\n".join(formatted_lines) + "\n"
-                        else:
-                            display_text = f"1. {current_depth} | Eval: {eval_str} | PV: (none)\n"
+                                display_text = "\n\n".join(formatted_lines) + "\n"
+                                self.outer.after(0, lambda dt=display_text: self.outer.update_engine_display(dt))
 
-                        self.outer.after(0, lambda: self.outer.update_engine_display(display_text))
+                            if current_depth >= 30 and self.pausing_to_depth_30:
+                                break
 
-                    engine.analyze_position(
-                        self.board_state,
-                        depths=(10, 15, 20, 25),
-                        multipv=3,
-                        callback=callback,
-                        worker_ref=self
-                    )
                 except Exception as e:
                     print(f"[RAW ENGINE WORKER CRASH] {e}")
+                finally:
+                    if engine:
+                        try:
+                            engine.quit()
+                        except Exception:
+                            pass
+                    self.outer.after(0, self.outer.stop_raw_engine_analysis)
 
         self._current_raw_engine_worker = RawEngineWorker(board_obj, self)
         self._current_raw_engine_worker.start()
@@ -314,7 +381,7 @@ class PatternsAnalysis(
             btn = getattr(self, btn_name, None)
             if btn is not None:
                 try:
-                    btn.configure(fg_color=THEME["btn_initial"], text="PV Engine" if btn_name == "btn_pv" else "Engine")
+                    btn.configure(fg_color=THEME["btn_initial"], text="Engine")
                 except Exception:
                     pass
 
