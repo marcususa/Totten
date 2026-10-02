@@ -1,5 +1,13 @@
+import sys
+import os
 import platform
 from pathlib import Path
+
+# Add the project root directory to Python's module search path to ensure robust absolute imports
+ROOT_DIR = Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import customtkinter as ctk
 from gui.sidebar import create_sidebar
 from gui.catalog import create_workspace
@@ -9,8 +17,6 @@ from gui.chess_board import ChessBoardWidget
 from gui.mixed_collections.mixed_core import MixedAnalysis
 from gui.mixed_collections.edit_core import EditWorkspace
 from gui.mixed_collections.edit_constants import load_categories_config
-
-ROOT_DIR = Path(__file__).resolve().parent
 
 
 def _detect_platform_engines():
