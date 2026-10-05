@@ -138,21 +138,41 @@ class PatternsAnalysis(
                 self.pgn_tree.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
                 self.pgn_tree.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
                 self.pgn_tree.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
+                self.pgn_tree.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
+                self.pgn_tree.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
 
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
                 self.board_widget.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
+                self.board_widget.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
+                self.board_widget.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
         except Exception as e:
             print(f"[SHORTCUT BIND ERROR] {e}")
 
+    def on_flip_board(self, event=None):
+        """Explicitly calls toggle_flip() on the board widget when 'f' or 'F' is pressed."""
+        try:
+            if hasattr(self, "board_widget") and self.board_widget:
+                if hasattr(self.board_widget, "toggle_flip") and callable(self.board_widget.toggle_flip):
+                    self.board_widget.toggle_flip()
+                    print("[BOARD DEBUG] Board widget toggle_flip() executed successfully.")
+        except Exception as e:
+            print(f"[BOARD FLIP ERROR] {e}")
+
     def _safe_handle_shortcut(self, callback, event):
         try:
+            print(f"[SHORTCUT DEBUG] Key pressed: {event.keysym}")
             focused = self.winfo_toplevel().focus_get()
             if focused and type(focused).__name__ in ("CTkTextbox", "CTkEntry", "Text", "Entry"):
+                print("[SHORTCUT DEBUG] Ignored because focus is in a text box.")
                 return
 
             if callable(callback):
-                callback(event)
+                print(f"[SHORTCUT DEBUG] Executing callback: {callback.__name__}")
+                try:
+                    callback(event)
+                except TypeError:
+                    callback()
                 return "break"
         except Exception as e:
             print(f"[SHORTCUT EXECUTION ERROR] {e}")
