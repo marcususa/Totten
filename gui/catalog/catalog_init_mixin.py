@@ -11,6 +11,16 @@ class CatalogInitMixin:
         if category_source and category_source != "catalog":
             return
 
+        # Ensure game_node is a proper chess node/game object and not an index
+        if isinstance(game_node, int):
+            import gui.app_state as state
+            active_games = state.catalog_state.get("active_games", [])
+            if 0 <= game_node < len(active_games):
+                game_node = active_games[game_node]
+
+        if hasattr(game_node, "root") and callable(game_node.root):
+            game_node = game_node.root()
+
         # If the analysis textbox already contains text, do not wipe it out
         if hasattr(self, "analysis_textbox") and self.analysis_textbox:
             current_text = self.analysis_textbox.get("1.0", "end").strip()
@@ -21,10 +31,11 @@ class CatalogInitMixin:
         import gui.app_state as state
         if hasattr(state, "catalog_state") and isinstance(state.catalog_state, dict):
             state.catalog_state["active_focus"] = game_node
-        if hasattr(state, "catalog_state") and state.catalog_state.get("active_focus"):
-            self.current_node = state.catalog_state["active_focus"]
-            if hasattr(self, "_update_active_boards"):
-                self._update_active_boards(self.current_node.board())
+
+        self.current_node = game_node
+        if hasattr(self, "_update_active_boards") and hasattr(self.current_node, "board"):
+            self.current_board = self.current_node.board()
+            self._update_active_boards(self.current_board)
 
         if hasattr(self, "analysis_data") and self.analysis_data:
             self.render_catalog_analysis_moves(self.analysis_data)
@@ -44,10 +55,13 @@ class CatalogInitMixin:
             self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
     def on_flip_board(self, event=None):
-        if hasattr(self, "board_widget") and hasattr(self.board_widget, "flip_board"):
-            self.board_widget.flip_board()
-        elif hasattr(self, "board_widget") and hasattr(self.board_widget, "invert"):
-            self.board_widget.invert()
+        if hasattr(self, "board_widget") and self.board_widget:
+            if hasattr(self.board_widget, "flip_board"):
+                self.board_widget.flip_board()
+            elif hasattr(self.board_widget, "invert"):
+                self.board_widget.invert()
+            elif hasattr(self.board_widget, "toggle_flip"):
+                self.board_widget.toggle_flip()
 
     def _handle_keypress(self, event=None):
         if event and event.keysym in ("f", "F"):
@@ -104,6 +118,26 @@ class CatalogInitMixin:
         target_box.tag_config("move_tag", foreground=THEME["text_primary"], spacing3=6)
         target_box.tag_config("active_tracker", background=THEME["active_tracker_bg"],
                               foreground=THEME["active_tracker_fg"])
+
+    def render_pv_lines(self, pv_data):
+        """Renders up to 4 Multi-PV engine lines into self.pv_textbox."""
+        if not hasattr(self, "pv_textbox") or not self.pv_textbox:
+            return
+
+        target_box = getattr(self.pv_textbox, "_textbox", getattr(self.pv_textbox, "textbox", self.pv_textbox))
+        target_box.delete("1.0", "end")
+
+        max_lines = 4
+        for i in range(1, max_lines + 1):
+            line = pv_data.get(i) if isinstance(pv_data, dict) else None
+            if not line and isinstance(pv_data, list) and (i - 1) < len(pv_data):
+                line = pv_data[i - 1]
+
+            if line:
+                score = line.get("score_str", line.get("score", ""))
+                moves = line.get("pv_str", " ".join(line.get("pv", [])))
+                text = f"{i}. {score} {moves}\n"
+                target_box.insert("end", text)
 
     def render_catalog_analysis_moves(self, analysis_data):
         """Bridges catalog analysis data into self.analysis_rows and uses _sync_analysis_selection to prevent wiping on click."""
@@ -174,7 +208,6 @@ class CatalogInitMixin:
                     btn.configure(
                         fg_color=THEME["btn_hover"] if is_selected else THEME["btn_initial"]
                     )
-                    # Force CTkButton to drop internal hover state if deselected under the cursor
                     if not is_selected and hasattr(btn, "_on_leave"):
                         btn._on_leave(None)
                 except Exception:

@@ -7,8 +7,33 @@ from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 class CatalogNavigationMixin:
     """Mixin class to handle board traversal steps, node jumps, and engine mode switching UI updates."""
 
+    def _ensure_valid_game(self):
+        """Safely ensures current_game and board_node are valid game/node objects rather than int indices."""
+        import gui.app_state as state_mod
+
+        # Resolve active_games from instance or global state if missing
+        if not hasattr(self, "active_games") or not self.active_games:
+            if hasattr(state_mod, "catalog_state") and state_mod.catalog_state.get("active_games"):
+                self.active_games = state_mod.catalog_state["active_games"]
+
+        # If current_game is an int index, map it to the actual game object
+        if isinstance(getattr(self, "current_game", None), int):
+            if hasattr(self, "active_games") and self.active_games:
+                idx = max(0, min(self.current_game, len(self.active_games) - 1))
+                self.current_game = self.active_games[idx]
+
+        # If board_node is an int index or missing, initialize it from current_game
+        if isinstance(getattr(self, "board_node", None), int) or not getattr(self, "board_node", None):
+            if hasattr(self, "current_game") and self.current_game:
+                self.board_node = self.current_game.root() if hasattr(self.current_game, "root") else self.current_game
+            elif hasattr(self, "active_games") and self.active_games:
+                self.current_game = self.active_games[0]
+                self.board_node = self.current_game.root() if hasattr(self.current_game, "root") else self.current_game
+
     def on_prev_move(self, event=None):
-        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
+        self._ensure_valid_game()
+        if hasattr(self, "board_node") and self.board_node and hasattr(self.board_node,
+                                                                       "parent") and self.board_node.parent:
             self.board_node = self.board_node.parent
             self.current_node = self.board_node
             if hasattr(self, "board_widget") and self.board_widget:
@@ -17,7 +42,9 @@ class CatalogNavigationMixin:
         return "break"
 
     def on_next_move(self, event=None):
-        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
+        self._ensure_valid_game()
+        if hasattr(self, "board_node") and self.board_node and hasattr(self.board_node,
+                                                                       "variations") and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
             self.current_node = self.board_node
             if hasattr(self, "board_widget") and self.board_widget:
@@ -26,20 +53,22 @@ class CatalogNavigationMixin:
         return "break"
 
     def on_first_move(self, event=None):
+        self._ensure_valid_game()
         if hasattr(self, "current_game") and self.current_game:
-            self.board_node = self.current_game
+            self.board_node = self.current_game.root() if hasattr(self.current_game, "root") else self.current_game
             self.current_node = self.board_node
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(self.current_game.board().fen())
             self.update_active_move_highlight()
 
     def on_last_move(self, event=None):
+        self._ensure_valid_game()
         if hasattr(self, "current_game") and self.current_game:
-            node = self.current_game
-            while node.variations:
+            node = self.current_game.root() if hasattr(self.current_game, "root") else self.current_game
+            while hasattr(node, "variations") and node.variations:
                 node = node.variation(0)
             self.board_node = node
-            self.current_node = self.board_node
+            self.current_node = node
             if hasattr(self, "board_widget") and self.board_widget:
                 self.board_widget.set_position_fen(node.board().fen())
             self.update_active_move_highlight()
@@ -59,7 +88,9 @@ class CatalogNavigationMixin:
         if hasattr(self, "board_widget") and self.board_widget:
             if hasattr(self.board_widget, "flip_board"):
                 self.board_widget.flip_board()
-            elif hasattr(self, "board_widget", "toggle_flip"):
+            elif hasattr(self, "invert"):
+                self.board_widget.invert()
+            elif hasattr(self.board_widget, "toggle_flip"):
                 self.board_widget.toggle_flip()
 
     def trigger_engine_mode(self, mode):
