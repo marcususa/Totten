@@ -129,3 +129,100 @@ class PatternsAnalysisNavigationMixin:
                 state.active_category_source = eco_games
 
         self.populate_catalog_tree(eco_games, active_game=target_game)
+
+    def jump_to_node(self, target_node):
+        """Jumps directly to a specific game node when clicked in the move analysis list."""
+        if not target_node:
+            return
+
+        self.current_node = target_node
+        self.board_node = target_node
+        if hasattr(self, "board_widget") and self.board_widget:
+            try:
+                self.board_widget.set_position_fen(self.board_node.board().fen())
+            except Exception:
+                pass
+        if hasattr(self, "_sync_analysis_selection"):
+            self._sync_analysis_selection()
+
+    def on_prev_move(self, event=None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
+            self.board_node = self.board_node.parent
+            self.current_node = self.board_node
+            if hasattr(self, "board_widget") and self.board_widget:
+                try:
+                    self.board_widget.set_position_fen(self.board_node.board().fen())
+                except Exception:
+                    pass
+            if hasattr(self, "_sync_analysis_selection"):
+                self._sync_analysis_selection()
+        return "break"
+
+    def on_next_move(self, event=None):
+        if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
+            self.board_node = self.board_node.variation(0)
+            self.current_node = self.board_node
+            if hasattr(self, "board_widget") and self.board_widget:
+                try:
+                    self.board_widget.set_position_fen(self.board_node.board().fen())
+                except Exception:
+                    pass
+            if hasattr(self, "_sync_analysis_selection"):
+                self._sync_analysis_selection()
+        return "break"
+
+    def on_first_move(self, event=None):
+        if hasattr(self, "current_game") and self.current_game:
+            self.board_node = self.current_game
+            self.current_node = self.board_node
+            if hasattr(self, "board_widget") and self.board_widget:
+                try:
+                    self.board_widget.set_position_fen(self.current_game.board().fen())
+                except Exception:
+                    pass
+            if hasattr(self, "_sync_analysis_selection"):
+                self._sync_analysis_selection()
+        return "break"
+
+    def on_last_move(self, event=None):
+        if hasattr(self, "current_game") and self.current_game:
+            node = self.current_game
+            while node.variations:
+                node = node.variation(0)
+            self.board_node = node
+            self.current_node = self.board_node
+            if hasattr(self, "board_widget") and self.board_widget:
+                try:
+                    self.board_widget.set_position_fen(node.board().fen())
+                except Exception:
+                    pass
+            if hasattr(self, "_sync_analysis_selection"):
+                self._sync_analysis_selection()
+        return "break"
+
+    def on_flip_board(self, event=None):
+        print("[DEBUG] on_flip_board called in Patterns!")  # <-- Add this line here
+        board = getattr(self, "board_widget", None)
+        if not board:
+            def find_board(widget):
+                if hasattr(widget, "flip_board") or hasattr(widget, "invert") or hasattr(widget, "toggle_flip"):
+                    return widget
+                for child in widget.winfo_children():
+                    res = find_board(child)
+                    if res:
+                        return res
+                return None
+
+            board = find_board(self)
+
+        if board:
+            try:
+                if hasattr(board, "flip_board"):
+                    board.flip_board()
+                elif hasattr(board, "invert"):
+                    board.invert()
+                elif hasattr(board, "toggle_flip"):
+                    board.toggle_flip()
+            except Exception as e:
+                print(f"[FLIP BOARD ERROR] {e}")
+        return "break"
