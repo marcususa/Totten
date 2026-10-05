@@ -154,9 +154,27 @@ class MixedAnalysisNavigation:
         return "break"
 
     def on_flip_board(self, event=None):
-        if hasattr(self, "board_widget") and self.board_widget:
-            if hasattr(self.board_widget, "flip_board"):
-                self.board_widget.flip_board()
-            elif hasattr(self.board_widget, "toggle_flip"):
-                self.board_widget.toggle_flip()
+        board = getattr(self, "board_widget", None)
+        if not board:
+            def find_board(widget):
+                if hasattr(widget, "flip_board") or hasattr(widget, "invert") or hasattr(widget, "toggle_flip"):
+                    return widget
+                for child in widget.winfo_children():
+                    res = find_board(child)
+                    if res:
+                        return res
+                return None
+
+            board = find_board(self)
+
+        if board:
+            try:
+                if hasattr(board, "flip_board"):
+                    board.flip_board()
+                elif hasattr(board, "invert"):
+                    board.invert()
+                elif hasattr(board, "toggle_flip"):
+                    board.toggle_flip()
+            except Exception as e:
+                print(f"[FLIP BOARD ERROR] {e}")
         return "break"

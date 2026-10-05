@@ -92,10 +92,10 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
             target.bind("<Down>", self.on_last_move)
             target.bind("<Home>", self.on_first_move)
             target.bind("<End>", self.on_last_move)
-            target.bind("f", self.on_flip_board)
-            target.bind("F", self.on_flip_board)
             target.bind("<Key-f>", self.on_flip_board)
             target.bind("<Key-F>", self.on_flip_board)
+            target.bind("f", self.on_flip_board)
+            target.bind("F", self.on_flip_board)
 
         if hasattr(self, "board_widget") and self.board_widget:
             self.board_widget.on_step_back = self.on_prev_move
@@ -114,22 +114,28 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
         """Flips the board orientation, dynamically locating the board widget if needed."""
         board = getattr(self, "board_widget", None)
         if not board:
-            # Recursively or directly check child widgets for toggle_flip support
             def find_board(widget):
-                if hasattr(widget, "toggle_flip"):
+                if hasattr(widget, "flip_board") or hasattr(widget, "invert") or hasattr(widget, "toggle_flip"):
                     return widget
                 for child in widget.winfo_children():
                     res = find_board(child)
                     if res:
                         return res
                 return None
+
             board = find_board(self)
 
-        if board and hasattr(board, "toggle_flip"):
+        if board:
             try:
-                board.toggle_flip()
+                if hasattr(board, "flip_board"):
+                    board.flip_board()
+                elif hasattr(board, "invert"):
+                    board.invert()
+                elif hasattr(board, "toggle_flip"):
+                    board.toggle_flip()
             except Exception as e:
                 print(f"[FLIP BOARD ERROR] {e}")
+        return "break"
 
     def _bind_engine_buttons(self):
         """Binds UI buttons to engine mode triggers."""
