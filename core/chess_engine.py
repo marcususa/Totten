@@ -50,6 +50,55 @@ class ChessEngine:
         except Exception:
             return False
 
+    def analyze_position(self, board, depths=(10, 15, 20, 25), multipv=5, callback=None, worker_ref=None):
+        """Analyzes a single board position incrementally across increasing depths for live PV evaluation with MultiPV=5."""
+        try:
+            with chess.engine.SimpleEngine.popen_uci(str(self.engine_path)) as engine:
+                engine.configure({"Hash": 64, "Threads": 2})
+
+                for d in depths:
+                    if worker_ref and getattr(worker_ref, "cancel", False):
+                        break
+
+                    info = engine.analyse(board, chess.engine.Limit(depth=d), multipv=multipv)
+
+                    pv_lines = []
+                    primary_eval = 0.0
+
+                    for idx, entry in enumerate(info):
+                        score_obj = entry["score"].white()
+                        if score_obj.is_mate():
+                            eval_val = f"M{abs(score_obj.mate())}"
+                            if score_obj.mate() < 0:
+                                eval_val = f"-{eval_val}"
+                            else:
+                                eval_val = f"+{eval_val}"
+                        else:
+                            score_cp = score_obj.score() or 0
+                            eval_val = f"{score_cp / 100.0:+.2f}"
+
+                        if idx == 0:
+                            primary_eval = eval_val
+
+                        if "pv" in entry:
+                            temp_b = board.copy()
+                            san_moves = []
+                            for m in entry["pv"][:20]:
+                                san_moves.append(temp_b.san(m))
+                                temp_b.push(m)
+                            pv_lines.append(" ".join(san_moves))
+
+                    result = {
+                        "depth": d,
+                        "eval": primary_eval,
+                        "pv_lines": pv_lines
+                    }
+                    if callback:
+                        callback(result)
+        except Exception as e:
+            print(f"[Position Engine Error]: {e}")
+            sys.stdout.flush()
+
     def analyze_game(self, pgn_input, mode="review", game_index=0, callback=None, start_move=1, end_move=200):
         print(f"[CHESS_ENGINE] analyze_game called: mode={mode}, start_move={start_move}, end_move={end_move}")
         sys.stdout.flush()
