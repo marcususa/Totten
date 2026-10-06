@@ -5,12 +5,13 @@ import chess.pgn
 import gui.app_state as state
 
 from core.constants import THEME
+from core.analysis_panel import AnalysisPanelMixin
 from gui.catalog.catalog_init_mixin import CatalogInitMixin
 from gui.mixed_collections.mixed_navigation import MixedAnalysisNavigation
 from gui.mixed_collections.mixed_engine import MixedAnalysisEngine
 
 
-class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, MixedAnalysisEngine):
+class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, MixedAnalysisEngine, AnalysisPanelMixin):
     """
     Dedicated self-contained workspace controller for Mixed Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
@@ -201,11 +202,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
         if hasattr(self, "board_widget") and self.board_widget and hasattr(self.board_widget, "toggle_popout"):
             self.board_widget.toggle_popout()
 
-    def load_game(self, game_node, category_source=None):
-        if hasattr(self, "load_game_hardwired"):
-            return self.load_game_hardwired(game_node, category_source=category_source)
-        return self.load_game_from_state(game_node, category_source=category_source)
-
     def load_games_from_file(self, filepath):
         """Loads all games from a specific PGN file path."""
         source_games = []
@@ -288,7 +284,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
         if target_item:
             self.pgn_tree.selection_set(target_item)
             self.pgn_tree.see(target_item)
-            self.load_game_from_state(self.preview_lookup[target_item])
+            self.load_game(self.preview_lookup[target_item])
 
     def load_games_by_eco(self, eco_code, active_game=None):
         if not eco_code:
@@ -319,99 +315,17 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
             self.game_list = category_source
             self.populate_catalog_tree(self.game_list, active_game=game_node)
         else:
-            self.load_game_from_state(game_node)
+            self.load_game(game_node)
 
     def on_hardwired_tree_select(self, game):
-        self.load_game_from_state(game)
+        self.load_game(game)
 
-    def load_game_from_state(self, game_obj, category_source=None):
-        """Loads a game object into the analysis board, notation view, and header metadata with red tracker highlighting intact."""
-        if not game_obj:
-            return
-
-        self.current_game = game_obj
-        self.board_node = game_obj
-        self.active_game = game_obj
-        self.root_game_node = game_obj
-        self.current_node = game_obj
-
-        if hasattr(self, "board_widget") and self.board_widget:
-            try:
-                fen_str = game_obj.board().fen()
-                self.board_widget.set_position_fen(fen_str)
-            except Exception:
-                pass
-
-        headers = game_obj.headers
-        white = headers.get("White", "Unknown")
-        black = headers.get("Black", "Unknown")
-        result = headers.get("Result", "*")
-
-        if hasattr(self, "pgn_data_text") and self.pgn_data_text:
-            try:
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
-                pgn_text_export = game_obj.accept(exporter)
-
-                self.pgn_data_text.configure(fg_color=THEME["bg_surface"])
-                inner_pgn = getattr(self.pgn_data_text, "_textbox", getattr(self.pgn_data_text, "textbox", self.pgn_data_text))
-                inner_pgn.configure(state="normal")
-                inner_pgn.delete("1.0", "end")
-                inner_pgn.insert("end", pgn_text_export)
-                inner_pgn.configure(state="disabled")
-            except Exception:
-                pass
-
-        if hasattr(self, "_load_plain_game_moves"):
-            try:
-                self._load_plain_game_moves(game_obj)
-            except Exception:
-                pass
-
-        if self.active_engine_mode == "review":
-            self.start_game_review(game_obj)
-
-    def _load_plain_game_moves(self, game_obj):
-        """Renders plain game moves into the Moves panel continuously like a book."""
-        if not game_obj:
-            return
-
-        try:
-            game = game_obj
-            temp_board = game.board()
-
-            if hasattr(self, "moves_textbox") and self.moves_textbox:
-                box = self.moves_textbox
-                box.configure(fg_color=THEME["bg_surface"], wrap="word")
-                moves_box = getattr(box, "_textbox", getattr(box, "textbox", box))
-                moves_box.configure(state="normal")
-                moves_box.delete("1.0", "end")
-
-                node = game
-                move_num = 1
-
-                while node.variations:
-                    next_node = node.variation(0)
-                    move = next_node.move
-                    move_san = temp_board.san(move)
-                    is_white = temp_board.turn == chess.WHITE
-                    temp_board.push(move)
-
-                    tag_name = str(id(next_node))
-
-                    if is_white:
-                        moves_box.insert("end", f"{move_num}. {move_san} ", ("default", tag_name))
-                    else:
-                        moves_box.insert("end", f"{move_san} ", ("default", tag_name))
-                        move_num += 1
-
-                    moves_box.tag_bind(tag_name, "<Button-1>", lambda e, n=next_node: self.jump_to_node(n))
-                    moves_box.tag_config(tag_name, foreground=THEME["text_primary"])
-
-                    node = next_node
-
-                moves_box.configure(state="disabled")
-        except Exception as e:
-            print(f"DEBUG: Error parsing game moves -> {e}")
+    def update_active_move_highlight(self):
+        """Ensures navigation steps trigger analysis panel position highlights."""
+        if hasattr(self, "board_node") and self.board_node and not getattr(self, "current_node", None):
+            self.current_node = self.board_node
+        if hasattr(self, "_sync_analysis_selection"):
+            self._sync_analysis_selection()
 
 
 def create_workspace(master, initial_games=None, filename=None, active_focus=None, active_index=None, **kwargs):
