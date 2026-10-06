@@ -5,17 +5,14 @@ import chess
 import chess.pgn
 import gui.app_state as state
 
+from core.analysis_panel import AnalysisPanelMixin
 from core.constants import THEME
 from .catalog_init_mixin import CatalogInitMixin
 from .engine import CatalogEngineMixin
 from .navigation import CatalogNavigationMixin
-from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
-from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
-from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
-class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, CatalogEngineMixin):
-
+class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, CatalogEngineMixin, AnalysisPanelMixin):
     """
     Dedicated self-contained workspace controller for Catalog Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
@@ -37,7 +34,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
-        self.active_engine_mode = None
+        self.active_engine_mode = state.catalog_state.get("active_engine_mode") if hasattr(state, "catalog_state") else None
         self.analysis_rows = {}
         self._current_analysis_worker = None
 
@@ -48,10 +45,13 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         self._bind_global_shortcuts()
 
         if hasattr(self, "board_widget") and self.board_widget:
-            self.board_widget.on_step_back = self.on_prev_move
-            self.board_widget.on_step_forward = self.on_next_move
-            self.board_widget.on_jump_start = self.on_first_move
-            self.board_widget.on_jump_end = self.on_last_move
+            try:
+                self.board_widget.on_step_back = self.on_prev_move
+                self.board_widget.on_step_forward = self.on_next_move
+                self.board_widget.on_jump_start = self.on_first_move
+                self.board_widget.on_jump_end = self.on_last_move
+            except Exception as e:
+                print(f"[BOARD WIDGET BIND ERROR] {e}")
 
         self.after(50, self.focus_force)
 
@@ -124,29 +124,35 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
     def _bind_engine_buttons(self):
-        for btn_name in ("btn_review", "btn_review_mode"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=lambda: self.trigger_engine_mode("review"),
-                    hover_color=THEME["btn_hover"]
-                )
+        try:
+            for btn_name in ("btn_review", "btn_review_mode"):
+                btn = getattr(self, btn_name, None)
+                if btn is not None:
+                    btn.configure(
+                        command=lambda: self.trigger_engine_mode("review"),
+                        hover_color=THEME["btn_hover"]
+                    )
 
-        for btn_name in ("btn_candidates", "btn_candidate_moves"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=lambda: self.trigger_engine_mode("candidates"),
-                    hover_color=THEME["btn_hover"]
-                )
+            for btn_name in ("btn_candidates", "btn_candidate_moves"):
+                btn = getattr(self, btn_name, None)
+                if btn is not None:
+                    btn.configure(
+                        command=lambda: self.trigger_engine_mode("candidates"),
+                        hover_color=THEME["btn_hover"]
+                    )
 
-        for btn_name in ("btn_standard", "btn_standard_mode", "btn_engines"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                btn.configure(
-                    command=lambda: self.trigger_engine_mode("standard"),
-                    hover_color=THEME["btn_hover"]
-                )
+            for btn_name in ("btn_standard", "btn_standard_mode", "btn_engines"):
+                btn = getattr(self, btn_name, None)
+                if btn is not None:
+                    btn.configure(
+                        command=lambda: self.trigger_engine_mode("standard"),
+                        hover_color=THEME["btn_hover"]
+                    )
+
+            if self.active_engine_mode:
+                self.trigger_engine_mode(self.active_engine_mode)
+        except Exception as e:
+            print(f"[ENGINE BUTTON BIND ERROR] {e}")
 
     def write_analysis(self, text):
         self.update_engine_display(text)
@@ -161,8 +167,8 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         if hasattr(self, "board_widget") and self.board_widget and board_obj:
             try:
                 self.board_widget.set_position_fen(board_obj.fen())
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[UPDATE ACTIVE BOARDS ERROR] {e}")
 
     def load_games_list(self, games_list, focused_game=None):
         if not games_list:
@@ -178,12 +184,10 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
     def pop_out_board(self, *args, **kwargs):
         if hasattr(self, "board_widget") and self.board_widget and hasattr(self.board_widget, "toggle_popout"):
-            self.board_widget.toggle_popout()
-
-    def load_game(self, game_node, category_source=None):
-        if hasattr(self, "load_game_hardwired"):
-            return self.load_game_hardwired(game_node, category_source=category_source)
-        return self.load_game_from_state(game_node, category_source=category_source)
+            try:
+                self.board_widget.toggle_popout()
+            except Exception as e:
+                print(f"[POPOUT ERROR] {e}")
 
     def load_catalog_data(self):
         if self.game_list:
@@ -256,8 +260,11 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
             return
 
-        self.pgn_tree.delete(*self.pgn_tree.get_children())
-        self.preview_lookup.clear()
+        try:
+            self.pgn_tree.delete(*self.pgn_tree.get_children())
+            self.preview_lookup.clear()
+        except Exception as e:
+            print(f"[TREE CLEAR ERROR] {e}")
 
         if hasattr(self, "lbl_empty_state") and self.lbl_empty_state and games_to_display:
             try:
@@ -273,15 +280,18 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             black = headers.get("Black", "Unknown")
             result = headers.get("Result", "*")
 
-            item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
-            self.preview_lookup[item_id] = g
+            try:
+                item_id = self.pgn_tree.insert("", "end", values=(idx, white, black, result))
+                self.preview_lookup[item_id] = g
 
-            if target and g == target:
-                self.pgn_tree.selection_set(item_id)
-                self.pgn_tree.see(item_id)
+                if target and g == target:
+                    self.pgn_tree.selection_set(item_id)
+                    self.pgn_tree.see(item_id)
+            except Exception as e:
+                print(f"[TREE INSERT ERROR] {e}")
 
         if target:
-            self.load_game_from_state(target)
+            self.load_game(target)
         self.after(50, self.focus_set)
 
     def load_games_by_eco(self, eco_code, active_game=None):
@@ -313,144 +323,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             self.game_list = category_source
             self.populate_catalog_tree(self.game_list, active_game=game_node)
         else:
-            self.load_game_from_state(game_node)
+            self.load_game(game_node)
 
     def on_hardwired_tree_select(self, game):
-        self.load_game_from_state(game)
-
-    def jump_to_node(self, node):
-        """Safely navigates to a specific move node when clicked without wiping text."""
-        if not node:
-            return
-
-        self.board_node = node
-        self.current_node = node
-
-        if hasattr(self, "board_widget") and self.board_widget:
-            try:
-                fen_str = node.board().fen()
-                self.board_widget.set_position_fen(fen_str)
-            except Exception:
-                pass
-
-        if hasattr(self, "update_active_move_highlight"):
-            try:
-                self.update_active_move_highlight()
-            except Exception:
-                pass
-
-    def load_game_from_state(self, game_obj, category_source=None):
-        if not game_obj:
-            return
-
-        if getattr(self, "current_game", None) == game_obj and hasattr(self, "moves_textbox") and self.moves_textbox:
-            return
-
-        self.current_game = game_obj
-        self.board_node = game_obj
-        self.active_game = game_obj
-        self.root_game_node = game_obj
-        self.current_node = game_obj
-
-        if hasattr(self, "board_widget") and self.board_widget:
-            try:
-                fen_str = game_obj.board().fen()
-                self.board_widget.set_position_fen(fen_str)
-            except Exception:
-                pass
-
-        headers = game_obj.headers
-        white = headers.get("White", "Unknown")
-        black = headers.get("Black", "Unknown")
-        result = headers.get("Result", "*")
-
-        if hasattr(self, "pgn_data_text") and self.pgn_data_text:
-            try:
-                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
-                pgn_text_export = game_obj.accept(exporter)
-
-                self.pgn_data_text.configure(fg_color=THEME["bg_surface"])
-                inner_pgn = getattr(self.pgn_data_text, "_textbox",
-                                    getattr(self.pgn_data_text, "textbox", self.pgn_data_text))
-                inner_pgn.configure(state="normal")
-                inner_pgn.delete("1.0", "end")
-                inner_pgn.insert("end", pgn_text_export)
-                inner_pgn.configure(state="disabled")
-            except Exception:
-                pass
-
-        if hasattr(self, "_load_plain_game_moves"):
-            try:
-                self._load_plain_game_moves(game_obj)
-            except Exception:
-                pass
-
-    def _load_plain_game_moves(self, game_obj):
-        """Renders plain game moves into the Moves panel in correct order."""
-        if not game_obj:
-            return
-
-        try:
-            root_game = game_obj.root() if hasattr(game_obj, "root") else game_obj
-            temp_board = root_game.board()
-
-            if hasattr(self, "moves_textbox") and self.moves_textbox:
-                box = self.moves_textbox
-                box.configure(fg_color=THEME["bg_surface"])
-                moves_box = getattr(box, "_textbox", getattr(box, "textbox", box))
-                moves_box.configure(state="normal")
-                moves_box.delete("1.0", "end")
-
-                node = root_game
-                move_num = 1
-
-                while node.variations:
-                    next_node = node.variation(0)
-                    move = next_node.move
-                    move_san = temp_board.san(move)
-                    is_white = temp_board.turn == chess.WHITE
-                    temp_board.push(move)
-
-                    tag_name = str(id(next_node))
-
-                    if is_white:
-                        moves_box.insert("end", f"{move_num}. {move_san} ", ("default", tag_name))
-                    else:
-                        moves_box.insert("end", f"{move_san} ", ("default", tag_name))
-                        move_num += 1
-
-                    moves_box.tag_bind(tag_name, "<Button-1>", lambda e, n=next_node: self.jump_to_node(n))
-                    moves_box.tag_config(tag_name, foreground=THEME["text_primary"])
-
-                    node = next_node
-
-                moves_box.configure(state="disabled")
-
-        except Exception as e:
-            print(f"DEBUG: Error parsing game moves -> {e}")
-
-    def update_active_move_highlight(self):
-        if hasattr(self, "moves_textbox") and self.moves_textbox:
-            try:
-                box = self.moves_textbox
-                box.configure(fg_color=THEME["bg_surface"])
-                moves_box = getattr(box, "_textbox", getattr(box, "textbox", box))
-                moves_box.configure(state="normal")
-                moves_box.tag_remove("active_move", "1.0", "end")
-
-                if self.board_node and self.board_node != self.current_game:
-                    current_tag = str(id(self.board_node))
-                    ranges = moves_box.tag_ranges(current_tag)
-                    if ranges:
-                        moves_box.tag_add("active_move", ranges[0], ranges[1])
-                        moves_box.see(ranges[0])
-
-                moves_box.configure(state="disabled")
-            except Exception:
-                pass
-
-        if hasattr(self, "_sync_analysis_selection"):
-            try:
-                self._sync_analysis_selection()
-            except Exception:
-                pass
+        self.load_game(game)
