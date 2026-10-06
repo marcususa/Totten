@@ -121,7 +121,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                     engine.analyze_position(
                         self.board_state,
                         depths=(10, 15, 20, 25),
-                        multipv=3,
+                        multipv=5,
                         callback=callback,
                         worker_ref=self
                     )
@@ -191,7 +191,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                         curr_eval = res.get('eval_after', 0.0)
                         played_san = res['played_san']
 
-                        steps = move_num * 2 if is_white else move_num * 2 - 1
+                        steps = move_num * 2 - 1 if is_white else move_num * 2
                         curr_n = self.game_obj
                         for _ in range(steps):
                             if curr_n.variations:
@@ -211,7 +211,6 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
 
                             tag_to_apply = "default"
                             eval_str = ""
-                            comment_str = ""
 
                             if loss >= 2.6:
                                 tag_to_apply = "red"
@@ -237,7 +236,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                                         self.black_streak += 1
                                     tag_to_apply = "green" if self.black_streak >= 3 else "light_blue"
 
-                            move_display = f"{played_san}{eval_str}{comment_str}"
+                            move_display = f"{played_san}{eval_str}"
 
                         if move_num not in self.outer.analysis_rows:
                             self.outer.analysis_rows[move_num] = {
