@@ -11,12 +11,22 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
     """Manages background analysis workers, raw engine evaluation, and mode routing."""
 
     def toggle_engine_action(self):
-        """Controls the independent Engine button for raw live evaluation on the left."""
+        """Controls the independent Engine button for raw live evaluation on the left, with real-time thread state sync."""
         is_running = getattr(self, "_engine_running", False)
+        worker = getattr(self, "_current_raw_engine_worker", None)
+
+        if is_running and (worker is None or not worker.is_alive()):
+            is_running = False
+            self._engine_running = False
+
+        print(f"[DEBUG] Mixed Engine button clicked! Synced _engine_running state: {is_running}")
+
         if is_running:
-            self.start_raw_engine_analysis()
-        else:
+            print("[DEBUG] Stopping raw engine analysis...")
             self.stop_raw_engine_analysis()
+        else:
+            print("[DEBUG] Starting raw engine analysis...")
+            self.start_raw_engine_analysis()
 
     def start_raw_engine_analysis(self):
         """Runs a lightweight background worker for raw engine lines targeting only pv_textbox."""
@@ -33,6 +43,16 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
 
         if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
             self._current_raw_engine_worker.cancel = True
+
+        # Set running state and update button appearance immediately
+        self._engine_running = True
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(fg_color=THEME["btn_hover"], text="Stop Engine")
+                except Exception:
+                    pass
 
         class RawEngineWorker(threading.Thread):
             def __init__(self, board_state, outer):
@@ -90,6 +110,14 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
 
                         self.outer.after(0, lambda: self.outer.update_engine_display(display_text))
 
+                        # Automatically reset the engine button/state when it finishes depth 25
+                        try:
+                            if int(current_depth) >= 25:
+                                print("[ENGINE] Reached max depth 25. Resetting engine state.")
+                                self.outer.after(0, self.outer.stop_raw_engine_analysis)
+                        except Exception as ex:
+                            print(f"[ENGINE DEBUG] Depth check error: {ex}")
+
                     engine.analyze_position(
                         self.board_state,
                         depths=(10, 15, 20, 25),
@@ -108,11 +136,14 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
             self._current_raw_engine_worker.cancel = True
             self._current_raw_engine_worker = None
 
-        if hasattr(self, "btn_engine_action") and self.btn_engine_action:
-            try:
-                self.btn_engine_action.configure(text="Engine")
-            except Exception:
-                pass
+        self._engine_running = False
+        for btn_name in ("btn_engine_action", "btn_engines"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(fg_color=THEME["btn_initial"], text="Engine")
+                except Exception:
+                    pass
 
     def update_engine_display(self, text):
         """Strictly controls the left-column pv_textbox for raw engine outputs without touching the right analysis column."""
@@ -160,7 +191,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                         curr_eval = res.get('eval_after', 0.0)
                         played_san = res['played_san']
 
-                        steps = move_num * 2 - 1 if is_white else move_num * 2
+                        steps = move_num * 2 if is_white else move_num * 2 - 1
                         curr_n = self.game_obj
                         for _ in range(steps):
                             if curr_n.variations:
@@ -185,17 +216,14 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                             if loss >= 2.6:
                                 tag_to_apply = "red"
                                 eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ??"
                                 self.white_streak = 0
                                 self.black_streak = 0
                             elif 1.0 <= loss <= 2.5:
                                 tag_to_apply = "orange"
                                 eval_str = f" {{{curr_eval:+.2f}}}"
-                                comment_str = " ?"
                                 self.white_streak = 0
                                 self.black_streak = 0
                             elif 0.3 <= loss < 1.0:
-                                comment_str = " ?!"
                                 if is_white:
                                     if self.black_streak > 0:
                                         self.black_streak -= 1
@@ -320,7 +348,6 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
         self.active_engine_mode = mode
         self._selected_mode_button = mode
 
-        # Highlight active buttons and dim inactive ones
         mode_buttons = {
             "review": ("btn_review", "btn_review_mode"),
             "candidates": ("btn_candidates", "btn_candidate_moves"),
@@ -341,7 +368,6 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                     except Exception:
                         pass
 
-        # Update frame border highlights if present
         if hasattr(self, "frame_review") and self.frame_review:
             try:
                 self.frame_review.configure(border_width=0 if mode == "review" else 1)
@@ -358,7 +384,6 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
             except Exception:
                 pass
 
-        # Delegate directly to the respective mixin handler
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
         elif mode == "candidates":
