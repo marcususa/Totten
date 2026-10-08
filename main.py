@@ -20,23 +20,42 @@ from gui.mixed_collections.edit_constants import load_categories_config
 
 
 def _detect_platform_engines():
-    """Dynamically resolves valid chess engine paths based on the host OS to prevent cross-platform crashes."""
+    """Dynamically scans for any Stockfish binary in the engines folder
+    matching the host OS, eliminating the need to manually rename files."""
     system = platform.system()
     engines = {}
+    engines_dir = ROOT_DIR / "engines"
 
-    if system == "Windows":
-        potential_paths = [
-            ROOT_DIR / "engines" / "stockfish.exe",
-            ROOT_DIR / "stockfish.exe"
-        ]
-    else:  # Linux / macOS
-        potential_paths = [
-            ROOT_DIR / "engines" / "stockfish",
-            ROOT_DIR / "stockfish"
-        ]
+    is_windows = (system == "Windows")
+    valid_path = None
 
-    valid_engines = [str(p) for p in potential_paths if p.is_file()]
-    engines["stockfish"] = valid_engines[0] if valid_engines else None
+    # Helper function to check if a file matches Stockfish criteria
+    def is_valid_stockfish(file_path):
+        if not file_path.is_file():
+            return False
+        filename = file_path.name.lower()
+        if "stockfish" in filename:
+            if is_windows and filename.endswith(".exe"):
+                return True
+            if not is_windows and not filename.endswith(".exe"):
+                return True
+        return False
+
+    # 1. Scan the engines/ directory first
+    if engines_dir.exists():
+        for file_path in engines_dir.iterdir():
+            if is_valid_stockfish(file_path):
+                valid_path = file_path
+                break
+
+    # 2. Fallback: Check project root directory if not found in engines/
+    if not valid_path:
+        for file_path in ROOT_DIR.iterdir():
+            if is_valid_stockfish(file_path):
+                valid_path = file_path
+                break
+
+    engines["stockfish"] = str(valid_path) if valid_path else None
     return engines
 
 
