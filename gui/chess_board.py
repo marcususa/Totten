@@ -1,7 +1,5 @@
-# gui/chess_board.py
-
 import io
-from PIL import Image
+from PIL import Image, ImageTk
 import customtkinter as ctk
 import chess
 
@@ -30,7 +28,7 @@ PIECE_MAP = {
 
 
 class ChessBoardWidget(ctk.CTkFrame):
-    def __init__(self, parent, square_size=55, is_popout=False, **kwargs):
+    def __init__(self, parent, square_size=48, is_popout=False, **kwargs):
         super().__init__(parent, fg_color="#172134", corner_radius=0, **kwargs)
         self.square_size = square_size
         self.is_popout = is_popout
@@ -66,12 +64,12 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        panel_width = 60 if self.is_popout else 90
+        panel_width = 45 if self.is_popout else 55
         self.control_panel = ctk.CTkFrame(self, fg_color="transparent", width=panel_width)
         self.control_panel.grid(row=0, column=0, sticky="sw", padx=0, pady=0)
         self.control_panel.grid_propagate(False)
 
-        button_width = panel_width - (4 if self.is_popout else 8)
+        button_width = panel_width - (4 if self.is_popout else 6)
         button_height = 35 if self.is_popout else 28
         btn_fg = "transparent"
         btn_hover = "#344268"
@@ -114,7 +112,7 @@ class ChessBoardWidget(ctk.CTkFrame):
             self,
             width=board_pixel_size,
             height=board_pixel_size,
-            bg="#0f172a",
+            bg="#172134",
             highlightthickness=0
         )
         self.canvas.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
@@ -123,7 +121,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag_motion)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
-
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
     def _get_chess_square(self, row, col):
@@ -179,12 +176,11 @@ class ChessBoardWidget(ctk.CTkFrame):
         if not self.is_dragging:
             dx = abs(event.x - self.press_x)
             dy = abs(event.y - self.press_y)
-            if dx > 3 or dy > 3:  # Threshold to distinguish click from drag
+            if dx > 3 or dy > 3:
                 self.is_dragging = True
                 self.dragging_piece = self.press_piece
                 self.drag_start_square = self.press_square
 
-                # Refresh board view so the piece hides from its start square visually
                 self.render_board()
 
                 filename = PIECE_MAP.get(self.dragging_piece.symbol())
@@ -195,7 +191,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                         self.image_cache[(filename, self.square_size)] = pil_img
 
                 if pil_img:
-                    from PIL import ImageTk
                     self.drag_image_ref = ImageTk.PhotoImage(pil_img)
                     self.drag_image_item = self.canvas.create_image(
                         event.x, event.y, image=self.drag_image_ref, anchor="center"
@@ -226,7 +221,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
                     if move in self.board.legal_moves:
                         self.board.push(move)
-                        self.sync_with_twin()  # <--- Step 4: Sync after drag-and-drop move
+                        self.sync_with_twin()
 
             self.dragging_piece = None
             self.drag_start_square = None
@@ -235,7 +230,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.render_board()
 
         else:
-            # Click-to-move handling
             if row is None or col is None:
                 self.selected_square = None
                 self.render_board()
@@ -244,16 +238,13 @@ class ChessBoardWidget(ctk.CTkFrame):
             clicked_square = self._get_chess_square(row, col)
 
             if self.selected_square is None:
-                # First click: Select the piece if there is one on the square
                 piece = self.board.piece_at(clicked_square)
                 if piece:
                     self.selected_square = clicked_square
                     self.render_board()
             else:
-                # Second click: Attempt to move from selected_square to clicked_square
                 target_square = clicked_square
 
-                # If clicking the exact same square twice, deselect it
                 if self.selected_square == target_square:
                     self.selected_square = None
                     self.render_board()
@@ -261,17 +252,15 @@ class ChessBoardWidget(ctk.CTkFrame):
 
                 promotion = None
                 selected_piece = self.board.piece_at(self.selected_square)
-                if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (
-                        0, 7):
+                if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (0, 7):
                     promotion = chess.QUEEN
 
                 move = chess.Move(self.selected_square, target_square, promotion=promotion)
 
                 if move in self.board.legal_moves:
                     self.board.push(move)
-                    self.sync_with_twin()  # <--- Step 4: Sync after click-to-move
+                    self.sync_with_twin()
 
-                # Reset selection and refresh view
                 self.selected_square = None
                 self.render_board()
 
@@ -290,6 +279,18 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.image_cache.clear()
         self.canvas.configure(width=new_square_size * 8, height=new_square_size * 8)
         self.render_board()
+
+    def set_position(self, position):
+        """Universal setter method supporting FEN strings or chess.Board objects."""
+        if isinstance(position, str):
+            self.set_position_fen(position)
+        elif isinstance(position, chess.Board):
+            self.set_board(position)
+        else:
+            try:
+                self.set_position_fen(str(position))
+            except Exception as e:
+                print(f"Error in set_position: {e}")
 
     def set_position_fen(self, fen: str):
         self.board.set_fen(fen)
@@ -339,7 +340,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_window = ctk.CTkToplevel(self)
         self.popout_window.title("Chess Board")
-        self.popout_window.configure(fg_color="#0f172a")
+        self.popout_window.configure(fg_color="#172134")
 
         win_w = (self.square_size * 8) + 90
         win_h = (self.square_size * 8) + 20
@@ -347,10 +348,7 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.popout_window.attributes("-topmost", True)
 
         self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
-
-        # --- LINK THE TWINS ---
-        self.popout_board.master_widget = self  # Popout points back to Main
-        # ---------------------
+        self.popout_board.master_widget = self
 
         self.popout_board.on_step_back = getattr(self, 'on_step_back', None)
         self.popout_board.on_step_forward = getattr(self, 'on_step_forward', None)
@@ -369,7 +367,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             except Exception:
                 pass
             self.popout_window = None
-            # Clear reference so parent stops trying to sync a closed window
             if hasattr(self, 'popout_board'):
                 del self.popout_board
 
@@ -377,13 +374,11 @@ class ChessBoardWidget(ctk.CTkFrame):
 
     def sync_with_twin(self):
         """Pushes current board state to the paired twin board (Main <-> Popout)."""
-        # If this is the main board, update the popout child
         if hasattr(self, 'popout_board') and self.popout_board:
             if self.popout_board.board != self.board:
                 self.popout_board.board = self.board.copy()
                 self.popout_board.render_board()
 
-        # If this is the popout board, update the main parent
         if hasattr(self, 'master_widget') and self.master_widget:
             if self.master_widget.board != self.board:
                 self.master_widget.board = self.board.copy()
@@ -408,7 +403,6 @@ class ChessBoardWidget(ctk.CTkFrame):
     def render_board(self):
         """Redraws all board squares, selection highlights, and pieces cleanly without altering model data during drags."""
         self.canvas.delete("all")
-        from PIL import ImageTk
 
         if not hasattr(self, '_canvas_images'):
             self._canvas_images = []
@@ -425,13 +419,12 @@ class ChessBoardWidget(ctk.CTkFrame):
 
                 chess_square = self._get_chess_square(row, col)
                 if self.selected_square is not None and chess_square == self.selected_square:
-                    square_color = "#d4af37"  # Gold highlight for selected piece
+                    square_color = "#d4af37"
 
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill=square_color, outline="")
 
                 piece = self.board.piece_at(chess_square)
 
-                # Only hide the piece visually on its start square while dragging
                 if piece and not (self.is_dragging and chess_square == self.drag_start_square):
                     filename = PIECE_MAP.get(piece.symbol())
                     cache_key = (filename, self.square_size)
