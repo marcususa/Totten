@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
-from core.piecepatterns import fetch_patterns_by_color
+from core.piece_patterns import fetch_patterns_by_color
 
 
 class PatternsInitMixin:
