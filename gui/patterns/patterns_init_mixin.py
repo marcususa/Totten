@@ -1,43 +1,34 @@
 import customtkinter as ctk
+import duckdb
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
-from core.piece_patterns import fetch_patterns_by_color
 
 
 class PatternsInitMixin:
-    """Mixin class to handle the UI initialization and layout for PatternsAnalysis."""
+    """Mixin class to handle the UI initialization, layout, and simple pattern matching for PatternsAnalysis."""
 
     def _safe_load_game(self, game_node, category_source=None):
         if category_source and category_source != "patterns":
             return
-        # Force global state index to 0 immediately to prevent late overrides
         import gui.app_state as state
         if hasattr(state, "patterns_state"):
             state.patterns_state["active_index"] = 0
             state.patterns_state["active_focus"] = None
 
-        # Poll until children populate so we can pin to the top reliably
         self._auto_select_first_game(retries=10)
 
     def _auto_select_first_game(self, retries=10):
-        """Pins the tree view and selection strictly to the top item, with retries if loading is delayed."""
         if hasattr(self, "pgn_tree") and self.pgn_tree:
             children = self.pgn_tree.get_children()
             if children:
                 first_item = children[0]
-
-                # Select only the absolute first item
                 self.pgn_tree.selection_set(first_item)
                 self.pgn_tree.focus(first_item)
-
-                # Lock scroll to top
                 self.pgn_tree.yview_moveto(0.0)
                 self.after_idle(lambda: self.pgn_tree.yview_moveto(0.0))
-
                 self._on_tree_selection_event(None)
                 return
 
-        # If children aren't loaded yet and we have retries left, try again shortly
         if retries > 0:
             self.after(50, lambda: self._auto_select_first_game(retries - 1))
 
@@ -97,7 +88,7 @@ class PatternsInitMixin:
         return "break"
 
     def trigger_engine_mode(self, mode):
-        """Queries patterns.duckdb and populates the left-side pv_textbox with error trapping."""
+        """Accurate pattern matching against patterns.duckdb using exact SAN comparison."""
         if not hasattr(self, "pv_textbox"):
             print("[DEBUG] pv_textbox missing!")
             return
@@ -105,24 +96,68 @@ class PatternsInitMixin:
         self.pv_textbox.delete("1.0", "end")
 
         try:
-            # Handle pattern fetching based on the active mode
+            color_filter = None
             if mode == "white_patterns_mode":
-                patterns = fetch_patterns_by_color("white")
+                color_filter = "W"
+                title = "=== WHITE PATTERNS ==="
             elif mode == "black_patterns_mode":
-                patterns = fetch_patterns_by_color("black")
+                color_filter = "B"
+                title = "=== BLACK PATTERNS ==="
             elif mode == "opening_pattern_mode":
-                patterns = "Loading opening patterns..."
+                title = "=== OPENING MODE ==="
             elif mode == "calculation_pattern_mode":
-                patterns = "Loading calculation patterns..."
+                title = "=== CALCULATION MODE ==="
             else:
-                patterns = f"Active mode: {mode}"
+                title = f"Active mode: {mode}"
 
-            self.pv_textbox.insert("end", str(patterns) + "\n")
+            output = [title]
+
+            # Fetch exact checklist moves from independent database
+            checklist_moves = set()
+            try:
+                conn = duckdb.connect("patterns.duckdb", read_only=True)
+                if color_filter:
+                    query = "SELECT target_square FROM pattern_checklist WHERE color = ? OR color = 'BOTH'"
+                    rows = conn.execute(query, [color_filter]).fetchall()
+                else:
+                    rows = conn.execute("SELECT target_square FROM pattern_checklist").fetchall()
+                conn.close()
+
+                # Store exact pattern strings (e.g., 'f3', 'Bb4', 'Nb5')
+                checklist_moves = {row[0].strip() for row in rows}
+            except Exception as db_err:
+                output.append(f"(Notice: Could not read patterns.duckdb: {db_err})")
+
+            # Extract and exact-match moves from the currently loaded game
+            game_matches = []
+            if hasattr(self, "current_game") and self.current_game:
+                for idx, node in enumerate(self.current_game.mainline(), start=1):
+                    san = node.san()
+                    move_num = (idx + 1) // 2
+                    is_white = (idx % 2 != 0)
+
+                    clean_san = san.replace("+", "").replace("#", "")
+
+                    # EXACT match against the checklist (e.g. clean_san must equal 'f3' or 'Bb4')
+                    if clean_san in checklist_moves:
+                        if is_white:
+                            game_matches.append(f"{move_num}. {san}")
+                        else:
+                            game_matches.append(f"{move_num}...{san}")
+
+            if color_filter:
+                if game_matches:
+                    output.extend(game_matches)
+                else:
+                    output.append("• No matching patterns found.")
+            else:
+                output.append("• Ready for analysis.")
+
+            self.pv_textbox.insert("end", "\n".join(output) + "\n")
 
         except Exception as e:
             print(f"[ERROR in trigger_engine_mode]: {e}")
-            self.pv_textbox.insert("end", f"Error loading patterns: {e}\n")
-
+            self.pv_textbox.insert("end", f"Error loading mode: {e}\n")
 
     def init_layout(self):
         import gui.app_state as state
@@ -198,21 +233,12 @@ class PatternsInitMixin:
                 self.toggle_engine_action()
 
         def set_analysis_mode(mode):
-            print(f"[DEBUG CLICK] set_analysis_mode called with: {mode}")
-
-            # Update internal selection state
             self._selected_mode_button = mode
             self._active_engine_mode = mode
             self.active_engine_mode = mode
-
-            # Visually update button highlights and borders
             update_analysis_buttons_state()
-
-            # Trigger the pattern loading logic in patterns_analysis.py
             if hasattr(self, "trigger_engine_mode"):
                 self.trigger_engine_mode(mode)
-            else:
-                print("[DEBUG CLICK] Error: trigger_engine_mode not found!")
 
         def update_analysis_buttons_state():
             buttons_map = {
@@ -250,7 +276,6 @@ class PatternsInitMixin:
             text_color = THEME["text_primary"]
             border_color = THEME.get("border_color", THEME["bg_surface"])
 
-            # --- BUTTON 1: PV Engine (Standalone, locked) ---
             self.frame_pv = ctk.CTkFrame(
                 self.row_analysis_btns, fg_color="transparent", corner_radius=btn_corner,
                 border_width=0, border_color=border_color
@@ -259,12 +284,9 @@ class PatternsInitMixin:
 
             self.btn_pv = ctk.CTkButton(
                 self.frame_pv, text="Stop" if self._engine_running else "PV Engine", width=70,
-                height=btn_height,
-                corner_radius=btn_corner,
-                border_width=0,
+                height=btn_height, corner_radius=btn_corner, border_width=0,
                 fg_color=btn_hover if self._engine_running else btn_initial,
-                hover_color=btn_hover,
-                text_color=text_color, font=btn_font,
+                hover_color=btn_hover, text_color=text_color, font=btn_font,
                 command=toggle_engine_state
             )
             self.btn_pv.pack()
@@ -277,9 +299,7 @@ class PatternsInitMixin:
                 frm.pack(side="left", padx=2)
                 btn = ctk.CTkButton(
                     frm, text=text, width=width, height=btn_height, corner_radius=btn_corner,
-                    border_width=0,
-                    fg_color=btn_initial,
-                    hover_color=btn_hover,
+                    border_width=0, fg_color=btn_initial, hover_color=btn_hover,
                     text_color=text_color, font=btn_font,
                     command=lambda: set_analysis_mode(mode_key)
                 )
@@ -288,16 +308,9 @@ class PatternsInitMixin:
                 btn.pack()
                 return btn, frm
 
-            # --- BUTTON 2: White Patterns ---
             self.btn_white, self.frame_white = create_mode_button("White Patterns", 95, "white_patterns_mode")
-
-            # --- BUTTON 3: Black Patterns ---
             self.btn_black, self.frame_black = create_mode_button("Black Patterns", 95, "black_patterns_mode")
-
-            # --- BUTTON 4: Opening ---
             self.btn_opening, self.frame_opening = create_mode_button("Opening", 75, "opening_pattern_mode")
-
-            # --- BUTTON 5: Calculation ---
             self.btn_calculation, self.frame_calculation = create_mode_button("Calculation", 80,
                                                                               "calculation_pattern_mode")
 
@@ -372,10 +385,7 @@ class PatternsInitMixin:
         self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
         self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
-        self.pgn_scrollbar = ttk.Scrollbar(
-            self.tree_frame,
-            orient="vertical"
-        )
+        self.pgn_scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical")
         self.pgn_scrollbar.pack(side="right", fill="y", padx=(2, 0), pady=0)
 
         self.pgn_tree = ttk.Treeview(
@@ -407,8 +417,7 @@ class PatternsInitMixin:
         self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
         self.analysis_container_frame = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"],
-                                                     corner_radius=8,
-                                                     border_width=1,
+                                                     corner_radius=8, border_width=1,
                                                      border_color=THEME.get("border_color", THEME["bg_surface"]))
         self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 

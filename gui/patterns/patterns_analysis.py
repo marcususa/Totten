@@ -688,11 +688,11 @@ class PatternsAnalysis(
                 inner_box.delete("1.0", "end")
 
                 if mode == "white_patterns_mode":
-                    from core.piece_patterns import fetch_patterns_by_color
+                    from core.piecepatterns import fetch_patterns_by_color
                     patterns = fetch_patterns_by_color("white")
                     inner_box.insert("end", str(patterns) + "\n")
                 elif mode == "black_patterns_mode":
-                    from core.piece_patterns import fetch_patterns_by_color
+                    from core.piecepatterns import fetch_patterns_by_color
                     patterns = fetch_patterns_by_color("black")
                     inner_box.insert("end", str(patterns) + "\n")
                 elif mode == "opening_pattern_mode":
