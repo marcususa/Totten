@@ -1,6 +1,5 @@
 import sys
 import os
-import platform
 from pathlib import Path
 
 # Add the project root directory to Python's module search path to ensure robust absolute imports
@@ -19,41 +18,32 @@ from gui.mixed_collections.edit_core import EditWorkspace
 from gui.mixed_collections.edit_constants import load_categories_config
 
 
-def _detect_platform_engines():
-    """Dynamically scans for any Stockfish binary in the engines folder
-    matching the host OS, eliminating the need to manually rename files."""
-    system = platform.system()
+def _detect_local_engines():
+    """Scans the local engines directory for user-installed engine binaries without downloading."""
     engines = {}
     engines_dir = ROOT_DIR / "engines"
-
-    is_windows = (system == "Windows")
+    engines_dir.mkdir(parents=True, exist_ok=True)
+    
+    is_windows = sys.platform.startswith("win")
     valid_path = None
 
-    # Helper function to check if a file matches Stockfish criteria
-    def is_valid_stockfish(file_path):
+    for file_path in engines_dir.iterdir():
         if not file_path.is_file():
-            return False
+            continue
         filename = file_path.name.lower()
         if "stockfish" in filename:
             if is_windows and filename.endswith(".exe"):
-                return True
-            if not is_windows and not filename.endswith(".exe"):
-                return True
-        return False
-
-    # 1. Scan the engines/ directory first
-    if engines_dir.exists():
-        for file_path in engines_dir.iterdir():
-            if is_valid_stockfish(file_path):
+                valid_path = file_path
+                break
+            elif not is_windows and not filename.endswith(".exe"):
                 valid_path = file_path
                 break
 
-    # 2. Fallback: Check project root directory if not found in engines/
-    if not valid_path:
-        for file_path in ROOT_DIR.iterdir():
-            if is_valid_stockfish(file_path):
-                valid_path = file_path
-                break
+    if valid_path and not is_windows:
+        try:
+            os.chmod(valid_path, 0o755)
+        except Exception:
+            pass
 
     engines["stockfish"] = str(valid_path) if valid_path else None
     return engines
@@ -78,10 +68,8 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
-        # Safely bind cross-platform detected engines to global state
-        state.available_engines = _detect_platform_engines()
+        state.available_engines = _detect_local_engines()
 
-        # Show native loading overlay before heavy UI initialization
         from gui.splash import LoadingOverlay
         splash = LoadingOverlay(self, "Totten", "Loading...")
         self.update_idletasks()
@@ -90,12 +78,10 @@ class Totten(ctk.CTk):
 
         splash.close()
 
-        # Hide the status bar progress bar now that loading is complete
         from gui.statusbar import hide_progress
         hide_progress()
 
     def _handle_global_navigation(self, target_view):
-        """Catches centralized navigation requests broadcasted from app_state hub."""
         if target_view == "catalog_analysis":
             self.show_workspace("analysis", initial_games=state.catalog_state.get("active_games"),
                                 target_game=state.catalog_state.get("active_focus"),
@@ -115,7 +101,6 @@ class Totten(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         state.left_frame = self.sidebar
 
-        # 1. Default Catalog Workspace (Only load this on startup)
         from gui.catalog import create_workspace
         initial_games = state.catalog_state.get("active_games")
         target_game = state.catalog_state.get("active_focus")
@@ -136,7 +121,6 @@ class Totten(ctk.CTk):
 
         self.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-        # 2-7. Keep other workspaces uninitialized until navigated to
         self.edit_workspace = None
         self.mixed_workspace = None
         self.analysis_workspace = None
@@ -144,7 +128,6 @@ class Totten(ctk.CTk):
         self.patterns_workspace = None
         self.calendar_workspace = None
 
-        # Register references in state
         state.workspace = self.catalog_workspace
         state.catalog_workspace = self.catalog_workspace
         state.edit_workspace = None
@@ -159,8 +142,6 @@ class Totten(ctk.CTk):
         state.register_nav_listener(self._handle_global_navigation)
 
     def show_workspace(self, target, *args, **kwargs):
-        """Persistent switchboard router that toggles or re-creates workspaces based on navigation flow."""
-        # Hide all main workspaces first
         if hasattr(state, "catalog_workspace") and state.catalog_workspace:
             state.catalog_workspace.grid_remove()
         if hasattr(state, "edit_workspace") and state.edit_workspace:
@@ -180,12 +161,10 @@ class Totten(ctk.CTk):
             state.transient_workspace.destroy()
             state.transient_workspace = None
 
-        # Route based on target type
         if target == "mixed":
             if not getattr(state, "edit_workspace", None):
                 state.edit_workspace = EditWorkspace(self)
             else:
-                # Reload categories from disk and refresh UI every time we navigate back here
                 state.edit_workspace.categories = load_categories_config()
                 if hasattr(state.edit_workspace, "_refresh_categories_list"):
                     state.edit_workspace._refresh_categories_list()
