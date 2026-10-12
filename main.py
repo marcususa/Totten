@@ -2,6 +2,7 @@ import sys
 import os
 import platform
 from pathlib import Path
+import duckdb
 
 # Add the project root directory to Python's module search path to ensure robust absolute imports
 ROOT_DIR = Path(__file__).resolve().parent
@@ -17,6 +18,37 @@ from gui.chess_board import ChessBoardWidget
 from gui.mixed_collections.mixed_core import MixedAnalysis
 from gui.mixed_collections.edit_core import EditWorkspace
 from gui.mixed_collections.edit_constants import load_categories_config
+
+
+def _ensure_database_initialized():
+    """Automatically seeds the patterns database and required tables on startup
+    if they are missing, ensuring zero-terminal setup for end users."""
+    db_path = ROOT_DIR / "patterns.duckdb"
+    need_seed = not db_path.exists()
+
+    try:
+        conn = duckdb.connect(str(db_path))
+        # Check if the pattern_checklist table exists
+        result = conn.execute("""
+                              SELECT count(*)
+                              FROM information_schema.tables
+                              WHERE table_name = 'pattern_checklist'
+                              """).fetchone()
+
+        if not need_seed and (result is None or result[0] == 0):
+            need_seed = True
+
+        if need_seed:
+            print("[INFO] Initializing patterns database automatically...")
+            try:
+                from core.piece_patterns import seed_patterns_database
+                seed_patterns_database()
+            except ImportError:
+                # Fallback if imported from a different module name
+                pass
+        conn.close()
+    except Exception as e:
+        print(f"[WARNING] Database auto-initialization check skipped/failed: {e}")
 
 
 def _detect_platform_engines():
@@ -62,6 +94,10 @@ def _detect_platform_engines():
 class Totten(ctk.CTk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Ensure database and tables exist before loading UI workspaces
+        _ensure_database_initialized()
+
         self.title("Totten")
 
         self.geometry("1200x720")
