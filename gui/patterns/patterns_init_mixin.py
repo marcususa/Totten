@@ -88,7 +88,7 @@ class PatternsInitMixin:
         return "break"
 
     def trigger_engine_mode(self, mode):
-        """Accurate pattern matching against patterns.duckdb using exact SAN comparison."""
+        """Compare the currently selected game from personal_catalog.pgn against patterns.duckdb with debug logs."""
         if not hasattr(self, "pv_textbox"):
             print("[DEBUG] pv_textbox missing!")
             return
@@ -99,10 +99,10 @@ class PatternsInitMixin:
             color_filter = None
             if mode == "white_patterns_mode":
                 color_filter = "W"
-                title = "=== WHITE PATTERNS ==="
+                title = "=== WHITE PATTERNS (Checklist Comparison) ==="
             elif mode == "black_patterns_mode":
                 color_filter = "B"
-                title = "=== BLACK PATTERNS ==="
+                title = "=== BLACK PATTERNS (Checklist Comparison) ==="
             elif mode == "opening_pattern_mode":
                 title = "=== OPENING MODE ==="
             elif mode == "calculation_pattern_mode":
@@ -112,46 +112,108 @@ class PatternsInitMixin:
 
             output = [title]
 
-            # Fetch exact checklist moves from independent database
-            checklist_moves = set()
+            # 1. Fetch ordered checklist moves from patterns.duckdb
+            checklist_moves = []
             try:
+                import duckdb
                 conn = duckdb.connect("patterns.duckdb", read_only=True)
-                if color_filter:
-                    query = "SELECT target_square FROM pattern_checklist WHERE color = ? OR color = 'BOTH'"
+                cols = [col[1] for col in conn.execute("PRAGMA table_info('pattern_checklist')").fetchall()]
+
+                col_to_query = 'san' if 'san' in cols else (
+                    'move' if 'move' in cols else ('target_square' if 'target_square' in cols else cols[0]))
+
+                if color_filter and 'color' in cols:
+                    query = f"SELECT {col_to_query} FROM pattern_checklist WHERE color = ? OR color = 'BOTH' ORDER BY rowid"
                     rows = conn.execute(query, [color_filter]).fetchall()
                 else:
-                    rows = conn.execute("SELECT target_square FROM pattern_checklist").fetchall()
+                    query = f"SELECT {col_to_query} FROM pattern_checklist ORDER BY rowid"
+                    rows = conn.execute(query).fetchall()
                 conn.close()
 
-                # Store exact pattern strings (e.g., 'f3', 'Bb4', 'Nb5')
-                checklist_moves = {row[0].strip() for row in rows}
+                checklist_moves = [row[0].strip() for row in rows if row[0]]
             except Exception as db_err:
+                print(f"[DEBUG DB Error]: {db_err}")
                 output.append(f"(Notice: Could not read patterns.duckdb: {db_err})")
 
-            # Extract and exact-match moves from the currently loaded game
-            game_matches = []
+            # 2. Retrieve the active game from memory or personal_catalog.pgn
+            target_game = None
             if hasattr(self, "current_game") and self.current_game:
-                for idx, node in enumerate(self.current_game.mainline(), start=1):
-                    san = node.san()
-                    move_num = (idx + 1) // 2
-                    is_white = (idx % 2 != 0)
-
-                    clean_san = san.replace("+", "").replace("#", "")
-
-                    # EXACT match against the checklist (e.g. clean_san must equal 'f3' or 'Bb4')
-                    if clean_san in checklist_moves:
-                        if is_white:
-                            game_matches.append(f"{move_num}. {san}")
-                        else:
-                            game_matches.append(f"{move_num}...{san}")
-
-            if color_filter:
-                if game_matches:
-                    output.extend(game_matches)
-                else:
-                    output.append("• No matching patterns found.")
+                target_game = self.current_game
+                print("[DEBUG] Using cached self.current_game")
             else:
-                output.append("• Ready for analysis.")
+                try:
+                    import chess.pgn
+                    import os
+
+                    print(f"[DEBUG] Current working directory: {os.getcwd()}")
+                    if os.path.exists("personal_catalog.pgn"):
+                        print("[DEBUG] personal_catalog.pgn found on disk.")
+                    else:
+                        print("[DEBUG] WARNING: personal_catalog.pgn NOT found in current directory!")
+
+                    if hasattr(self, "pgn_tree"):
+                        selected_items = self.pgn_tree.selection()
+                        children = list(self.pgn_tree.get_children())
+
+                        game_index = 0
+                        if selected_items and selected_items[0] in children:
+                            game_index = children.index(selected_items[0])
+                        print(f"[DEBUG] Selected tree index: {game_index}")
+
+                        with open("personal_catalog.pgn", "r", encoding="utf-8", errors="ignore") as pgn_file:
+                            for i in range(game_index + 1):
+                                game = chess.pgn.read_game(pgn_file)
+                                if game is None:
+                                    print(f"[DEBUG] Reached end of PGN file at game index {i}")
+                                    break
+                                if i == game_index:
+                                    target_game = game
+                                    headers = game.headers
+                                    print(
+                                        f"[DEBUG] Successfully loaded game {i}: {headers.get('White', '?')} vs {headers.get('Black', '?')}")
+                                    break
+                except Exception as pgn_err:
+                    print(f"[DEBUG PGN Error]: {pgn_err}")
+                    output.append(f"(Notice: Could not read personal_catalog.pgn: {pgn_err})")
+
+            # 3. Extract mainline moves from the resolved game
+            game_moves = []
+            if target_game:
+                for node in target_game.mainline():
+                    game_moves.append(node.san())
+                print(f"[DEBUG] Extracted {len(game_moves)} moves from target game.")
+            else:
+                print("[DEBUG] WARNING: target_game is None!")
+
+            # 4. Perform strict sequential comparison
+            output.append(
+                f"Comparing game ({len(game_moves)} moves played) vs Checklist ({len(checklist_moves)} steps):\n")
+
+            diverged = False
+            for i, expected in enumerate(checklist_moves):
+                move_num = (i // 2) + 1
+                is_white = (i % 2 == 0)
+                prefix = f"{move_num}. " if is_white else f"{move_num}... "
+
+                clean_expected = expected.replace("+", "").replace("#", "")
+
+                if i < len(game_moves):
+                    actual_san = game_moves[i]
+                    clean_actual = actual_san.replace("+", "").replace("#", "")
+
+                    if not diverged:
+                        if clean_actual.lower() == clean_expected.lower():
+                            output.append(f"✓ {prefix}{actual_san} (Matched)")
+                        else:
+                            diverged = True
+                            output.append(f"✗ {prefix}Played '{actual_san}' | Expected '{expected}' (Deviation)")
+                    else:
+                        output.append(f"- {prefix}Expected '{expected}' (Skipped)")
+                else:
+                    if not diverged:
+                        output.append(f"○ {prefix}Expected '{expected}' (Pending)")
+                    else:
+                        output.append(f"- {prefix}Expected '{expected}'")
 
             self.pv_textbox.insert("end", "\n".join(output) + "\n")
 
