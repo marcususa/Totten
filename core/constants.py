@@ -3,14 +3,14 @@ CONFIG_FILE = "config.json"
 # Layout & Dimension Constants
 LAYOUT = {
     "square_size": 47,
-    "board_width": 570,
-    "board_height": 400,
+    "board_width": 510,
+    "board_height": 425,
     "pv_box_height": 120,
     "analysis_box_height": 90,
 }
 
 THEME = {
-    "bg_panel": "#0f172a",          # Outer panel color
+    "bg_panel": "#172134",          # Outer panel color
     "bg_surface": "#1e293b",        # Text field box background
     "btn_hover": "#2e4a8c",          # Hover over / active state color
     "btn_initial": "#344268",        # Resting / initial state color
@@ -21,7 +21,7 @@ THEME = {
     "border_color": "#344268",
     "divider": "#344268",  # Divider color
     "border_ring": "#344268",
-    "progress_bg": "#0f172a",
+    "progress_bg": "#0f172a", # Can also use for other panel bg
     "progress_fill": "#ff0000",
     "eval_red": "#de3d35",
     "eval_red_bg": "#4a1f1f",
@@ -32,6 +32,7 @@ THEME = {
     "eval_light_blue": "#31a0ef",
     "eval_light_blue_bg": "#1f3852",
     "eval_default": "#adc3dc",        # Right column moves
+    "pattern_yellow": "#ffd700",      # Yellow
     "active_tracker_bg": "#2e4a8c",
     "active_tracker_fg": "#ffffff"
 }
