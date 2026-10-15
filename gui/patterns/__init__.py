@@ -1,2 +1,5 @@
-from gui.patterns.patterns_analysis import PatternsAnalysis, create_patterns_analysis_workspace
-from gui.patterns.patterns_workspace import PatternsWorkspace
+from gui.patterns.patterns_layout import (
+    PatternsAnalysis,
+    create_workspace,
+    create_patterns_analysis_workspace
+)

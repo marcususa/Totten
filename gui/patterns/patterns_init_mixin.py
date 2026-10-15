@@ -5,92 +5,11 @@ from core.constants import THEME, LAYOUT
 
 
 class PatternsInitMixin:
-    """Mixin class to handle the UI initialization, layout, and simple pattern matching for PatternsAnalysis."""
-
-    def _safe_load_game(self, game_node, category_source=None):
-        if category_source and category_source != "patterns":
-            return
-        import gui.app_state as state
-        if hasattr(state, "patterns_state"):
-            state.patterns_state["active_index"] = 0
-            state.patterns_state["active_focus"] = None
-
-        self._auto_select_first_game(retries=10)
-
-    def _auto_select_first_game(self, retries=10):
-        if hasattr(self, "pgn_tree") and self.pgn_tree:
-            children = self.pgn_tree.get_children()
-            if children:
-                first_item = children[0]
-                self.pgn_tree.selection_set(first_item)
-                self.pgn_tree.focus(first_item)
-                self.pgn_tree.yview_moveto(0.0)
-                self.after_idle(lambda: self.pgn_tree.yview_moveto(0.0))
-                self._on_tree_selection_event(None)
-                return
-
-        if retries > 0:
-            self.after(50, lambda: self._auto_select_first_game(retries - 1))
-
-    def toggle_pgn_data_panel(self):
-        if self.pgn_data_panel.winfo_ismapped():
-            self.pgn_data_panel.grid_remove()
-            self.right_analysis_panel.rowconfigure(2, weight=0, minsize=0)
-            self.right_analysis_panel.rowconfigure(1, weight=4)
-            self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 0))
-        else:
-            self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
-            self.right_analysis_panel.rowconfigure(1, weight=3)
-            self.right_analysis_panel.rowconfigure(2, weight=1, minsize=0)
-            self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
-
-    def on_flip_board(self, event=None):
-        if hasattr(self, "board_widget") and hasattr(self.board_widget, "flip_board"):
-            self.board_widget.flip_board()
-        elif hasattr(self, "board_widget") and hasattr(self.board_widget, "invert"):
-            self.board_widget.invert()
-
-    def _handle_keypress(self, event=None):
-        if event and event.keysym in ("f", "F"):
-            self.on_flip_board()
-            return "break"
-
-    def _handle_left(self, event=None):
-        if hasattr(self, "on_prev_move") and callable(self.on_prev_move):
-            try:
-                self.on_prev_move(event)
-            except TypeError:
-                self.on_prev_move()
-        return "break"
-
-    def _handle_right(self, event=None):
-        if hasattr(self, "on_next_move") and callable(self.on_next_move):
-            try:
-                self.on_next_move(event)
-            except TypeError:
-                self.on_next_move()
-        return "break"
-
-    def _handle_up(self, event=None):
-        if hasattr(self, "on_first_move") and callable(self.on_first_move):
-            try:
-                self.on_first_move(event)
-            except TypeError:
-                self.on_first_move()
-        return "break"
-
-    def _handle_down(self, event=None):
-        if hasattr(self, "on_last_move") and callable(self.on_last_move):
-            try:
-                self.on_last_move(event)
-            except TypeError:
-                self.on_last_move()
-        return "break"
+    """Mixin class to handle the UI initialization, layout, and yellow pattern matching for PatternsAnalysis."""
 
     def trigger_engine_mode(self, mode):
-        """Compare the currently selected game from personal_catalog.pgn against patterns.duckdb with debug logs."""
+        """PGN-compliant continuous text stream with yellow pattern match highlighting."""
         if not hasattr(self, "pv_textbox"):
-            print("[DEBUG] pv_textbox missing!")
             return
 
         self.pv_textbox.delete("1.0", "end")
@@ -99,127 +18,112 @@ class PatternsInitMixin:
             color_filter = None
             if mode == "white_patterns_mode":
                 color_filter = "W"
-                title = "=== WHITE PATTERNS (Checklist Comparison) ==="
             elif mode == "black_patterns_mode":
                 color_filter = "B"
-                title = "=== BLACK PATTERNS (Checklist Comparison) ==="
             elif mode == "opening_pattern_mode":
-                title = "=== OPENING MODE ==="
+                from gui.openings import OpeningsManager
+                manager = OpeningsManager()
+                manager.attach_to_workspace(self, mode_key=mode)
+                return
             elif mode == "calculation_pattern_mode":
-                title = "=== CALCULATION MODE ==="
+                return
             else:
-                title = f"Active mode: {mode}"
+                return
 
-            output = [title]
+            # Configure the yellow tag for pattern matches
+            self.pv_textbox.tag_config("pattern_yellow", foreground=THEME.get("pattern_yellow", "#fbbf24"))
 
-            # 1. Fetch ordered checklist moves from patterns.duckdb
-            checklist_moves = []
+            # 1. Fetch checklist moves from patterns.duckdb
+            stored_singles = set()
             try:
                 import duckdb
                 conn = duckdb.connect("patterns.duckdb", read_only=True)
                 cols = [col[1] for col in conn.execute("PRAGMA table_info('pattern_checklist')").fetchall()]
 
-                col_to_query = 'san' if 'san' in cols else (
-                    'move' if 'move' in cols else ('target_square' if 'target_square' in cols else cols[0]))
-
-                if color_filter and 'color' in cols:
-                    query = f"SELECT {col_to_query} FROM pattern_checklist WHERE color = ? OR color = 'BOTH' ORDER BY rowid"
-                    rows = conn.execute(query, [color_filter]).fetchall()
+                if 'color' in cols:
+                    rows = conn.execute("SELECT * FROM pattern_checklist WHERE color = ? OR color = 'BOTH'",
+                                        [color_filter]).fetchall()
                 else:
-                    query = f"SELECT {col_to_query} FROM pattern_checklist ORDER BY rowid"
-                    rows = conn.execute(query).fetchall()
+                    rows = conn.execute("SELECT * FROM pattern_checklist").fetchall()
                 conn.close()
 
-                checklist_moves = [row[0].strip() for row in rows if row[0]]
+                for row in rows:
+                    for item in row:
+                        if item is not None and isinstance(item, str):
+                            clean_item = item.strip().replace("+", "").replace("#", "").lower()
+                            if clean_item and len(clean_item) <= 7:
+                                stored_singles.add(clean_item)
             except Exception as db_err:
-                print(f"[DEBUG DB Error]: {db_err}")
-                output.append(f"(Notice: Could not read patterns.duckdb: {db_err})")
+                print(f"[PATTERNS DB ERROR]: {db_err}")
 
-            # 2. Retrieve the active game from memory or personal_catalog.pgn
-            target_game = None
-            if hasattr(self, "current_game") and self.current_game:
-                target_game = self.current_game
-                print("[DEBUG] Using cached self.current_game")
-            else:
-                try:
-                    import chess.pgn
-                    import os
+            # 2. Resolve target game
+            target_game = getattr(self, "current_game", None)
 
-                    print(f"[DEBUG] Current working directory: {os.getcwd()}")
-                    if os.path.exists("personal_catalog.pgn"):
-                        print("[DEBUG] personal_catalog.pgn found on disk.")
-                    else:
-                        print("[DEBUG] WARNING: personal_catalog.pgn NOT found in current directory!")
-
-                    if hasattr(self, "pgn_tree"):
-                        selected_items = self.pgn_tree.selection()
-                        children = list(self.pgn_tree.get_children())
-
-                        game_index = 0
-                        if selected_items and selected_items[0] in children:
-                            game_index = children.index(selected_items[0])
-                        print(f"[DEBUG] Selected tree index: {game_index}")
-
-                        with open("personal_catalog.pgn", "r", encoding="utf-8", errors="ignore") as pgn_file:
-                            for i in range(game_index + 1):
-                                game = chess.pgn.read_game(pgn_file)
-                                if game is None:
-                                    print(f"[DEBUG] Reached end of PGN file at game index {i}")
-                                    break
-                                if i == game_index:
-                                    target_game = game
-                                    headers = game.headers
-                                    print(
-                                        f"[DEBUG] Successfully loaded game {i}: {headers.get('White', '?')} vs {headers.get('Black', '?')}")
-                                    break
-                except Exception as pgn_err:
-                    print(f"[DEBUG PGN Error]: {pgn_err}")
-                    output.append(f"(Notice: Could not read personal_catalog.pgn: {pgn_err})")
-
-            # 3. Extract mainline moves from the resolved game
-            game_moves = []
+            # 3. Process mainline moves and apply yellow tags to matches
             if target_game:
-                for node in target_game.mainline():
-                    game_moves.append(node.san())
-                print(f"[DEBUG] Extracted {len(game_moves)} moves from target game.")
-            else:
-                print("[DEBUG] WARNING: target_game is None!")
+                all_moves = []
+                for idx, node in enumerate(target_game.mainline(), start=1):
+                    is_white = (idx % 2 != 0)
+                    san = node.san()
+                    clean_san = san.replace("+", "").replace("#", "").lower()
+                    move_num = (idx + 1) // 2
 
-            # 4. Perform strict sequential comparison
-            output.append(
-                f"Comparing game ({len(game_moves)} moves played) vs Checklist ({len(checklist_moves)} steps):\n")
+                    is_target_side = (color_filter == "W" and is_white) or (color_filter == "B" and not is_white)
+                    match_found = is_target_side and clean_san in stored_singles
 
-            diverged = False
-            for i, expected in enumerate(checklist_moves):
-                move_num = (i // 2) + 1
-                is_white = (i % 2 == 0)
-                prefix = f"{move_num}. " if is_white else f"{move_num}... "
+                    all_moves.append({
+                        "move_num": move_num,
+                        "is_white": is_white,
+                        "san": san,
+                        "matched": match_found
+                    })
 
-                clean_expected = expected.replace("+", "").replace("#", "")
+                # Group into move number pairs (White & Black)
+                paired_moves = {}
+                for m in all_moves:
+                    m_num = m["move_num"]
+                    if m_num not in paired_moves:
+                        paired_moves[m_num] = {"W": None, "B": None}
+                    if m["is_white"]:
+                        paired_moves[m_num]["W"] = m
+                    else:
+                        paired_moves[m_num]["B"] = m
 
-                if i < len(game_moves):
-                    actual_san = game_moves[i]
-                    clean_actual = actual_san.replace("+", "").replace("#", "")
+                first_item = True
+                for m_num in sorted(paired_moves.keys()):
+                    w_move = paired_moves[m_num]["W"]
+                    b_move = paired_moves[m_num]["B"]
 
-                    if not diverged:
-                        if clean_actual.lower() == clean_expected.lower():
-                            output.append(f"✓ {prefix}{actual_san} (Matched)")
+                    prefix = "" if first_item else " "
+                    first_item = False
+
+                    if w_move:
+                        self.pv_textbox.insert("end", f"{prefix}{m_num}. ")
+                        is_w_match = (color_filter == "W" and w_move["matched"])
+                        tag = "pattern_yellow" if is_w_match else ()
+
+                        self.pv_textbox.insert("end", w_move['san'], tag)
+                        if is_w_match:
+                            self.pv_textbox.insert("end", f" {{ Pattern Match }}")
+                        prefix = " "
+
+                    if b_move:
+                        if not w_move:
+                            self.pv_textbox.insert("end", f"{prefix}{m_num}... ")
                         else:
-                            diverged = True
-                            output.append(f"✗ {prefix}Played '{actual_san}' | Expected '{expected}' (Deviation)")
-                    else:
-                        output.append(f"- {prefix}Expected '{expected}' (Skipped)")
-                else:
-                    if not diverged:
-                        output.append(f"○ {prefix}Expected '{expected}' (Pending)")
-                    else:
-                        output.append(f"- {prefix}Expected '{expected}'")
+                            self.pv_textbox.insert("end", " ")
 
-            self.pv_textbox.insert("end", "\n".join(output) + "\n")
+                        is_b_match = (color_filter == "B" and b_move["matched"])
+                        tag = "pattern_yellow" if is_b_match else ()
+
+                        self.pv_textbox.insert("end", b_move['san'], tag)
+                        if is_b_match:
+                            self.pv_textbox.insert("end", f" {{ Pattern Match }}")
+
+                self.pv_textbox.insert("end", "\n")
 
         except Exception as e:
             print(f"[ERROR in trigger_engine_mode]: {e}")
-            self.pv_textbox.insert("end", f"Error loading mode: {e}\n")
 
     def init_layout(self):
         import gui.app_state as state
@@ -549,21 +453,3 @@ class PatternsInitMixin:
 
         self.bind("<Map>", _bind_keys)
         self.after(100, _bind_keys)
-
-    def _on_tree_selection_event(self, event):
-        selected_items = self.pgn_tree.selection()
-        if not selected_items:
-            return
-        item_id = selected_items[0]
-        if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
-            game = self.preview_lookup[item_id]
-
-            if hasattr(self, "analysis_textbox"):
-                self.analysis_textbox.delete("1.0", "end")
-            if hasattr(self, "pgn_data_text"):
-                self.pgn_data_text.delete("1.0", "end")
-
-            if hasattr(self, "on_hardwired_tree_select"):
-                self.on_hardwired_tree_select(game)
-            else:
-                self.load_game(game)
