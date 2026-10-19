@@ -2,6 +2,7 @@ import customtkinter as ctk
 import duckdb
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
+from core.patterns_db import get_patterns
 
 
 class PatternsInitMixin:
@@ -34,27 +35,7 @@ class PatternsInitMixin:
             self.pv_textbox.tag_config("pattern_yellow", foreground=THEME.get("pattern_yellow", "#fbbf24"))
 
             # 1. Fetch checklist moves from patterns.duckdb
-            stored_singles = set()
-            try:
-                import duckdb
-                conn = duckdb.connect("patterns.duckdb", read_only=True)
-                cols = [col[1] for col in conn.execute("PRAGMA table_info('pattern_checklist')").fetchall()]
-
-                if 'color' in cols:
-                    rows = conn.execute("SELECT * FROM pattern_checklist WHERE color = ? OR color = 'BOTH'",
-                                        [color_filter]).fetchall()
-                else:
-                    rows = conn.execute("SELECT * FROM pattern_checklist").fetchall()
-                conn.close()
-
-                for row in rows:
-                    for item in row:
-                        if item is not None and isinstance(item, str):
-                            clean_item = item.strip().replace("+", "").replace("#", "").lower()
-                            if clean_item and len(clean_item) <= 7:
-                                stored_singles.add(clean_item)
-            except Exception as db_err:
-                print(f"[PATTERNS DB ERROR]: {db_err}")
+            stored_singles, _ = get_patterns(color_filter)
 
             # 2. Resolve target game
             target_game = getattr(self, "current_game", None)

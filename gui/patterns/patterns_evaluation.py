@@ -5,7 +5,7 @@ import chess
 import chess.engine
 import gui.app_state as state
 from core.constants import THEME
-from gui.patterns.patterns_db import PatternsDatabase
+from core.patterns_db import PatternsDatabase
 
 
 class PatternsEvaluation(PatternsDatabase):
