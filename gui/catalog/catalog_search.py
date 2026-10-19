@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from .constants import STANDARD_TAG_BANK
 
+
 class CatalogSearchMixin:
     def get_header(self, headers, key, default="Unknown"):
         if not headers:
@@ -60,7 +61,7 @@ class CatalogSearchMixin:
     def open_all_tags_dialog(self):
         dialog = ctk.CTkToplevel(self)
         dialog.title("All Available Tags")
-        dialog.geometry("340x420")
+        dialog.geometry("460x350")  # Adjusted height to remove excess bottom gap
         dialog.transient(self)
         dialog.grab_set()
 
@@ -82,11 +83,16 @@ class CatalogSearchMixin:
         )
         scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        all_possible_tags = sorted(list(STANDARD_TAG_BANK["common"] | STANDARD_TAG_BANK["essential"]))
+        # Configure two columns inside the scrollable frame
+        scrollable_frame.grid_columnconfigure(0, weight=1)
+        scrollable_frame.grid_columnconfigure(1, weight=1)
 
-        for tag in all_possible_tags:
-            if tag in ("ECO", "Opening", "Games"):
-                continue
+        all_possible_tags = sorted(list(STANDARD_TAG_BANK["common"] | STANDARD_TAG_BANK["essential"]))
+        tags_to_show = [t for t in all_possible_tags if t not in ("ECO", "Opening", "Games")]
+
+        for idx, tag in enumerate(tags_to_show):
+            row_idx = idx // 2
+            col_idx = idx % 2
 
             var = ctk.BooleanVar(value=tag in self.active_extra_columns)
             chk = ctk.CTkCheckBox(
@@ -107,13 +113,14 @@ class CatalogSearchMixin:
                 c.configure(hover_color="#3b5998" if v.get() else "#2e4a8c")
 
             chk.bind("<Enter>", on_enter)
-            chk.pack(anchor="w", pady=6, padx=8)
+            chk.grid(row=row_idx, column=col_idx, sticky="w", pady=6, padx=12)
 
     def _rebuild_toolbar_buttons(self):
         for widget in self.tag_buttons_frame.winfo_children():
             widget.destroy()
 
-        for tag in ["Players", "Elo", "Event", "Variation", "All"]:
+        # Removed "Variation" since it is now natively displayed next to opening game counts
+        for tag in ["Players", "Elo", "Event", "All"]:
             if tag == "All":
                 btn_width = 50
             elif tag == "Elo":
@@ -123,7 +130,7 @@ class CatalogSearchMixin:
             else:
                 btn_width = 80
 
-            is_active = (tag == self.active_primary_tag) and not self.active_extra_columns
+            is_active = (tag == self.active_primary_tag) or (tag == "All" and len(self.active_extra_columns) > 0)
             btn_fg = "#2e4a8c" if is_active else "transparent"
             btn_hover = "#3b5998" if is_active else "#2b3856"
             text_color = "#ffffff" if is_active else "#cbd5e1"
