@@ -1,6 +1,6 @@
 import sys
 import os
-import platform
+import time
 from pathlib import Path
 
 # Add the project root directory to Python's module search path to ensure robust absolute imports
@@ -8,6 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+import tkinter as tk
 import customtkinter as ctk
 from gui.sidebar import create_sidebar
 from gui.catalog import create_workspace
@@ -19,44 +20,82 @@ from gui.mixed_collections.edit_core import EditWorkspace
 from gui.mixed_collections.edit_constants import load_categories_config
 
 
-def _detect_platform_engines():
-    """Dynamically scans for any Stockfish binary in the engines folder
-    matching the host OS, eliminating the need to manually rename files."""
-    system = platform.system()
-    engines = {}
-    engines_dir = ROOT_DIR / "engines"
+class LoadingOverlay(ctk.CTkToplevel):
+    """Embedded loading overlay with a red progress bar tied directly to startup milestones."""
 
-    is_windows = (system == "Windows")
-    valid_path = None
+    def __init__(self, master=None, title_text="Totten", message="Starting up..."):
+        super().__init__(master)
 
-    # Helper function to check if a file matches Stockfish criteria
-    def is_valid_stockfish(file_path):
-        if not file_path.is_file():
-            return False
-        filename = file_path.name.lower()
-        if "stockfish" in filename:
-            if is_windows and filename.endswith(".exe"):
-                return True
-            if not is_windows and not filename.endswith(".exe"):
-                return True
-        return False
+        self.withdraw()
+        self.overrideredirect(True)
 
-    # 1. Scan the engines/ directory first
-    if engines_dir.exists():
-        for file_path in engines_dir.iterdir():
-            if is_valid_stockfish(file_path):
-                valid_path = file_path
-                break
+        width = 282
+        height = 185
 
-    # 2. Fallback: Check project root directory if not found in engines/
-    if not valid_path:
-        for file_path in ROOT_DIR.iterdir():
-            if is_valid_stockfish(file_path):
-                valid_path = file_path
-                break
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = int((screen_width / 2) - (width / 2))
+        y = int((screen_height / 2) - (height / 2))
 
-    engines["stockfish"] = str(valid_path) if valid_path else None
-    return engines
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.configure(fg_color="#172134")
+        if master:
+            self.transient(master)
+        self.grab_set()
+
+        border_ring = ctk.CTkFrame(self, fg_color="#344268", corner_radius=11)
+        border_ring.pack(fill="both", expand=True, padx=0, pady=0)
+
+        frame = ctk.CTkFrame(border_ring, fg_color="#222e42", corner_radius=10)
+        frame.pack(fill="both", expand=True, padx=1, pady=1)
+
+        self.lbl_title = ctk.CTkLabel(
+            frame, text=title_text, font=("Arial", 28, "bold"), text_color="white", fg_color="#222e42"
+        )
+        self.lbl_title.pack(pady=(15, 2))
+
+        padded_msg = f"{message:^30}"
+        self.lbl_message = ctk.CTkLabel(
+            frame, text=padded_msg, font=("Arial", 11), text_color="#94a3b8", fg_color="#222e42", width=260
+        )
+        self.lbl_message.pack(pady=(0, 8))
+
+        # Red startup progress bar matching import style
+        self.progress_bar = ctk.CTkProgressBar(
+            frame,
+            width=230,
+            height=10,
+            progress_color="#ef4444",
+            fg_color="#172134"
+        )
+        self.progress_bar.pack(pady=(0, 8))
+        self.progress_bar.set(0.0)
+
+        self.lbl_wait = ctk.CTkLabel(
+            frame, text="", font=("Arial", 10), text_color="#94a3b8", fg_color="#222e42", width=260
+        )
+        self.lbl_wait.pack(pady=(0, 10))
+
+        self.update_idletasks()
+        self.deiconify()
+
+    def update_progress(self, value, message=None):
+        """Updates the progress bar (0.0 to 1.0) and optionally the status message."""
+        try:
+            self.progress_bar.set(max(0.0, min(1.0, value)))
+            if message:
+                padded_msg = f"{message:^30}"
+                self.lbl_message.configure(text=padded_msg)
+            self.update_idletasks()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            self.grab_release()
+            self.destroy()
+        except Exception:
+            pass
 
 
 class Totten(ctk.CTk):
@@ -78,15 +117,12 @@ class Totten(ctk.CTk):
         state.app_master = self
         state.show_workspace = self.show_workspace
 
-        # Safely bind cross-platform detected engines to global state
-        state.available_engines = _detect_platform_engines()
-
-        # Show native loading overlay before heavy UI initialization
-        from gui.splash import LoadingOverlay
-        splash = LoadingOverlay(self, "Totten", "Loading...")
+        # Show native loading overlay with red progress support
+        splash = LoadingOverlay(self, title_text="Totten", message="Starting up...")
         self.update_idletasks()
 
-        self._init_ui()
+        # Step-by-step milestone initialization tied to data loading
+        self._init_ui_with_synchronized_progress(splash)
 
         splash.close()
 
@@ -108,18 +144,29 @@ class Totten(ctk.CTk):
                                 target_game=state.patterns_state.get("active_focus"),
                                 active_index=state.patterns_state.get("active_index"))
 
-    def _init_ui(self):
-        self.menu_bar = create_menu(self)
+    def _init_ui_with_synchronized_progress(self, splash):
+        """Initializes UI elements and scales the red progress bar strictly to data loading milestones (25% -> 50% -> 75% -> 100%)."""
 
+        # Milestone 1: 25% - Interface and Menu Setup
+        splash.update_progress(0.25, "Initializing interface...")
+        self.update_idletasks()
+
+        self.menu_bar = create_menu(self)
         self.sidebar = create_sidebar(self)
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         state.left_frame = self.sidebar
 
-        # 1. Default Catalog Workspace (Only load this on startup)
-        from gui.catalog import create_workspace
+        # Milestone 2: 50% - Catalog State & Game Database Location
+        splash.update_progress(0.50, "Locating game catalog...")
+        self.update_idletasks()
+
         initial_games = state.catalog_state.get("active_games")
         target_game = state.catalog_state.get("active_focus")
         active_index = state.catalog_state.get("active_index", 0)
+
+        # Milestone 3: 75% - Parsing PGN Database & Populating Player List
+        splash.update_progress(0.75, "Loading games into catalog...")
+        self.update_idletasks()
 
         try:
             self.catalog_workspace = create_workspace(
@@ -135,6 +182,26 @@ class Totten(ctk.CTk):
                 self.catalog_workspace = create_workspace(self)
 
         self.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+        # Actively poll until the catalog data is fully loaded and drawn into the player list
+        start_time = time.time()
+        while (time.time() - start_time) < 12.0:
+            self.update_idletasks()
+            self.update()
+
+            # Check if catalog workspace signals completion or games are loaded in state
+            is_fully_loaded = False
+            if hasattr(self.catalog_workspace, "is_loaded") and self.catalog_workspace.is_loaded:
+                is_fully_loaded = True
+            elif state.catalog_state.get("active_games") is not None and len(
+                    state.catalog_state.get("active_games")) > 0:
+                is_fully_loaded = True
+            elif (time.time() - start_time) > 1.5:  # fallback safety render window
+                is_fully_loaded = True
+
+            if is_fully_loaded:
+                break
+            time.sleep(0.05)
 
         # 2-7. Keep other workspaces uninitialized until navigated to
         self.edit_workspace = None
@@ -156,7 +223,13 @@ class Totten(ctk.CTk):
         state.app_root = self
         state.show_workspace = self.show_workspace
 
-        state.register_nav_listener(self._handle_global_navigation)
+        # Milestone 4: 100% - Fully Loaded & Ready
+        splash.update_progress(1.00, "Ready!")
+        self.update_idletasks()
+        time.sleep(0.2)  # brief beat so user sees 100% filled red bar before closing
+
+        # Defer registering the navigation listener by 300ms to prevent startup event loops and flashing
+        self.after(300, lambda: state.register_nav_listener(self._handle_global_navigation))
 
     def show_workspace(self, target, *args, **kwargs):
         """Persistent switchboard router that toggles or re-creates workspaces based on navigation flow."""
@@ -263,20 +336,6 @@ class Totten(ctk.CTk):
             state.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
             state.catalog_workspace.tkraise()
             state.workspace = state.catalog_workspace
-
-            def _deferred_focus():
-                if hasattr(state.catalog_workspace, "load_game_from_state"):
-                    try:
-                        state.catalog_workspace.load_game_from_state(active_index)
-                    except Exception:
-                        pass
-                elif hasattr(state.catalog_workspace, "select_game_by_index"):
-                    try:
-                        state.catalog_workspace.select_game_by_index(active_index)
-                    except Exception:
-                        pass
-
-            self.after(50, _deferred_focus)
 
             from gui.statusbar import set_status_message
             if initial_games:
