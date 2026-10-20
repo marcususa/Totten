@@ -34,13 +34,17 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
-        self.active_engine_mode = state.catalog_state.get("active_engine_mode") if hasattr(state, "catalog_state") else None
+        self.active_engine_mode = state.catalog_state.get("active_engine_mode") if hasattr(state,
+                                                                                           "catalog_state") else None
         self.analysis_rows = {}
         self._current_analysis_worker = None
 
         self.init_layout()
         self._inject_stop_analysis_button()
-        self.load_catalog_data()
+
+        # Defer catalog load so the window draws blank first, running exactly once
+        self.after(50, self.load_catalog_data)
+
         self._bind_engine_buttons()
         self._bind_global_shortcuts()
 
@@ -115,7 +119,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         try:
             focused = self.winfo_toplevel().focus_get()
             if focused and type(focused).__name__ in ("CTkTextbox", "CTkEntry", "Text", "Entry"):
-                return
+                return None
 
             if callable(callback):
                 callback(event)
@@ -190,6 +194,11 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                 print(f"[POPOUT ERROR] {e}")
 
     def load_catalog_data(self):
+        # Strict execution guard guarantees this runs exactly once per startup
+        if getattr(self, "_catalog_already_loaded", False):
+            return
+        self._catalog_already_loaded = True
+
         if self.game_list:
             if hasattr(self, "pgn_tree"):
                 active_game = None
@@ -203,49 +212,48 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
         source_games = []
         target_file = Path(self.filename) if Path(self.filename).exists() else Path("personal_catalog.pgn")
-        offset_file = Path("catalog_offset.txt")
+        offset_file = Path("catalog_offset.txt")  # Stores byte position now
 
         chunk_size = 100
-        current_offset = 0
+        byte_offset = 0
 
+        # Read the stored byte offset instantly (O(1) seek instead of O(N) parsing)
         if offset_file.exists():
             try:
-                current_offset = int(offset_file.read_text().strip())
+                byte_offset = int(offset_file.read_text().strip())
             except Exception:
-                current_offset = 0
+                byte_offset = 0
 
         if target_file.exists():
             try:
                 with open(target_file, "r", encoding="utf-8", errors="replace") as f:
-                    skipped = 0
-                    while skipped < current_offset:
-                        g = chess.pgn.read_game(f)
-                        if g is None:
-                            current_offset = 0
+                    # Jump directly to the exact byte position instantly!
+                    if byte_offset > 0:
+                        try:
+                            f.seek(byte_offset)
+                        except Exception:
                             f.seek(0)
-                            break
-                        skipped += 1
+                            byte_offset = 0
 
+                    # Read only the next chunk of games
                     while len(source_games) < chunk_size:
+                        # Check if we hit EOF, loop back to start if necessary
+                        pos = f.tell()
                         g = chess.pgn.read_game(f)
                         if g is None:
-                            break
-                        source_games.append(g)
-
-                if not source_games and current_offset > 0:
-                    current_offset = 0
-                    with open(target_file, "r", encoding="utf-8", errors="replace") as f:
-                        while len(source_games) < chunk_size:
+                            if pos == 0:  # Empty file
+                                break
+                            # End of file reached, loop back to start
+                            f.seek(0)
+                            byte_offset = 0
                             g = chess.pgn.read_game(f)
                             if g is None:
                                 break
-                            source_games.append(g)
+                        source_games.append(g)
 
-                next_offset = current_offset + len(source_games)
-                if len(source_games) < chunk_size:
-                    next_offset = 0
-
-                offset_file.write_text(str(next_offset))
+                    # Save the new ending byte position for the next chunk
+                    next_byte_offset = f.tell()
+                    offset_file.write_text(str(next_byte_offset))
             except Exception as e:
                 print(f"[CATALOG ANALYSIS DEBUG] Error reading catalog file: {e}")
 
@@ -254,9 +262,15 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             state.all_games = source_games
 
         if self.game_list and hasattr(self, "pgn_tree"):
-            self.populate_catalog_tree(self.game_list)
+            self.populate_catalog_tree(self.game_list, load_first=True)
 
-    def populate_catalog_tree(self, games_to_display, active_game=None):
+    def load_next_chunk(self):
+        """Advances to the next chunk using the byte-seek position already updated in file."""
+        self._catalog_already_loaded = False
+        self.game_list = []
+        self.load_catalog_data()
+
+    def populate_catalog_tree(self, games_to_display, active_game=None, load_first=False):
         if not hasattr(self, "pgn_tree") or not hasattr(self, "preview_lookup"):
             return
 
@@ -265,12 +279,6 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             self.preview_lookup.clear()
         except Exception as e:
             print(f"[TREE CLEAR ERROR] {e}")
-
-        if hasattr(self, "lbl_empty_state") and self.lbl_empty_state and games_to_display:
-            try:
-                self.lbl_empty_state.pack_forget()
-            except Exception:
-                pass
 
         target = active_game or (games_to_display[0] if games_to_display else None)
 
@@ -290,8 +298,9 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             except Exception as e:
                 print(f"[TREE INSERT ERROR] {e}")
 
-        if target:
+        if load_first and target:
             self.load_game(target)
+
         self.after(50, self.focus_set)
 
     def load_games_by_eco(self, eco_code, active_game=None):
