@@ -6,7 +6,7 @@ import chess.engine
 import gui.app_state as state
 from core.constants import THEME
 from core.patterns_db import PatternsDatabase
-
+from core.patterns_db import mark_move_good, mark_move_bad
 
 class PatternsEvaluation(PatternsDatabase):
     """Handles game evaluation, piece sequence analysis, board state loading, UI synchronization, and Stockfish comparison worker threads."""
@@ -192,6 +192,36 @@ class PatternsEvaluation(PatternsDatabase):
                 inner_box.configure(state="disabled")
         except Exception as e:
             print(f"[SYNC ANALYSIS ERROR] {e}")
+
+    def on_eval_good(self):
+        """Marks current selected move as Good (forces yellow in engine window)."""
+        current_node = getattr(self, "board_node", None) or getattr(self, "current_node", None)
+        if current_node and current_node.parent and hasattr(current_node, "move"):
+            parent_board = current_node.parent.board()
+            san = parent_board.san(current_node.move)
+            clean_san = san.replace("+", "").replace("#", "").lower()
+            mark_move_good(clean_san)
+
+            active_mode = getattr(self, "active_engine_mode", None)
+            if active_mode:
+                self.trigger_engine_mode(active_mode)
+
+    def on_eval_bad(self):
+        """Marks current selected move as Bad (strips yellow back to white)."""
+        current_node = getattr(self, "board_node", None) or getattr(self, "current_node", None)
+        if current_node and current_node.parent and hasattr(current_node, "move"):
+            parent_board = current_node.parent.board()
+            san = parent_board.san(current_node.move)
+            clean_san = san.replace("+", "").replace("#", "").lower()
+            mark_move_bad(clean_san)
+
+            active_mode = getattr(self, "active_engine_mode", None)
+            if active_mode:
+                self.trigger_engine_mode(active_mode)
+
+    def on_eval_idk(self):
+        """Standby mode."""
+        pass
 
     def load_games_list(self, games_list, focused_game=None):
         if not games_list:

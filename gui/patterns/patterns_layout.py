@@ -104,16 +104,31 @@ class PatternsAnalysis(
             self.after(50, lambda: self._auto_select_first_game(retries - 1))
 
     def toggle_pgn_data_panel(self):
+        """Toggles the Game Details panel (Row 3), making the player panel longer and extending analysis downwards."""
         if self.pgn_data_panel.winfo_ismapped():
+            # 1. Hide Game Details panel
             self.pgn_data_panel.grid_remove()
-            self.right_analysis_panel.rowconfigure(2, weight=0, minsize=0)
-            self.right_analysis_panel.rowconfigure(1, weight=4)
-            self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 0))
+
+            # 2. Collapse Row 3 weight completely
+            self.right_analysis_panel.rowconfigure(3, weight=0, minsize=0)
+
+            # 3. Increase Row 0 (Player panel) weight to 2 for extra height
+            self.right_analysis_panel.rowconfigure(0, weight=2)
+
+            # 4. Set Row 2 (Analysis Panel) weight to 6 to absorb the rest and stretch down
+            self.right_analysis_panel.rowconfigure(2, weight=6)
+
+            # 5. Explicitly ensure container frame fills downwards
+            self.analysis_container_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=(0, 0))
         else:
-            self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
-            self.right_analysis_panel.rowconfigure(1, weight=3)
-            self.right_analysis_panel.rowconfigure(2, weight=1, minsize=0)
-            self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
+            # 1. Restore standard weights when Game Details is open
+            self.right_analysis_panel.rowconfigure(0, weight=1)
+            self.right_analysis_panel.rowconfigure(2, weight=3)
+            self.right_analysis_panel.rowconfigure(3, weight=1, minsize=70)
+
+            # 2. Restore bottom padding and re-grid Game Details on Row 3
+            self.analysis_container_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=(0, 8))
+            self.pgn_data_panel.grid(row=3, column=0, sticky="nsew", padx=0, pady=0)
 
     def on_flip_board(self, event=None):
         """Explicitly calls toggle_flip() on the board widget when 'f' or 'F' is pressed."""
