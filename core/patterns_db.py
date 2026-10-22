@@ -1,7 +1,17 @@
 from core.constants import THEME
 
-# patterns_db.py
+CONFIRMED_GOOD_MOVES = set()
+REJECTED_BAD_MOVES = set()
 
+def mark_move_good(clean_san: str):
+    CONFIRMED_GOOD_MOVES.add(clean_san)
+    REJECTED_BAD_MOVES.discard(clean_san)
+
+def mark_move_bad(clean_san: str):
+    REJECTED_BAD_MOVES.add(clean_san)
+    CONFIRMED_GOOD_MOVES.discard(clean_san)
+
+# patterns_db.py
 WHITE_PATTERNS = [
     ("f3", 1), ("f4", 1), ("g4", 1),
     ("h3, g4", 1),
@@ -57,6 +67,10 @@ def get_patterns(target_color):
                 stored_chains.append(clean_item)
             elif clean_item and len(clean_item) <= 7:
                 stored_singles.add(clean_item)
+
+    # Incorporate user evaluations directly into the pattern set
+    stored_singles.update(CONFIRMED_GOOD_MOVES)
+    stored_singles.difference_update(REJECTED_BAD_MOVES)
 
     return stored_singles, stored_chains
 
@@ -115,6 +129,14 @@ class PatternsDatabase:
                         is_target_side = (target_color == "W" and is_white) or (target_color == "B" and not is_white)
                         match_found = is_target_side and clean_san in stored_singles
 
+                        if clean_san in REJECTED_BAD_MOVES:
+                            match_found = False
+                        elif clean_san in CONFIRMED_GOOD_MOVES:
+                            match_found = True
+                        else:
+                            match_found = is_target_side and clean_san in stored_singles
+
+
                         all_moves.append({
                             "move_num": move_num,
                             "is_white": is_white,
@@ -158,8 +180,6 @@ class PatternsDatabase:
                         tag = "pattern_yellow" if is_w_match else ()
 
                         inner_box.insert("end", w_move['san'], tag)
-                        if is_w_match:
-                            inner_box.insert("end", f" {{ Pattern Match: {w_move['san']} }}")
                         prefix = " "
 
                     if b_move:
@@ -172,8 +192,6 @@ class PatternsDatabase:
                         tag = "pattern_yellow" if is_b_match else ()
 
                         inner_box.insert("end", b_move['san'], tag)
-                        if is_b_match:
-                            inner_box.insert("end", f" {{ Pattern Match: {b_move['san']} }}")
 
                 inner_box.insert("end", "\n")
                 inner_box.configure(state="disabled")
