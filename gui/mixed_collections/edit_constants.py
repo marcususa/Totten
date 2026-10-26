@@ -1,5 +1,9 @@
 import json
 from pathlib import Path
+import customtkinter as ctk
+from core.constants import THEME
+
+CONFIG_FILE = Path(__file__).resolve().parent.parent.parent / "pgn" / "categories_config.json"
 
 DEFAULT_COLLECTION_CATEGORIES = [
     "Open Events", "Women's Events", "Tournaments", "Matches",
@@ -20,35 +24,21 @@ CATEGORY_FOLDER_MAP = {
     "Notable People / Players": ("players", "players.pgn"),
 }
 
-# Points directly to the pgn folder sitting next to your main project structure using 2 parents
-CONFIG_FILE = Path(__file__).resolve().parent.parent.parent/ "pgn" / "categories_config.json"
-
-
 def load_categories_config():
-    print(f"[DEBUG] Looking for config at: {CONFIG_FILE.resolve()}")
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 cats = data.get("categories", DEFAULT_COLLECTION_CATEGORIES)
                 custom_map = data.get("custom_map", {})
-
-                # Restore custom mappings so the folder map knows about them
                 for k, v in custom_map.items():
-                    if isinstance(v, list) and len(v) == 2:
-                        CATEGORY_FOLDER_MAP[k] = (v[0], v[1])
-
-                print(f"[DEBUG] Successfully loaded categories: {cats}")
+                    CATEGORY_FOLDER_MAP[k] = (v[0], v[1])
                 return cats
-        except Exception as e:
-            print(f"[DEBUG] Error loading category config: {e}")
-    else:
-        print("[DEBUG] Config file does not exist yet. Using defaults.")
+        except Exception:
+            pass
     return list(DEFAULT_COLLECTION_CATEGORIES)
 
-
 def save_categories_config(categories):
-    # Ensure custom folders are correctly captured
     custom_map = {cat: CATEGORY_FOLDER_MAP[cat] for cat in categories if cat not in DEFAULT_COLLECTION_CATEGORIES}
     data = {
         "categories": categories,
@@ -58,6 +48,33 @@ def save_categories_config(categories):
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
-        print(f"[DEBUG] Successfully saved categories to: {CONFIG_FILE.resolve()}")
     except Exception as e:
-        print(f"[DEBUG] Error saving category config: {e}")
+        print(f"Error saving category config: {e}")
+
+class ToolTip:
+    """Simple tooltip helper for mixed collection UI elements."""
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self.widget.bind("<Enter>", self.show_tip)
+        self.widget.bind("<Leave>", self.hide_tip)
+
+    def show_tip(self, event=None):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tip_window = tw = ctk.CTkToplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = ctk.CTkLabel(tw, text=self.text, fg_color=THEME.get("bg_surface", "#2b2b2b"), text_color=THEME.get("text_main", "#ffffff"), corner_radius=4, padx=6, pady=4)
+        label.pack()
+
+    def hide_tip(self, event=None):
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+def get_saved_pgn_filename():
+    return "mixed_collections.pgn"

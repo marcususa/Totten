@@ -2,6 +2,7 @@ from tkinter import ttk
 import customtkinter as ctk
 
 import gui.app_state as state
+from core.constants import THEME
 
 from gui.mixed_collections.edit_navigation import EditNavigationMixin
 from gui.mixed_collections.edit_engine import EditEngineMixin
@@ -29,7 +30,7 @@ class CategoryListAdapter:
 class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
     def __init__(self, master, initial_games=None, filename=None, *args, **kwargs):
-        super().__init__(master, fg_color="#0f172a", corner_radius=0)
+        super().__init__(master, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0)
 
         self.categories = load_categories_config()
         print(f"[DEBUG INIT] EditWorkspace loaded categories: {self.categories}")
@@ -78,11 +79,16 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
         style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
 
+        bg_surface = THEME.get("bg_surface", "#1e293b")
+        text_primary = THEME.get("text_primary", "#f8fafc")
+        btn_bg = THEME.get("btn_bg", "#344268")
+        progress_bg = THEME.get("progress_bg", "#0f172a")
+
         style.configure(
             "Borderless.Treeview",
-            background="#1e293b",
-            foreground="#f8fafc",
-            fieldbackground="#1e293b",
+            background=bg_surface,
+            foreground=text_primary,
+            fieldbackground=bg_surface,
             rowheight=22,
             font=("Arial", 10),
             borderwidth=0,
@@ -91,22 +97,22 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         )
         style.map(
             "Borderless.Treeview",
-            background=[("selected", "#344268"), ("focus", "#1e293b"), ("active", "#1e293b")],
-            foreground=[("selected", "#ffffff"), ("focus", "#f8fafc"), ("active", "#f8fafc")],
+            background=[("selected", btn_bg), ("focus", bg_surface), ("active", bg_surface)],
+            foreground=[("selected", "#ffffff"), ("focus", text_primary), ("active", text_primary)],
             borderwidth=[("focus", 0), ("active", 0)]
         )
         style.configure(
             "Borderless.Treeview.Heading",
-            background="#0f172a",
-            foreground="#f8fafc",
+            background=progress_bg,
+            foreground=text_primary,
             font=("Arial", 10, "bold"),
             relief="flat",
             borderwidth=0
         )
         style.map(
             "Borderless.Treeview.Heading",
-            background=[('active', '#0f172a'), ('selected', '#0f172a')],
-            foreground=[('active', '#f8fafc'), ('selected', '#f8fafc')]
+            background=[('active', progress_bg), ('selected', progress_bg)],
+            foreground=[('active', text_primary), ('selected', text_primary)]
         )
 
     def refresh_view(self):
@@ -118,7 +124,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         self.grid_columnconfigure(1, weight=2)
 
         # Left Column: Structured Game Table View
-        left_box = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=8, border_color="#344268", border_width=1)
+        left_box = ctk.CTkFrame(self, fg_color=THEME.get("progress_bg", "#0f172a"), corner_radius=8, border_color=THEME.get("border_color", "#344268"), border_width=1)
         left_box.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         left_box.grid_rowconfigure(0, weight=1)
         left_box.grid_columnconfigure(0, weight=1)
@@ -156,14 +162,14 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         col_scroll.grid(row=0, column=1, sticky="ns", padx=(2, 0))
 
         # Right Column: Control Panel
-        right_box = ctk.CTkFrame(self, fg_color="#1e293b", corner_radius=8, border_color="#344268", border_width=1)
+        right_box = ctk.CTkFrame(self, fg_color=THEME.get("bg_surface", "#1e293b"), corner_radius=8, border_color=THEME.get("border_color", "#344268"), border_width=1)
         right_box.grid(row=0, column=1, sticky="nsew", padx=(4, 8), pady=8)
         right_box.grid_columnconfigure(0, weight=1)
 
         header_box = ctk.CTkFrame(right_box, fg_color="transparent")
         header_box.pack(fill="x", padx=10, pady=(15, 5))
-        ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color="#f8fafc").pack(anchor="w")
-        ctk.CTkLabel(header_box, text="Select category first.", font=("Arial", 12), text_color="#94a3b8").pack(anchor="w")
+        ctk.CTkLabel(header_box, text="Mixed Collections", font=("Arial", 14, "bold"), text_color=THEME.get("text_primary", "#f8fafc")).pack(anchor="w")
+        ctk.CTkLabel(header_box, text="Select category first.", font=("Arial", 12), text_color=THEME.get("text_secondary", "#94a3b8")).pack(anchor="w")
 
         # Adapter setup for category selection compatibility
         self.opt_category = CategoryListAdapter(self)
@@ -223,8 +229,8 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         btn_add_cat = ctk.CTkButton(
             right_box,
             text="+ Category",
-            fg_color="#344268",
-            hover_color="#2e4a8c",
+            fg_color=THEME.get("btn_bg", "#344268"),
+            hover_color=THEME.get("btn_hover", "#2e4a8c"),
             border_width=0,
             height=28,
             font=("Arial", 12),
@@ -235,48 +241,48 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         move_row = ctk.CTkFrame(right_box, fg_color="transparent")
         move_row.pack(fill="x", padx=10, pady=(5, 2))
         move_row.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(move_row, text="Up", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+        ctk.CTkButton(move_row, text="Up", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"), border_width=0,
                       height=28, font=("Arial", 12),
                       command=lambda: self._move_category(-1)).grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        ctk.CTkButton(move_row, text="Down", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+        ctk.CTkButton(move_row, text="Down", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"), border_width=0,
                       height=28, font=("Arial", 12),
                       command=lambda: self._move_category(1)).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
         info_row = ctk.CTkFrame(right_box, fg_color="transparent")
         info_row.pack(fill="x", padx=10, pady=(5, 2))
         self.lbl_selected_files = ctk.CTkLabel(info_row, text="No PGN files selected.", font=("Arial", 12),
-                                               text_color="#94a3b8", anchor="w")
+                                              text_color=THEME.get("text_secondary", "#94a3b8"), anchor="w")
         self.lbl_selected_files.pack(side="left", anchor="w")
 
         action_row = ctk.CTkFrame(right_box, fg_color="transparent")
         action_row.pack(fill="x", padx=10, pady=(2, 10))
 
         self.btn_undo_pgn = ctk.CTkButton(
-            action_row, text="✕", fg_color="#344268", hover_color="#2e4a8c",
+            action_row, text="✕", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
             border_width=0, width=26, height=30, font=("Arial", 12, "bold"),
-            text_color="#f8fafc", command=self._undo_last_pgn
+            text_color=THEME.get("text_primary", "#f8fafc"), command=self._undo_last_pgn
         )
 
         self.btn_select_pgns = ctk.CTkButton(
-            action_row, text="Select PGNs", fg_color="#344268", hover_color="#2e4a8c",
+            action_row, text="Select PGNs", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
             border_width=0, width=95, height=30, font=("Arial", 12),
             command=self._select_pgn_files
         )
         self.btn_select_pgns.pack(side="left", padx=(0, 3))
 
         ctk.CTkButton(
-            action_row, text="+ Collection", fg_color="#344268", hover_color="#2e4a8c",
+            action_row, text="+ Collection", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
             border_width=0, width=125, height=30, font=("Arial", 12, "bold"),
             command=self._create_collection
         ).pack(side="left", padx=(3, 0))
 
-        separator1 = ctk.CTkFrame(right_box, fg_color="#344268", height=2)
+        separator1 = ctk.CTkFrame(right_box, fg_color=THEME.get("divider", "#344268"), height=2)
         separator1.pack(fill="x", padx=10, pady=10)
 
         del_header = ctk.CTkFrame(right_box, fg_color="transparent")
         del_header.pack(fill="x", padx=10, pady=(0, 4))
         ctk.CTkLabel(del_header, text="Use with caution when deleting", font=("Arial", 11, "bold"),
-                     text_color="#94a3b8").pack(anchor="w")
+                      text_color=THEME.get("text_secondary", "#94a3b8")).pack(anchor="w")
 
         del_row = ctk.CTkFrame(right_box, fg_color="transparent")
         del_row.pack(fill="x", padx=10, pady=2)
@@ -284,8 +290,8 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         ctk.CTkButton(
             del_row,
             text="Delete Category",
-            fg_color="#344268",
-            hover_color="#2e4a8c",
+            fg_color=THEME.get("btn_bg", "#344268"),
+            hover_color=THEME.get("btn_hover", "#2e4a8c"),
             border_width=0,
             height=28,
             font=("Arial", 12),
@@ -293,23 +299,23 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
             command=self._delete_category
         ).grid(row=0, column=0, sticky="ew", padx=(0, 2))
 
-        separator2 = ctk.CTkFrame(right_box, fg_color="#344268", height=2)
+        separator2 = ctk.CTkFrame(right_box, fg_color=THEME.get("divider", "#344268"), height=2)
         separator2.pack(fill="x", padx=10, pady=10)
 
         eco_box = ctk.CTkFrame(right_box, fg_color="transparent")
         eco_box.pack(fill="x", padx=10, pady=2)
-        ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color="#f8fafc").pack(anchor="w")
-        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+        ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color=THEME.get("text_primary", "#f8fafc")).pack(anchor="w")
+        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"), border_width=0,
                       height=30, font=("Arial", 12), command=self._repair_eco_tags).pack(fill="x", pady=(4, 0))
 
         engine_box = ctk.CTkFrame(right_box, fg_color="transparent")
         engine_box.pack(fill="x", padx=10, pady=(12, 5))
-        ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color="#f8fafc").pack(anchor="w")
+        ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color=THEME.get("text_primary", "#f8fafc")).pack(anchor="w")
         eng_row = ctk.CTkFrame(engine_box, fg_color="transparent")
         eng_row.pack(fill="x", pady=(4, 0))
-        ctk.CTkButton(eng_row, text="Browse Engine", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+        ctk.CTkButton(eng_row, text="Browse Engine", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"), border_width=0,
                       height=30, font=("Arial", 12), command=self._browse_engine).pack(side="left", fill="x", expand=True, padx=(0, 2))
-        ctk.CTkButton(eng_row, text="Save Settings", fg_color="#344268", hover_color="#2e4a8c", border_width=0,
+        ctk.CTkButton(eng_row, text="Save Settings", fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"), border_width=0,
                       height=30, font=("Arial", 12), command=self._save_engine_settings).pack(side="right", fill="x", expand=True, padx=(2, 0))
 
     def _refresh_categories_list(self):
