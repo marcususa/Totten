@@ -2,6 +2,7 @@ import io
 from PIL import Image, ImageTk
 import customtkinter as ctk
 import chess
+from core.constants import THEME
 
 PIECE_PATH = "assets/pieces/"
 
@@ -29,7 +30,7 @@ PIECE_MAP = {
 
 class ChessBoardWidget(ctk.CTkFrame):
     def __init__(self, parent, square_size=48, is_popout=False, **kwargs):
-        super().__init__(parent, fg_color="#172134", corner_radius=0, **kwargs)
+        super().__init__(parent, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0, **kwargs)
         self.square_size = square_size
         self.is_popout = is_popout
         self.board = chess.Board()
@@ -72,8 +73,8 @@ class ChessBoardWidget(ctk.CTkFrame):
         button_width = panel_width - (4 if self.is_popout else 6)
         button_height = 35 if self.is_popout else 28
         btn_fg = "transparent"
-        btn_hover = "#344268"
-        text_color = "#8292a8"
+        btn_hover = THEME.get("btn_hover", "#344268")
+        text_color = THEME.get("text_secondary", "#8292a8")
 
         self.flip_button = ctk.CTkButton(
             self.control_panel, text="↻ Flip" if not self.is_popout else "↻",
@@ -112,7 +113,7 @@ class ChessBoardWidget(ctk.CTkFrame):
             self,
             width=board_pixel_size,
             height=board_pixel_size,
-            bg="#172134",
+            bg=THEME.get("bg_panel", "#172134"),
             highlightthickness=0
         )
         self.canvas.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
@@ -181,20 +182,20 @@ class ChessBoardWidget(ctk.CTkFrame):
                 self.dragging_piece = self.press_piece
                 self.drag_start_square = self.press_square
 
-                self.render_board()
+        self.render_board()
 
-                filename = PIECE_MAP.get(self.dragging_piece.symbol())
-                pil_img = self.image_cache.get((filename, self.square_size))
-                if not pil_img:
-                    pil_img = load_piece_image(filename, size=self.square_size)
-                    if pil_img:
-                        self.image_cache[(filename, self.square_size)] = pil_img
+        filename = PIECE_MAP.get(self.dragging_piece.symbol())
+        pil_img = self.image_cache.get((filename, self.square_size))
+        if not pil_img:
+            pil_img = load_piece_image(filename, size=self.square_size)
+            if pil_img:
+                self.image_cache[(filename, self.square_size)] = pil_img
 
-                if pil_img:
-                    self.drag_image_ref = ImageTk.PhotoImage(pil_img)
-                    self.drag_image_item = self.canvas.create_image(
-                        event.x, event.y, image=self.drag_image_ref, anchor="center"
-                    )
+        if pil_img:
+            self.drag_image_ref = ImageTk.PhotoImage(pil_img)
+            self.drag_image_item = self.canvas.create_image(
+                event.x, event.y, image=self.drag_image_ref, anchor="center"
+            )
 
         if self.is_dragging and self.drag_image_item:
             self.canvas.coords(self.drag_image_item, event.x, event.y)
@@ -228,7 +229,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.is_dragging = False
             self.selected_square = None
             self.render_board()
-
         else:
             if row is None or col is None:
                 self.selected_square = None
@@ -281,7 +281,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.render_board()
 
     def set_position(self, position):
-        """Universal setter method supporting FEN strings or chess.Board objects."""
         if isinstance(position, str):
             self.set_position_fen(position)
         elif isinstance(position, chess.Board):
@@ -321,7 +320,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                 pass
 
     def toggle_popout(self):
-        """Spawns or closes the standalone popout window."""
         if self.is_popout:
             try:
                 if self.master and hasattr(self.master, 'destroy'):
@@ -340,7 +338,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_window = ctk.CTkToplevel(self)
         self.popout_window.title("Chess Board")
-        self.popout_window.configure(fg_color="#172134")
+        self.popout_window.configure(fg_color=THEME.get("bg_panel", "#172134"))
 
         win_w = (self.square_size * 8) + 90
         win_h = (self.square_size * 8) + 20
@@ -352,61 +350,50 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_board.on_step_back = getattr(self, 'on_step_back', None)
         self.popout_board.on_step_forward = getattr(self, 'on_step_forward', None)
-        self.popout_board.on_jump_start = getattr(self, 'on_jump_start', None)
-        self.popout_board.on_jump_end = getattr(self, 'on_jump_end', None)
+        self.popout_board.on_jump_to_move = getattr(self, 'on_jump_to_move', None)
 
-        self.popout_board.configure(fg_color="#0f172a")
-        self.popout_board.flipped = self.flipped
         self.popout_board.set_board(self.board)
-        self.popout_board.pack(fill="both", expand=True, padx=0, pady=0)
+        self.popout_board.flipped = self.flipped
+        self.popout_board.render_board()
 
-        def on_close():
+        def on_popout_close():
             try:
                 if self.popout_window:
                     self.popout_window.destroy()
             except Exception:
                 pass
             self.popout_window = None
-            if hasattr(self, 'popout_board'):
-                del self.popout_board
+            self.popout_board = None
 
-        self.popout_window.protocol("WM_DELETE_WINDOW", on_close)
+        self.popout_window.protocol("WM_DELETE_WINDOW", on_popout_close)
 
     def sync_with_twin(self):
-        """Pushes current board state to the paired twin board (Main <-> Popout)."""
-        if hasattr(self, 'popout_board') and self.popout_board:
-            if self.popout_board.board != self.board:
-                self.popout_board.board = self.board.copy()
-                self.popout_board.render_board()
-
         if hasattr(self, 'master_widget') and self.master_widget:
-            if self.master_widget.board != self.board:
+            if hasattr(self.master_widget, 'board'):
                 self.master_widget.board = self.board.copy()
                 self.master_widget.render_board()
+        if hasattr(self, 'on_move_made') and self.on_move_made:
+            try:
+                self.on_move_made(self.board)
+            except Exception:
+                pass
 
-    def _on_left_arrow(self, event=None):
-        if hasattr(self, 'on_step_back') and callable(self.on_step_back):
+    def _on_left_arrow(self):
+        if hasattr(self, 'on_step_back') and self.on_step_back:
             self.on_step_back()
 
-    def _on_right_arrow(self, event=None):
-        if hasattr(self, 'on_step_forward') and callable(self.on_step_forward):
+    def _on_right_arrow(self):
+        if hasattr(self, 'on_step_forward') and self.on_step_forward:
             self.on_step_forward()
 
-    def _on_up_arrow(self, event=None):
-        if hasattr(self, 'on_jump_start') and callable(self.on_jump_start):
-            self.on_jump_start()
-
-    def _on_down_arrow(self, event=None):
-        if hasattr(self, 'on_jump_end') and callable(self.on_jump_end):
-            self.on_jump_end()
-
     def render_board(self):
-        """Redraws all board squares, selection highlights, and pieces cleanly without altering model data during drags."""
         self.canvas.delete("all")
+        self._canvas_images = []
 
-        if not hasattr(self, '_canvas_images'):
-            self._canvas_images = []
-        self._canvas_images.clear()
+        # Pull dynamic board colors from the active theme dictionary
+        dark_color = THEME.get("board_dark", "#9f7939")
+        light_color = THEME.get("board_light", "#fbcba4")
+        highlight_color = THEME.get("board_highlight", "#d4af37")
 
         for row in range(8):
             for col in range(8):
@@ -415,16 +402,19 @@ class ChessBoardWidget(ctk.CTkFrame):
                 x2 = x1 + self.square_size
                 y2 = y1 + self.square_size
 
-                square_color = "#9f7939" if (row + col) % 2 else "#fbcba4"
-
                 chess_square = self._get_chess_square(row, col)
-                if self.selected_square is not None and chess_square == self.selected_square:
-                    square_color = "#d4af37"
+
+                if (row + col) % 2 == 1:
+                    square_color = dark_color
+                else:
+                    square_color = light_color
+
+                if self.selected_square == chess_square:
+                    square_color = highlight_color
 
                 self.canvas.create_rectangle(x1, y1, x2, y2, fill=square_color, outline="")
 
                 piece = self.board.piece_at(chess_square)
-
                 if piece and not (self.is_dragging and chess_square == self.drag_start_square):
                     filename = PIECE_MAP.get(piece.symbol())
                     cache_key = (filename, self.square_size)

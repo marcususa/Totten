@@ -11,7 +11,7 @@ from core.constants import THEME
 class Sidebar(ctk.CTkFrame):
 
     def __init__(self, parent):
-        super().__init__(parent, width=105, corner_radius=0, fg_color="#172134")
+        super().__init__(parent, width=105, corner_radius=0, fg_color=THEME.get("bg_panel"))
 
         # --- STATUS DISPLAY ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")

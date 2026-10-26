@@ -6,6 +6,7 @@ import customtkinter as ctk
 import gui.app_state as state
 from pgn.importer import import_pgn, import_fen, reset_importer_state
 from gui.sidebar import toggle_sidebar
+from gui.theme_chooser import ThemeChooserWindow
 
 # Import your core constants for centralized theming
 try:
@@ -85,6 +86,17 @@ def handle_import_fen():
     """Ingests FEN directly, then jumps straight to Search Catalog."""
     import_fen()
     state.show_workspace("search_catalog")
+
+
+def open_theme_chooser():
+    """Spawns the Theme Chooser pop-out window."""
+    print("[MENU] Triggering Theme Chooser...")
+    ThemeChooserWindow()
+
+
+def open_theme_editor():
+    """Spawns the Theme Editor pop-out window."""
+    print("[MENU] Triggering Theme Editor...")
 
 
 def show_about_dialog():
@@ -185,6 +197,9 @@ def create_menu(app):
     # 2. Edit Menu
     edit_menu = tk.Menu(menubar, tearoff=0)
     edit_menu.add_command(label="PGN & Engine", command=lambda: state.show_workspace("mixed"))
+    edit_menu.add_separator()
+    edit_menu.add_command(label="Theme Chooser", command=open_theme_chooser)
+    edit_menu.add_command(label="Theme Editor", command=open_theme_editor)
     menubar.add_cascade(label="Edit", menu=edit_menu)
 
     # 3. View Menu
