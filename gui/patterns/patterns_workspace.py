@@ -6,6 +6,7 @@ import customtkinter as ctk
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
+from core.constants import THEME
 from gui.patterns.patterns_colors import WORKSPACE_BG, TOOLBAR_BG, TOOLBAR_BORDER
 from gui.patterns.patterns_slider_logic import PatternsSliderLogicMixin
 from gui.patterns.patterns_loader import PatternsLoaderMixin
@@ -13,7 +14,7 @@ from gui.patterns.patterns_loader import PatternsLoaderMixin
 
 class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMixin):
     def __init__(self, master, app_state=None, stockfish_path=None):
-        super().__init__(master, fg_color=WORKSPACE_BG, corner_radius=0)
+        super().__init__(master, fg_color=THEME.get("bg_panel", WORKSPACE_BG), corner_radius=0)
         self.app_state = app_state or state
 
         self.db_path = Path("personal_catalog.duckdb")
@@ -37,7 +38,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self._init_slider_state()
         self._init_db()
         self._build_ui()
-        self.after(200, self.check_and_load_catalog)  # Deferred initialization
+        self.after(200, self.check_and_load_catalog) # Deferred initialization
 
     def _find_assets_dir(self):
         current = Path(__file__).resolve().parent
@@ -56,31 +57,31 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.panel = ctk.CTkFrame(self, fg_color=WORKSPACE_BG, corner_radius=0)
+        self.panel = ctk.CTkFrame(self, fg_color=THEME.get("bg_panel", WORKSPACE_BG), corner_radius=0)
         self.panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self.panel.grid_rowconfigure(0, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
         self.master_container = ctk.CTkFrame(
             self.panel,
-            fg_color=WORKSPACE_BG,
+            fg_color=THEME.get("bg_panel", WORKSPACE_BG),
             corner_radius=0,
-            border_color="#445577",
+            border_color=THEME.get("border_color", "#445577"),
             border_width=0,
         )
         self.master_container.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self.master_container.grid_propagate(False)
 
-        self.master_container.grid_rowconfigure(0, weight=0)  # Unified Toolbar Area
-        self.master_container.grid_rowconfigure(1, weight=1)  # Scrollable Tiers
+        self.master_container.grid_rowconfigure(0, weight=0) # Unified Toolbar Area
+        self.master_container.grid_rowconfigure(1, weight=1) # Scrollable Tiers
         self.master_container.grid_columnconfigure(0, weight=1)
 
         # Unified Toolbar Ring Housing Sliders + Piece Tray Together
         self.unified_toolbar_ring = ctk.CTkFrame(
             self.master_container,
-            fg_color=TOOLBAR_BG,
+            fg_color=THEME.get("bg_surface", TOOLBAR_BG),
             corner_radius=6,
-            border_color=TOOLBAR_BORDER,
+            border_color=THEME.get("border_color", TOOLBAR_BORDER),
             border_width=1,
         )
         self.unified_toolbar_ring.grid(
@@ -101,7 +102,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s1_box,
             text=f"Opening: {self.slider_1_val.get()}–{self.slider_2_val.get() - 1}",
             font=("Arial", 11, "bold"),
-            text_color="#cbd5e1",
+            text_color=THEME.get("text_secondary", "#cbd5e1"),
         )
         self.lbl_s1.pack(anchor="w", padx=2)
         self.slider_1 = ctk.CTkSlider(
@@ -113,7 +114,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             width=130,
             height=16,
             fg_color="#439462",
-            progress_color="#334155",
+            progress_color=THEME.get("border_color", "#334155"),
             button_color="#439462",
             button_hover_color="#34754e",
             command=self.on_slider_changed,
@@ -127,7 +128,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s2_box,
             text=f"Middlegame: {self.slider_2_val.get()}–{self.slider_3_val.get() - 1}",
             font=("Arial", 11, "bold"),
-            text_color="#cbd5e1",
+            text_color=THEME.get("text_secondary", "#cbd5e1"),
         )
         self.lbl_s2.pack(anchor="w", padx=2)
         self.slider_2 = ctk.CTkSlider(
@@ -139,7 +140,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             width=130,
             height=16,
             fg_color="#D18228",
-            progress_color="#334155",
+            progress_color=THEME.get("border_color", "#334155"),
             button_color="#D18228",
             button_hover_color="#a6661e",
             command=self.on_slider_changed,
@@ -153,7 +154,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s3_box,
             text=f"Endgame: {self.slider_3_val.get()}+",
             font=("Arial", 11, "bold"),
-            text_color="#cbd5e1",
+            text_color=THEME.get("text_secondary", "#cbd5e1"),
         )
         self.lbl_s3.pack(anchor="w", padx=2)
         self.slider_3 = ctk.CTkSlider(
@@ -165,7 +166,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             width=130,
             height=16,
             fg_color="#C95F5F",
-            progress_color="#334155",
+            progress_color=THEME.get("border_color", "#334155"),
             button_color="#C95F5F",
             button_hover_color="#9e4a4a",
             command=self.on_slider_changed,
@@ -177,7 +178,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
         # Main Scrollable Tier Results Container
         self.cards_scroll_frame = ctk.CTkScrollableFrame(
-            self.master_container, fg_color=WORKSPACE_BG, corner_radius=0, border_width=0
+            self.master_container, fg_color=THEME.get("bg_panel", WORKSPACE_BG), corner_radius=0, border_width=0
         )
         self.cards_scroll_frame.grid(
             row=1, column=0, sticky="nsew", padx=6, pady=(0, 5)
@@ -200,7 +201,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
             tier_frame = ctk.CTkFrame(
                 self.cards_scroll_frame,
-                fg_color=WORKSPACE_BG,
+                fg_color=THEME.get("bg_panel", WORKSPACE_BG),
                 border_color=theme["border"],
                 border_width=2,
                 corner_radius=8,
@@ -210,7 +211,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
             header_btn = ctk.CTkButton(
                 tier_frame,
-                text=f"{arrow}  {t_data['label']}  ({len(games)} games)",
+                text=f"{arrow} {t_data['label']} ({len(games)} games)",
                 anchor="w",
                 fg_color=theme["bg"],
                 hover_color=theme["border"],
@@ -235,11 +236,11 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
                     game_btn = ctk.CTkButton(
                         preview_container,
-                        text=f"    {eco}  |  {white} vs {black}",
+                        text=f" {eco} | {white} vs {black}",
                         anchor="w",
-                        fg_color="#223049",
-                        hover_color="#2d3e5f",
-                        text_color="#cbd5e1",
+                        fg_color=THEME.get("bg_surface", "#1e293b"),
+                        hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                        text_color=THEME.get("text_secondary", "#cbd5e1"),
                         font=("Arial", 11),
                         height=28,
                         command=lambda game_item=g: self.send_tier_games_to_analysis(
@@ -251,11 +252,11 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                 if len(games) > 5:
                     more_btn = ctk.CTkButton(
                         preview_container,
-                        text=f"    ... and {len(games) - 5} more games. Click to open all.",
+                        text=f" ... and {len(games) - 5} more games. Click to open all.",
                         anchor="w",
                         fg_color="transparent",
-                        hover_color="#2d3e5f",
-                        text_color="#94a3b8",
+                        hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                        text_color=THEME.get("text_secondary", "#94a3b8"),
                         font=("Arial", 10),
                         height=24,
                         command=lambda tk=t_key: self.send_tier_to_analysis(tk),

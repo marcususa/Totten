@@ -3,6 +3,7 @@
 import os
 import io
 import customtkinter as ctk
+from core.constants import THEME
 from .patterns_colors import TIER_THEMES
 
 # Optional import for rendering SVGs in CustomTkinter via PIL and cairosvg
@@ -46,9 +47,9 @@ class PatternsSliderLogicMixin:
 
         for code, tooltip in pieces:
             btn = ctk.CTkButton(
-                tray_inner, text="", width=34, height=32,
-                font=("Arial", 10, "bold"), fg_color="#334155",
-                hover_color="#2e4a8c",
+                tray_inner, text=code.upper(), width=34, height=32,
+                font=("Arial", 10, "bold"), fg_color=THEME.get("border_color", "#334155"),
+                hover_color=THEME.get("btn_hover", "#2e4a8c"),
                 command=lambda c=code: self.on_piece_clicked(c)
             )
             btn.pack(side="left", padx=2)
@@ -64,20 +65,20 @@ class PatternsSliderLogicMixin:
                     btn.configure(image=ctk_img, text="")
                 except Exception as e:
                     print(f"[ERROR] Failed rendering SVG {code}: {e}")
-                    btn.configure(text="")
+                    btn.configure(text=code.upper())
             else:
-                btn.configure(text="")
+                btn.configure(text=code.upper())
 
     def on_piece_clicked(self, piece_code):
         if self.selected_piece_filter == piece_code:
             self.selected_piece_filter = None
             self.selected_piece = None
-            self.piece_buttons[piece_code].configure(fg_color="#334155")
+            self.piece_buttons[piece_code].configure(fg_color=THEME.get("border_color", "#334155"))
         else:
             if self.selected_piece_filter and self.selected_piece_filter in self.piece_buttons:
-                self.piece_buttons[self.selected_piece_filter].configure(fg_color="#334155")
+                self.piece_buttons[self.selected_piece_filter].configure(fg_color=THEME.get("border_color", "#334155"))
             self.selected_piece_filter = piece_code
-            self.selected_piece = piece_code  # Carries over the exact two-letter piece code (e.g. 'wb', 'wn')
+            self.selected_piece = piece_code # Carries over the exact two-letter piece code (e.g. 'wb', 'wn')
             self.piece_buttons[piece_code].configure(fg_color="#2563eb")
 
         self.recalculate_tiers()
@@ -152,9 +153,9 @@ class PatternsSliderLogicMixin:
                     tier_2.append(game)
                     assigned_to_t1_or_t2 = True
 
-                if not assigned_to_t1_or_t2 or in_t3_matched:
-                    if game not in tier_3:
-                        tier_3.append(game)
+            if not assigned_to_t1_or_t2 or in_t3_matched:
+                if game not in tier_3:
+                    tier_3.append(game)
 
         self.aggregated_tiers = {
             "tier1": {
