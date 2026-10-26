@@ -422,7 +422,7 @@ class CatalogInitMixin:
         style.map(
             "Borderless.Treeview",
             background=[("selected", THEME["btn_hover"])],
-            foreground=[("selected", "#ffffff")]
+            foreground=[("selected", THEME.get("active_tracker_fg", "#ffffff"))]
         )
         style.configure(
             "Borderless.Treeview.Heading",
