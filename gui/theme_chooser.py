@@ -27,7 +27,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("Theme Chooser")
-        self.geometry("360x420")
+        self.geometry("380x450")
         self.resizable(False, False)
         self.attributes("-topmost", True)
 
@@ -35,17 +35,23 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
         header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(anchor="w", pady=(0, 10))
+        header_frame.pack(anchor="w", pady=(0, 6))
 
         ctk.CTkLabel(
-            header_frame, text="Theme Chooser ",
+            header_frame, text="Theme Chooser",
             font=("Arial", 16, "bold")
         ).pack(side="left")
 
+        # Instruction label instructing base color selection and theme editor usage
+        instruction_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        instruction_frame.pack(anchor="w", pady=(0, 12))
+
         ctk.CTkLabel(
-            header_frame, text="(click color)",
-            font=("Arial", 13, "normal")
-        ).pack(side="left")
+            instruction_frame,
+            text="Select a base color below, then fine-tune using the Theme Editor.",
+            font=("Arial", 11),
+            text_color=("gray60", "gray70")
+        ).pack(anchor="w")
 
         grid_container = ctk.CTkFrame(main_frame, fg_color="transparent")
         grid_container.pack(fill="both", expand=True)

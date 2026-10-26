@@ -252,7 +252,8 @@ class ChessBoardWidget(ctk.CTkFrame):
 
                 promotion = None
                 selected_piece = self.board.piece_at(self.selected_square)
-                if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (0, 7):
+                if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (
+                        0, 7):
                     promotion = chess.QUEEN
 
                 move = chess.Move(self.selected_square, target_square, promotion=promotion)
@@ -390,10 +391,42 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.canvas.delete("all")
         self._canvas_images = []
 
-        # Pull dynamic board colors from the active theme dictionary
-        dark_color = THEME.get("board_dark", "#9f7939")
-        light_color = THEME.get("board_light", "#fbcba4")
-        highlight_color = THEME.get("board_highlight", "#d4af37")
+        # Theme-aware square colors adapting to light/dark themes
+        bg_surface = THEME.get("bg_surface", "#1e293b")
+
+        # Helper to check if theme is dark
+        def _is_dark(hex_col):
+            hex_col = hex_col.lstrip('#')
+            if len(hex_col) != 6:
+                return True
+            r, g, b = int(hex_col[0:2], 16), int(hex_col[2:4], 16), int(hex_col[4:6], 16)
+            return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
+
+        # Helper to lift dark theme colors into a clear medium tone
+        def _lighten_color(hex_col, amount=45):
+            hex_col = hex_col.lstrip('#')
+            if len(hex_col) != 6:
+                return hex_col
+            try:
+                r = min(255, int(hex_col[0:2], 16) + amount)
+                g = min(255, int(hex_col[2:4], 16) + amount)
+                b = min(255, int(hex_col[4:6], 16) + amount)
+                return f"#{r:02x}{g:02x}{b:02x}"
+            except Exception:
+                return hex_col
+
+        if _is_dark(bg_surface):
+            # Dark Theme: Take the theme's button/border color and lighten it into a proper medium square tone
+            base_dark = THEME.get("btn_initial", THEME.get("border_color", "#344268"))
+            dark_color = _lighten_color(base_dark, amount=45)
+            light_color = THEME.get("eval_default", "#adc3dc")
+        else:
+            # Light Theme Formula: Derive squares from theme surface and border colors
+            light_color = THEME.get("bg_surface", "#f8fafc")
+            dark_color = THEME.get("border_color", THEME.get("text_secondary", "#cbd5e1"))
+
+        highlight_color = THEME.get("btn_hover", "#2e4a8c" if _is_dark(bg_surface) else "#3b82f6")
+        border_color = THEME.get("border_color", "#344268")
 
         for row in range(8):
             for col in range(8):
@@ -412,7 +445,12 @@ class ChessBoardWidget(ctk.CTkFrame):
                 if self.selected_square == chess_square:
                     square_color = highlight_color
 
-                self.canvas.create_rectangle(x1, y1, x2, y2, fill=square_color, outline="")
+                # Draw squares touching each other with NO individual square borders
+                self.canvas.create_rectangle(
+                    x1, y1, x2, y2,
+                    fill=square_color,
+                    outline=""
+                )
 
                 piece = self.board.piece_at(chess_square)
                 if piece and not (self.is_dragging and chess_square == self.drag_start_square):
@@ -432,3 +470,11 @@ class ChessBoardWidget(ctk.CTkFrame):
                         cx = x1 + (self.square_size / 2)
                         cy = y1 + (self.square_size / 2)
                         self.canvas.create_image(cx, cy, image=img_tk, anchor="center")
+
+        # Draw a single 2-pixel border strictly around the outer perimeter of the board
+        board_pixel_size = self.square_size * 8
+        self.canvas.create_rectangle(
+            0, 0, board_pixel_size, board_pixel_size,
+            outline=border_color,
+            width=2
+        )
