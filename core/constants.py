@@ -1,5 +1,3 @@
-# core/constants.py
-
 import json
 from pathlib import Path
 
@@ -27,7 +25,7 @@ DEFAULT_THEME = {
     "status_text": "#ddddff",
     "border_color": "#344268",
     "divider": "#344268",
-    "border_ring": "#344268",
+    "border_ring": "#334155",
     "progress_bg": "#0f172a",
     "progress_fill": "#ff0000",
     "eval_red": "#de3d35",
@@ -49,6 +47,9 @@ if CONFIG_FILE.exists():
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             THEME = json.load(f)
+            # Ensure border_ring is never blindingly bright/yellow if loaded from an old config
+            if THEME.get("border_ring") in ["#ffd700", "#fef08a", "#facc15"]:
+                THEME["border_ring"] = "#334155"
     except Exception:
         THEME = DEFAULT_THEME.copy()
 else:
