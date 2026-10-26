@@ -1,129 +1,26 @@
-import colorsys
 import json
 import sys
 import os
 from pathlib import Path
 import customtkinter as ctk
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+# Robustly locate the actual project root directory
+ROOT_DIR = Path(__file__).resolve().parent
+while ROOT_DIR != ROOT_DIR.parent:
+    if (ROOT_DIR / "main.py").exists() or (ROOT_DIR / "core").exists():
+        break
+    ROOT_DIR = ROOT_DIR.parent
+
+DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
 CONFIG_FILE = ROOT_DIR / "theme_override.json"
 
+# Load static defaults directly from JSON
 try:
-    from core.constants import THEME
-except ImportError:
-    THEME = {}
-
-THEME_GRID_DATA = {
-    "Red": {"Light": "#fca5a5", "Medium": "#ef4444", "Dark": "#991b1b"},
-    "Orange": {"Light": "#fed7aa", "Medium": "#f97316", "Dark": None},
-    "Green": {"Light": "#bbf7d0", "Medium": "#22c55e", "Dark": "#166534"},
-    "Blue": {"Light": "#bae6fd", "Medium": "#3b82f6", "Dark": "#1e3a8a"},
-    "Purple": {"Light": "#e9d5ff", "Medium": "#a855f7", "Dark": "#581c87"},
-    "Brown": {"Light": "#f5d0fe", "Medium": "#b45309", "Dark": "#451a03"},
-    "Black": {"Light": "#cbd5e1", "Medium": "#475569", "Dark": "#0f172a"},
-    "Pink": {"Light": "#fbcfe8", "Medium": "#ec4899", "Dark": None},
-    "Yellow": {"Light": "#fef08a", "Medium": "#eab308", "Dark": None}
-}
-
-
-def hex_to_rgb(hex_str):
-    hex_str = hex_str.lstrip('#')
-    return tuple(int(hex_str[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-
-
-def rgb_to_hex(rgb):
-    return '#{:02x}{:02x}{:02x}'.format(
-        max(0, min(255, int(rgb[0] * 255))),
-        max(0, min(255, int(rgb[1] * 255))),
-        max(0, min(255, int(rgb[2] * 255)))
-    )
-
-
-def generate_complete_palette(hue_name, tier_key, base_hex):
-    r, g, b = hex_to_rgb(base_hex)
-    h, l, s = colorsys.rgb_to_hls(r, g, b)
-
-    if tier_key == "Light":
-        bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.96, l * 1.25), s * 0.4))
-        bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.92, l * 1.15), s * 0.5))
-        text_primary = "#0f172a"
-        text_secondary = "#334155"
-        status_text = "#1e293b"
-        border_color = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.70, l * 0.85), s))
-
-        # High contrast deep fill for light modes
-        progress_fill = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.25, l * 0.45), min(1.0, s * 1.3)))
-
-        if hue_name == "Yellow":
-            border_ring = "#ca8a04"
-        else:
-            border_ring = border_color
-
-    elif tier_key == "Medium":
-        if hue_name in ["Orange", "Yellow"]:
-            text_primary = "#0f172a"
-            text_secondary = "#334155"
-            active_tracker_fg = "#000000"
-        else:
-            text_primary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.92, l * 1.6 + 0.4), min(1.0, s * 1.1)))
-            text_secondary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.80, l * 1.3 + 0.2), s))
-            active_tracker_fg = text_primary if l < 0.5 else "#000000"
-
-        bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.20, l * 0.5), s))
-        bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.26, l * 0.6), s))
-        status_text = "#ddddff"
-        border_color = base_hex
-        border_ring = base_hex
-
-        # Luminous high-contrast fill for medium mode
-        progress_fill = "#ffffff"
-
-    else:
-        text_primary = "#ffffff"
-        text_secondary = "#94a3b8"
-        status_text = "#ddddff"
-        bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.10, l * 0.35), s))
-        bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.15, l * 0.45), s))
-        border_color = base_hex
-        border_ring = base_hex
-
-        # Blazing bright pure white fill for dark modes so it pops instantly
-        progress_fill = "#ffffff"
-
-    btn_initial = base_hex
-    btn_hover = rgb_to_hex(colorsys.hls_to_rgb(h, min(1.0, l * 1.15), s))
-
-    eval_light_blue = rgb_to_hex(colorsys.hls_to_rgb((h + 0.5) % 1.0, min(0.7, max(0.4, l)), max(0.5, s)))
-    eval_light_blue_bg = rgb_to_hex(colorsys.hls_to_rgb((h + 0.5) % 1.0, max(0.15, l * 0.4), s * 0.5))
-
-    return {
-        "bg_panel": bg_panel,
-        "bg_surface": bg_surface,
-        "btn_hover": btn_hover,
-        "btn_initial": btn_initial,
-        "btn_active": btn_initial,
-        "btn_bg": btn_initial,
-        "text_primary": text_primary,
-        "text_secondary": text_secondary,
-        "status_text": status_text,
-        "border_color": border_color,
-        "divider": border_color,
-        "border_ring": border_ring,
-        "progress_bg": bg_surface,
-        "progress_fill": progress_fill,
-        "eval_red": "#de3d35",
-        "eval_red_bg": "#4a1f1f",
-        "eval_orange": "#FFA500",
-        "eval_orange_bg": "#4a331f",
-        "eval_green": "#1fa73b",
-        "eval_green_bg": "#00FF00",
-        "eval_light_blue": eval_light_blue,
-        "eval_light_blue_bg": eval_light_blue_bg,
-        "eval_default": text_secondary,
-        "pattern_yellow": base_hex if hue_name == "Yellow" else "#ffd700",
-        "active_tracker_bg": btn_hover,
-        "active_tracker_fg": text_primary
-    }
+    with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
+        THEME_DEFAULTS = json.load(f)
+except Exception as e:
+    print(f"[THEME] Error loading {DEFAULTS_FILE}: {e}")
+    THEME_DEFAULTS = {}
 
 
 class ThemeChooserWindow(ctk.CTkToplevel):
@@ -159,22 +56,27 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         grid_container.grid_columnconfigure(3, weight=1)
 
         row_idx = 0
-        for hue_name, tiers in THEME_GRID_DATA.items():
+        tier_keys = ["Light", "Medium", "Dark"]
+
+        for hue_name, tiers in THEME_DEFAULTS.items():
             ctk.CTkLabel(
                 grid_container, text=hue_name,
                 font=("Arial", 12, "bold")
             ).grid(row=row_idx, column=0, sticky="w", padx=5, pady=4)
 
-            for col_offset, tier_key in enumerate(["Light", "Medium", "Dark"], start=1):
-                hex_val = tiers.get(tier_key)
+            for col_offset, tier_key in enumerate(tier_keys, start=1):
+                tier_data = tiers.get(tier_key)
 
-                if hex_val:
+                if tier_data and isinstance(tier_data, dict):
+                    # Use btn_initial color for the swatch preview button
+                    swatch_color = tier_data.get("btn_initial", "#3b82f6")
+
                     swatch = ctk.CTkButton(
                         grid_container, text="", width=45, height=24,
-                        fg_color=hex_val,
-                        hover_color=hex_val,
+                        fg_color=swatch_color,
+                        hover_color=swatch_color,
                         corner_radius=4,
-                        command=lambda h=hue_name, t=tier_key, v=hex_val: self.apply_theme_live(h, t, v)
+                        command=lambda h=hue_name, t=tier_key, d=tier_data: self.apply_theme_live(h, t, d)
                     )
                     swatch.grid(row=row_idx, column=col_offset, padx=4, pady=4)
                 else:
@@ -186,14 +88,15 @@ class ThemeChooserWindow(ctk.CTkToplevel):
 
             row_idx += 1
 
-    def apply_theme_live(self, hue, tier, hex_val):
-        new_palette = generate_complete_palette(hue, tier, hex_val)
+    def apply_theme_live(self, hue, tier, palette_dict):
         try:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(new_palette, f, indent=4)
+                json.dump(palette_dict, f, indent=4)
+            print(f"[THEME] Saved static palette for {hue} ({tier}) to {CONFIG_FILE}")
         except Exception as e:
             print(f"[THEME] Error saving theme override: {e}")
+            return
 
-        print(f"[THEME] Applied {hue} ({tier}). Restarting application...")
+        print(f"[THEME] Restarting application...")
         python = sys.executable
         os.execv(python, [python] + sys.argv)
