@@ -4,6 +4,7 @@ import chess.pgn
 
 import gui.app_state as state
 from gui.sidebar import set_status_message
+from core.constants import THEME
 from .constants import SECTION_TITLES, ECO_THEME_CONFIG
 from .catalog_loader import CatalogLoaderMixin
 from .catalog_search import CatalogSearchMixin
@@ -22,7 +23,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
         kwargs.pop("target_game", None)
         kwargs.pop("active_index", None)
         kwargs.pop("initial_games", None)
-        super().__init__(master, fg_color="#172134", corner_radius=0, *args, **kwargs)
+        super().__init__(master, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0, *args, **kwargs)
 
         self.app_state = app_state or state
 
@@ -44,7 +45,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
 
         self.expanded_eco_sections = set()
         self.expanded_groups = set()
-        self.group_display_limits = {}  # Tracks pagination limits per group key
+        self.group_display_limits = {}
 
         self._build_ui()
         self.check_and_load_catalog()
@@ -53,16 +54,16 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.panel = ctk.CTkFrame(self, fg_color="#344268", corner_radius=0)
+        self.panel = ctk.CTkFrame(self, fg_color=THEME.get("btn_bg", "#344268"), corner_radius=0)
         self.panel.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
         self.panel.grid_rowconfigure(0, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
         self.master_container = ctk.CTkFrame(
             self.panel,
-            fg_color="#172134",
+            fg_color=THEME.get("bg_panel", "#172134"),
             corner_radius=6,
-            border_color="#445577",
+            border_color=THEME.get("border_color", "#445577"),
             border_width=1
         )
         self.master_container.grid(row=0, column=0, sticky="nsew", padx=1, pady=1)
@@ -85,10 +86,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             width=160,
             height=30,
             font=("Arial", 12),
-            fg_color="#1e293b",
-            text_color="#f8fafc",
-            placeholder_text_color="#94a3b8",
-            border_color="#445577",
+            fg_color=THEME.get("bg_surface", "#1e293b"),
+            text_color=THEME.get("text_primary", "#f8fafc"),
+            placeholder_text_color=THEME.get("text_secondary", "#94a3b8"),
+            border_color=THEME.get("border_color", "#445577"),
             border_width=1,
             corner_radius=6
         )
@@ -97,9 +98,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
 
         self.tag_buttons_frame = ctk.CTkFrame(
             self.toolbar,
-            fg_color="#1e293b",
+            fg_color=THEME.get("bg_surface", "#1e293b"),
             corner_radius=6,
-            border_color="#334155",
+            border_color=THEME.get("border_color", "#334155"),
             border_width=1
         )
         self.tag_buttons_frame.grid(row=0, column=1, sticky="w", padx=0)
@@ -110,14 +111,13 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             self.toolbar,
             text="",
             font=("Arial", 11, "bold"),
-            text_color="#93c5fd"
+            text_color=THEME.get("eval_light_blue", "#93c5fd")
         )
         self.lbl_tag_count.grid(row=0, column=2, sticky="e", padx=(10, 12))
 
-        # Increased bottom padding to prevent border clipping
         self.cards_scroll_frame = ctk.CTkScrollableFrame(
             self.master_container,
-            fg_color="#1e293b",
+            fg_color=THEME.get("bg_surface", "#1e293b"),
             corner_radius=6,
             border_width=0
         )
@@ -184,10 +184,9 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             if total_filtered_in_section == 0 and query:
                 continue
 
-            # --- 1. MODERN ECO SECTION CARD FRAME ---
             group_frame = ctk.CTkFrame(
                 self.cards_scroll_frame,
-                fg_color="#10172a",
+                fg_color=THEME.get("progress_bg", "#10172a"),
                 border_color=theme["border"],
                 border_width=1,
                 corner_radius=8
@@ -202,10 +201,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             expand_indicator = "▼" if is_eco_expanded else "▶"
             header_btn = ctk.CTkButton(
                 header_inner,
-                text=f"{expand_indicator}  ECO {cat} — {SECTION_TITLES[cat]}",
+                text=f"{expand_indicator} ECO {cat} — {SECTION_TITLES[cat]}",
                 anchor="w",
                 fg_color="transparent",
-                hover_color="#1e293b",
+                hover_color=THEME.get("bg_surface", "#1e293b"),
                 text_color=theme["fg"],
                 font=("Arial", 12, "bold"),
                 height=32,
@@ -217,15 +216,14 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
                 header_inner,
                 text=f"{total_filtered_in_section} games",
                 font=("Arial", 10, "bold"),
-                text_color="#93c5fd",
-                fg_color="#1e3a8a",
+                text_color=THEME.get("eval_light_blue", "#93c5fd"),
+                fg_color=THEME.get("eval_light_blue_bg", "#1e3a8a"),
                 corner_radius=4,
                 padx=8,
                 pady=2
             )
             count_badge.grid(row=0, column=1, sticky="e", padx=4)
 
-            # --- 2. EXPANDED CONTENT CONTAINER ---
             if is_eco_expanded:
                 content_container = ctk.CTkFrame(group_frame, fg_color="transparent")
                 content_container.pack(fill="x", padx=8, pady=(0, 8))
@@ -236,7 +234,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
                         content_container,
                         text="No games found in this section.",
                         font=("Arial", 11, "italic"),
-                        text_color="#64748b"
+                        text_color=THEME.get("text_secondary", "#64748b")
                     )
                     lbl_empty.pack(anchor="w", padx=8, pady=6)
 
@@ -252,11 +250,11 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
                     variation_display = f" — {variation}" if variation else ""
                     row_btn = ctk.CTkButton(
                         content_container,
-                        text=f"  {sub_expand}  {eco}   |   {opening} ({count} games){variation_display}",
+                        text=f" {sub_expand} {eco} | {opening} ({count} games){variation_display}",
                         anchor="w",
-                        fg_color="#1e293b",
-                        hover_color="#334155",
-                        text_color="#f8fafc",
+                        fg_color=THEME.get("bg_surface", "#1e293b"),
+                        hover_color=THEME.get("btn_hover", "#334155"),
+                        text_color=THEME.get("text_primary", "#f8fafc"),
                         font=("Arial", 11, "bold"),
                         height=32,
                         corner_radius=6
@@ -277,81 +275,79 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
                     row_btn.bind("<Button-1>", handle_single_click)
                     row_btn.bind("<Double-Button-1>", handle_double_click)
 
-                    # --- 3. INDIVIDUAL GAME INSTANCES (WITH PAGINATION) ---
-                    if is_expanded and instances:
-                        sub_container = ctk.CTkFrame(
-                            content_container,
-                            fg_color="#0f172a",
-                            corner_radius=6,
-                            border_color="#334155",
-                            border_width=1
+                if is_expanded and instances:
+                    sub_container = ctk.CTkFrame(
+                        content_container,
+                        fg_color=THEME.get("progress_bg", "#0f172a"),
+                        corner_radius=6,
+                        border_color=THEME.get("border_color", "#334155"),
+                        border_width=1
+                    )
+                    sub_container.pack(fill="x", padx=16, pady=(2, 6))
+                    sub_container.grid_columnconfigure(0, weight=1)
+
+                    current_limit = self.group_display_limits.get(group_key, 15)
+                    visible_instances = instances[:current_limit]
+
+                    for inst in visible_instances:
+                        inst_headers = inst.get("headers", {})
+                        inst_game = inst.get("game_object")
+                        moves_str = self.get_first_n_moves_str(inst_game, n=8)
+
+                        white_p = self.get_header(inst_headers, "White", "Unknown")
+                        black_p = self.get_header(inst_headers, "Black", "Unknown")
+                        white_e = self.get_header(inst_headers, "WhiteElo", "")
+                        black_e = self.get_header(inst_headers, "BlackElo", "")
+
+                        elo_str = f"({white_e} vs {black_e})" if white_e or black_e else ""
+                        matchup_text = f"{white_p} {elo_str} vs {black_p}"
+
+                        extra_info_parts = []
+                        active_tags = set(self.active_extra_columns)
+                        if self.active_primary_tag:
+                            active_tags.add(self.active_primary_tag)
+
+                        for tag in sorted(active_tags):
+                            if tag not in ["Players", "Elo", "Variation"]:
+                                val = self.get_header(inst_headers, tag, "")
+                                if val and val != "Unknown":
+                                    extra_info_parts.append(f"{tag}: {val}")
+
+                        extra_str = f"[{' | '.join(extra_info_parts)}] " if extra_info_parts else ""
+
+                        game_btn = ctk.CTkButton(
+                            sub_container,
+                            text=f"• {extra_str}{matchup_text} | {moves_str}",
+                            anchor="w",
+                            fg_color="transparent",
+                            hover_color=THEME.get("bg_surface", "#1e293b"),
+                            text_color=THEME.get("text_secondary", "#cbd5e1"),
+                            font=("Arial", 11),
+                            height=28,
+                            command=lambda idata=item_data, game_inst=inst: self.on_game_click(idata, game_inst)
                         )
-                        sub_container.pack(fill="x", padx=16, pady=(2, 6))
-                        sub_container.grid_columnconfigure(0, weight=1)
+                        game_btn.pack(fill="x", padx=6, pady=2)
 
-                        current_limit = self.group_display_limits.get(group_key, 15)
-                        visible_instances = instances[:current_limit]
+                    if len(instances) > current_limit:
+                        remaining = len(instances) - current_limit
 
-                        for inst in visible_instances:
-                            inst_headers = inst.get("headers", {})
-                            inst_game = inst.get("game_object")
-                            moves_str = self.get_first_n_moves_str(inst_game, n=8)
+                        def load_more_games(gk=group_key):
+                            current = self.group_display_limits.get(gk, 15)
+                            self.group_display_limits[gk] = current + 20
+                            self.refresh_current_view()
 
-                            white_p = self.get_header(inst_headers, "White", "Unknown")
-                            black_p = self.get_header(inst_headers, "Black", "Unknown")
-                            white_e = self.get_header(inst_headers, "WhiteElo", "")
-                            black_e = self.get_header(inst_headers, "BlackElo", "")
-
-                            elo_str = f"({white_e} vs {black_e})" if white_e or black_e else ""
-                            matchup_text = f"{white_p} {elo_str}  vs  {black_p}"
-
-                            # Extract active extra tags (like Round, Event, etc.) to display
-                            extra_info_parts = []
-                            active_tags = set(self.active_extra_columns)
-                            if self.active_primary_tag:
-                                active_tags.add(self.active_primary_tag)
-
-                            for tag in sorted(active_tags):
-                                if tag not in ["Players", "Elo", "Variation"]:
-                                    val = self.get_header(inst_headers, tag, "")
-                                    if val and val != "Unknown":
-                                        extra_info_parts.append(f"{tag}: {val}")
-
-                            extra_str = f"[{' | '.join(extra_info_parts)}]  " if extra_info_parts else ""
-
-                            game_btn = ctk.CTkButton(
-                                sub_container,
-                                text=f"•  {extra_str}{matchup_text}    |    {moves_str}",
-                                anchor="w",
-                                fg_color="transparent",
-                                hover_color="#1e293b",
-                                text_color="#cbd5e1",
-                                font=("Arial", 11),
-                                height=28,
-                                command=lambda idata=item_data, game_inst=inst: self.on_game_click(idata, game_inst)
-                            )
-                            game_btn.pack(fill="x", padx=6, pady=2)
-
-                        if len(instances) > current_limit:
-                            remaining = len(instances) - current_limit
-
-                            def load_more_games(gk=group_key):
-                                current = self.group_display_limits.get(gk, 15)
-                                self.group_display_limits[gk] = current + 20
-                                self.refresh_current_view()
-
-                            more_btn = ctk.CTkButton(
-                                sub_container,
-                                text=f"↓ Load More ({remaining} remaining)...",
-                                anchor="center",
-                                fg_color="#1e293b",
-                                hover_color="#334155",
-                                text_color="#93c5fd",
-                                font=("Arial", 11, "bold"),
-                                height=28,
-                                command=load_more_games
-                            )
-                            more_btn.pack(fill="x", padx=10, pady=6)
+                        more_btn = ctk.CTkButton(
+                            sub_container,
+                            text=f"↓ Load More ({remaining} remaining)...",
+                            anchor="center",
+                            fg_color=THEME.get("bg_surface", "#1e293b"),
+                            hover_color=THEME.get("btn_hover", "#334155"),
+                            text_color=THEME.get("eval_light_blue", "#93c5fd"),
+                            font=("Arial", 11, "bold"),
+                            height=28,
+                            command=load_more_games
+                        )
+                        more_btn.pack(fill="x", padx=10, pady=6)
 
         self.lbl_tag_count.configure(text=f"Active View: {active_display_tag}")
 
@@ -360,7 +356,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             self.expanded_eco_sections.remove(cat)
         else:
             self.expanded_eco_sections = {cat}
-            self.lazy_load_eco_section(cat)
+        self.lazy_load_eco_section(cat)
         self.refresh_current_view()
 
     def toggle_group_expansion(self, group_key):

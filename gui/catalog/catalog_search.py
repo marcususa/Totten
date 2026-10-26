@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from core.constants import THEME
 from .constants import STANDARD_TAG_BANK
 
 
@@ -35,7 +36,7 @@ class CatalogSearchMixin:
                     formatted_moves.append(f"{move_num}. {white_move} {black_move}")
                 else:
                     formatted_moves.append(f"{move_num}. {white_move}")
-            return "  ".join(formatted_moves)
+            return " ".join(formatted_moves)
         except Exception:
             return ""
 
@@ -54,36 +55,35 @@ class CatalogSearchMixin:
         else:
             if tag in self.active_extra_columns:
                 self.active_extra_columns.remove(tag)
-        self.active_primary_tag = None
-        self._rebuild_toolbar_buttons()
-        self.refresh_current_view()
+            self.active_primary_tag = None
+            self._rebuild_toolbar_buttons()
+            self.refresh_current_view()
 
     def open_all_tags_dialog(self):
         dialog = ctk.CTkToplevel(self)
         dialog.title("All Available Tags")
-        dialog.geometry("460x350")  # Adjusted height to remove excess bottom gap
+        dialog.geometry("460x350")
         dialog.transient(self)
         dialog.grab_set()
 
-        dialog.configure(fg_color="#172134")
+        dialog.configure(fg_color=THEME.get("bg_panel", "#172134"))
         dialog.grid_rowconfigure(0, weight=1)
         dialog.grid_columnconfigure(0, weight=1)
 
-        frame = ctk.CTkFrame(dialog, fg_color="#172134", corner_radius=0)
+        frame = ctk.CTkFrame(dialog, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0)
         frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
         scrollable_frame = ctk.CTkScrollableFrame(
             frame,
-            fg_color="#1e293b",
-            label_fg_color="#1e293b",
-            border_color="#445577",
+            fg_color=THEME.get("bg_surface", "#1e293b"),
+            label_fg_color=THEME.get("bg_surface", "#1e293b"),
+            border_color=THEME.get("border_color", "#445577"),
             border_width=1
         )
         scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        # Configure two columns inside the scrollable frame
         scrollable_frame.grid_columnconfigure(0, weight=1)
         scrollable_frame.grid_columnconfigure(1, weight=1)
 
@@ -101,16 +101,16 @@ class CatalogSearchMixin:
                 variable=var,
                 font=("Arial", 12),
                 command=lambda t=tag, v=var: self.toggle_tag_from_dialog(t, v.get()),
-                text_color="#f8fafc",
-                fg_color="#2e4a8c",
-                hover_color="#3b5998",
-                checkmark_color="#ffffff",
-                border_color="#2e4a8c",
+                text_color=THEME.get("text_primary", "#f8fafc"),
+                fg_color=THEME.get("btn_hover", "#2e4a8c"),
+                hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                checkmark_color=THEME.get("active_tracker_fg", "#ffffff"),
+                border_color=THEME.get("btn_hover", "#2e4a8c"),
                 border_width=2
             )
 
             def on_enter(e, c=chk, v=var):
-                c.configure(hover_color="#3b5998" if v.get() else "#2e4a8c")
+                c.configure(hover_color=THEME.get("btn_hover", "#2e4a8c"))
 
             chk.bind("<Enter>", on_enter)
             chk.grid(row=row_idx, column=col_idx, sticky="w", pady=6, padx=12)
@@ -119,7 +119,6 @@ class CatalogSearchMixin:
         for widget in self.tag_buttons_frame.winfo_children():
             widget.destroy()
 
-        # Removed "Variation" since it is now natively displayed next to opening game counts
         for tag in ["Players", "Elo", "Event", "All"]:
             if tag == "All":
                 btn_width = 50
@@ -131,9 +130,9 @@ class CatalogSearchMixin:
                 btn_width = 80
 
             is_active = (tag == self.active_primary_tag) or (tag == "All" and len(self.active_extra_columns) > 0)
-            btn_fg = "#2e4a8c" if is_active else "transparent"
-            btn_hover = "#3b5998" if is_active else "#2b3856"
-            text_color = "#ffffff" if is_active else "#cbd5e1"
+            btn_fg = THEME.get("btn_hover", "#2e4a8c") if is_active else "transparent"
+            btn_hover = THEME.get("btn_hover", "#3b5998") if is_active else THEME.get("btn_initial", "#2b3856")
+            text_color = THEME.get("text_primary", "#ffffff") if is_active else THEME.get("text_secondary", "#cbd5e1")
 
             if tag == "All":
                 btn = ctk.CTkButton(
