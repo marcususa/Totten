@@ -1,15 +1,18 @@
-# gui/statusbar.py
-
 import gui.app_state as state
 
+try:
+    from core.constants import THEME
+except ImportError:
+    THEME = {}
 
-def set_status_message(message, text_color="#ddddff"):
-    """Updates the status bar label in the sidebar safely with #ddddff default."""
+
+def set_status_message(message, text_color=None):
+    """Updates the status bar label in the sidebar safely using theme-aware defaults."""
     print(f"[DEBUG STATUS]: {message}")
     try:
         label = getattr(state, "status", None) or getattr(state, "status_label", None)
         if label:
-            active_color = text_color if text_color else "#ddddff"
+            active_color = text_color if text_color else THEME.get("status_text", "#ddddff")
             label.configure(text=message, text_color=active_color)
             if hasattr(label, "update_idletasks"):
                 label.update_idletasks()
@@ -46,6 +49,7 @@ def start_progress(indeterminate=False):
     except Exception as e:
         print(f"Progress Start Error: {e}")
 
+
 def update_progress(value):
     """Grows the red bar smoothly from left to right (value between 0.0 and 1.0)."""
     try:
@@ -74,6 +78,7 @@ def stop_progress():
                 master_root.update_idletasks()
     except Exception as e:
         print(f"Progress Stop Error: {e}")
+
 
 def hide_progress():
     """Resets the progress bar to 0.0 and leaves it ready for the next task."""

@@ -8,6 +8,40 @@ import gui.calendar_workspace
 from core.constants import THEME
 
 
+def _get_dynamic_progress_fill():
+    """Computes a high-contrast progress fill color dynamically based on background luminance."""
+    bg = THEME.get("bg_panel", "#172134").lstrip('#')
+    try:
+        r, g, b = int(bg[0:2], 16), int(bg[2:4], 16), int(bg[4:6], 16)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+        if luminance > 0.5:
+            # Light background: darken significantly (~75% darkness / 25% brightness)
+            factor = 0.25
+            nr, ng, nb = int(r * factor), int(g * factor), int(b * factor)
+        else:
+            # Dark background: make it blazing bright (~85% lightness / glow-like)
+            factor = 0.85
+            nr = int(r + (255 - r) * factor)
+            ng = int(g + (255 - g) * factor)
+            nb = int(b + (255 - b) * factor)
+
+        return f"#{max(0, min(255, nr)):02x}{max(0, min(255, ng)):02x}{max(0, min(255, nb)):02x}"
+    except Exception:
+        return "#ffffff"
+
+
+def _get_dynamic_text_color(hex_str):
+    """Computes high-contrast text color (dark or white) based on button background luminance."""
+    clean_hex = hex_str.lstrip('#')
+    try:
+        r, g, b = int(clean_hex[0:2], 16), int(clean_hex[2:4], 16), int(clean_hex[4:6], 16)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+        return "#0f172a" if luminance > 0.5 else "#ffffff"
+    except Exception:
+        return THEME.get("text_primary", "#ffffff")
+
+
 class Sidebar(ctk.CTkFrame):
 
     def __init__(self, parent):
@@ -38,8 +72,8 @@ class Sidebar(ctk.CTkFrame):
             self.progress_container,
             height=8,
             corner_radius=2,
-            fg_color=THEME.get("progress_bg", "#0f172a"),
-            progress_color=THEME.get("progress_fill", "#ff0000"),
+            fg_color=THEME.get("progress_bg", "#1e293b"),
+            progress_color=_get_dynamic_progress_fill(),
             mode="determinate"
         )
         self.progress_bar.pack(fill="x", expand=True, pady=4)
@@ -57,7 +91,6 @@ class Sidebar(ctk.CTkFrame):
             command=lambda: state.show_workspace("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 5))
-
 
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
@@ -109,7 +142,9 @@ class Sidebar(ctk.CTkFrame):
 
         self.btn_qeval_analysis = ctk.CTkButton(
             self, text="Analyze", height=24, font=ctk.CTkFont(size=10),
-            fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], command=self.handle_qeval_send_analysis
+            fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
+            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
+            command=self.handle_qeval_send_analysis
         )
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 6))
 

@@ -1,5 +1,3 @@
-# gui/theme_chooser.py
-
 import colorsys
 import json
 import sys
@@ -48,70 +46,71 @@ def generate_complete_palette(hue_name, tier_key, base_hex):
     if tier_key == "Light":
         bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.96, l * 1.25), s * 0.4))
         bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.92, l * 1.15), s * 0.5))
-        text_primary = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.18, l * 0.35), min(1.0, s * 1.2)))
-        text_secondary = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.30, l * 0.55), s))
-        status_text = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.22, l * 0.4), s))
+        text_primary = "#0f172a"
+        text_secondary = "#334155"
+        status_text = "#1e293b"
         border_color = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.70, l * 0.85), s))
-        hover_l = max(0.05, l * 0.82)
-        active_l = max(0.0, l * 0.65)
-        active_tracker_bg = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.70, l * 0.80), min(1.0, s * 1.1)))
-        active_tracker_fg = text_primary
-        eval_light_blue = text_primary
-        eval_light_blue_bg = bg_surface
+
+        # High contrast deep fill for light modes
+        progress_fill = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.25, l * 0.45), min(1.0, s * 1.3)))
+
+        if hue_name == "Yellow":
+            border_ring = "#ca8a04"
+        else:
+            border_ring = border_color
+
     elif tier_key == "Medium":
         if hue_name in ["Orange", "Yellow"]:
             text_primary = "#0f172a"
             text_secondary = "#334155"
+            active_tracker_fg = "#000000"
         else:
             text_primary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.92, l * 1.6 + 0.4), min(1.0, s * 1.1)))
             text_secondary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.80, l * 1.3 + 0.2), s))
+            active_tracker_fg = text_primary if l < 0.5 else "#000000"
+
         bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.20, l * 0.5), s))
         bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.26, l * 0.6), s))
         status_text = "#ddddff"
         border_color = base_hex
-        if l < 0.5:
-            hover_l = min(0.92, l * 1.35 + 0.12)
-            active_l = max(0.12, l * 0.70)
-        else:
-            hover_l = max(0.15, l * 0.78)
-            active_l = max(0.08, l * 0.60)
-        active_tracker_bg = rgb_to_hex(colorsys.hls_to_rgb(h, hover_l, s))
-        active_tracker_fg = text_primary
-        eval_light_blue = "#31a0ef"
-        eval_light_blue_bg = "#1f3852"
+        border_ring = base_hex
+
+        # Luminous high-contrast fill for medium mode
+        progress_fill = "#ffffff"
+
     else:
-        text_primary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.95, l * 1.8 + 0.45), min(1.0, s * 1.1)))
-        text_secondary = rgb_to_hex(colorsys.hls_to_rgb(h, min(0.82, l * 1.4 + 0.25), s))
+        text_primary = "#ffffff"
+        text_secondary = "#94a3b8"
         status_text = "#ddddff"
         bg_panel = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.10, l * 0.35), s))
         bg_surface = rgb_to_hex(colorsys.hls_to_rgb(h, max(0.15, l * 0.45), s))
         border_color = base_hex
-        hover_l = min(0.88, l * 1.45 + 0.18)
-        active_l = min(0.75, l * 1.20 + 0.08)
-        active_tracker_bg = rgb_to_hex(colorsys.hls_to_rgb(h, hover_l, s))
-        active_tracker_fg = text_primary
-        eval_light_blue = "#31a0ef"
-        eval_light_blue_bg = "#1f3852"
+        border_ring = base_hex
+
+        # Blazing bright pure white fill for dark modes so it pops instantly
+        progress_fill = "#ffffff"
 
     btn_initial = base_hex
-    btn_hover = rgb_to_hex(colorsys.hls_to_rgb(h, hover_l, s))
-    btn_active = rgb_to_hex(colorsys.hls_to_rgb(h, active_l, s))
+    btn_hover = rgb_to_hex(colorsys.hls_to_rgb(h, min(1.0, l * 1.15), s))
+
+    eval_light_blue = rgb_to_hex(colorsys.hls_to_rgb((h + 0.5) % 1.0, min(0.7, max(0.4, l)), max(0.5, s)))
+    eval_light_blue_bg = rgb_to_hex(colorsys.hls_to_rgb((h + 0.5) % 1.0, max(0.15, l * 0.4), s * 0.5))
 
     return {
         "bg_panel": bg_panel,
         "bg_surface": bg_surface,
         "btn_hover": btn_hover,
         "btn_initial": btn_initial,
-        "btn_active": btn_active,
+        "btn_active": btn_initial,
         "btn_bg": btn_initial,
         "text_primary": text_primary,
         "text_secondary": text_secondary,
         "status_text": status_text,
         "border_color": border_color,
         "divider": border_color,
-        "border_ring": border_color,
+        "border_ring": border_ring,
         "progress_bg": bg_surface,
-        "progress_fill": base_hex,
+        "progress_fill": progress_fill,
         "eval_red": "#de3d35",
         "eval_red_bg": "#4a1f1f",
         "eval_orange": "#FFA500",
@@ -120,10 +119,10 @@ def generate_complete_palette(hue_name, tier_key, base_hex):
         "eval_green_bg": "#00FF00",
         "eval_light_blue": eval_light_blue,
         "eval_light_blue_bg": eval_light_blue_bg,
-        "eval_default": "#adc3dc",
+        "eval_default": text_secondary,
         "pattern_yellow": base_hex if hue_name == "Yellow" else "#ffd700",
-        "active_tracker_bg": active_tracker_bg,
-        "active_tracker_fg": active_tracker_fg
+        "active_tracker_bg": btn_hover,
+        "active_tracker_fg": text_primary
     }
 
 
