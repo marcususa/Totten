@@ -1,4 +1,8 @@
-CONFIG_FILE = "config.json"
+import json
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+CONFIG_FILE = ROOT_DIR / "theme_override.json"
 
 # Layout & Dimension Constants
 LAYOUT = {
@@ -9,19 +13,20 @@ LAYOUT = {
     "analysis_box_height": 90,
 }
 
-THEME = {
-    "bg_panel": "#172134",          # Outer panel color
-    "bg_surface": "#1e293b",        # Text field box background
-    "btn_hover": "#2e4a8c",          # Hover over / active state color
-    "btn_initial": "#344268",        # Resting / initial state color
+# Default Theme Template
+DEFAULT_THEME = {
+    "bg_panel": "#172134",
+    "bg_surface": "#1e293b",
+    "btn_hover": "#2e4a8c",
+    "btn_initial": "#344268",
     "btn_bg": "#344268",
     "text_primary": "#f8fafc",
     "text_secondary": "#94a3b8",
     "status_text": "#ddddff",
     "border_color": "#344268",
-    "divider": "#344268",  # Divider color
+    "divider": "#344268",
     "border_ring": "#344268",
-    "progress_bg": "#0f172a", # Can also use for other panel bg
+    "progress_bg": "#0f172a",
     "progress_fill": "#ff0000",
     "eval_red": "#de3d35",
     "eval_red_bg": "#4a1f1f",
@@ -31,8 +36,18 @@ THEME = {
     "eval_green_bg": "#00FF00",
     "eval_light_blue": "#31a0ef",
     "eval_light_blue_bg": "#1f3852",
-    "eval_default": "#adc3dc",        # Right column moves
-    "pattern_yellow": "#ffd700",      # Yellow
+    "eval_default": "#adc3dc",
+    "pattern_yellow": "#ffd700",
     "active_tracker_bg": "#2e4a8c",
     "active_tracker_fg": "#ffffff"
 }
+
+# Load saved overrides if they exist, otherwise fallback to default
+if CONFIG_FILE.exists():
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            THEME = json.load(f)
+    except Exception:
+        THEME = DEFAULT_THEME.copy()
+else:
+    THEME = DEFAULT_THEME.copy()
