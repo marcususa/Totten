@@ -2,6 +2,7 @@ import sys
 import os
 import time
 from pathlib import Path
+from core.constants import THEME
 
 # Add the project root directory to Python's module search path to ensure robust absolute imports
 ROOT_DIR = Path(__file__).resolve().parent
@@ -29,7 +30,7 @@ class Totten(ctk.CTk):
 
         self.resizable(True, True)
 
-        self.configure(fg_color="#172134")
+        self.configure(fg_color=THEME["bg_panel"])
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
