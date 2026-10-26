@@ -6,21 +6,21 @@ CONFIG_FILE = ROOT_DIR / "theme_override.json"
 
 # Complete fallback theme containing every required key
 DEFAULT_THEME = {
-    "bg_panel": "#7f1d1d",
-    "bg_surface": "#991b1b",
-    "text_primary": "#ef4444",
-    "text_secondary": "#fca5a5",
+    "bg_panel": "#172134",
+    "bg_surface": "#1e293b",
+    "text_primary": "#f8fafc",
+    "text_secondary": "#94a3b8",
     "status_text": "#ddddff",
-    "border_color": "#ef4444",
-    "divider": "#ef4444",
-    "border_ring": "#ef4444",
-    "progress_bg": "#991b1b",
-    "progress_fill": "#ffffff",
-    "btn_initial": "#ef4444",
-    "btn_hover": "#dc2626",
-    "btn_active": "#ef4444",
-    "btn_bg": "#ef4444",
-    "active_tracker_bg": "#dc2626",
+    "border_color": "#344268",
+    "divider": "#344268",
+    "border_ring": "#344268",
+    "progress_bg": "#0f172a",
+    "progress_fill": "#ff0000",
+    "btn_initial": "#344268",
+    "btn_hover": "#2e4a8c",
+    "btn_active": "#344268",
+    "btn_bg": "#344268",
+    "active_tracker_bg": "#2e4a8c",
     "active_tracker_fg": "#ffffff",
     "eval_red": "#de3d35",
     "eval_red_bg": "#4a1f1f",
@@ -28,9 +28,9 @@ DEFAULT_THEME = {
     "eval_orange_bg": "#4a331f",
     "eval_green": "#1fa73b",
     "eval_green_bg": "#00FF00",
-    "eval_light_blue": "#7dd3fc",
-    "eval_light_blue_bg": "#082f49",
-    "eval_default": "#fca5a5",
+    "eval_light_blue": "#31a0ef",
+    "eval_light_blue_bg": "#1f3852",
+    "eval_default": "#adc3dc",
     "pattern_yellow": "#ffd700"
 }
 
@@ -50,12 +50,9 @@ def load_theme():
 THEME = load_theme()
 
 LAYOUT = {
-    "padding": 5,
-    "margin": 5,
-    "corner_radius": 6,
-    "board_width": 480,
-    "board_height": 480,
-    "square_size": 60,
-    "pv_box_height": 150,
-    "analysis_box_height": 200
+    "square_size": 47,
+    "board_width": 510,
+    "board_height": 425,
+    "pv_box_height": 120,
+    "analysis_box_height": 90,
 }
