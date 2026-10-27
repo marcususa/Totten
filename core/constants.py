@@ -3,8 +3,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CONFIG_FILE = ROOT_DIR / "theme_override.json"
+DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
 
-# Complete fallback theme containing every required key
 DEFAULT_THEME = {
     "bg_panel": "#172134",
     "bg_surface": "#1e293b",
@@ -17,10 +17,10 @@ DEFAULT_THEME = {
     "progress_bg": "#0f172a",
     "progress_fill": "#ff0000",
     "btn_initial": "#344268",
-    "btn_hover": "#2e4a8c",
+    "btn_hover": "#475569",
     "btn_active": "#344268",
     "btn_bg": "#344268",
-    "active_tracker_bg": "#2e4a8c",
+    "active_tracker_bg": "#475569",
     "active_tracker_fg": "#ffffff",
     "eval_red": "#de3d35",
     "eval_red_bg": "#4a1f1f",
@@ -28,24 +28,42 @@ DEFAULT_THEME = {
     "eval_orange_bg": "#4a331f",
     "eval_green": "#1fa73b",
     "eval_green_bg": "#00FF00",
-    "eval_light_blue": "#31a0ef",
-    "eval_light_blue_bg": "#1f3852",
-    "eval_default": "#adc3dc",
+    "eval_light_blue": "#fed7aa",
+    "eval_light_blue_bg": "#4a331f",
+    "eval_default": "#ffedd5",
     "pattern_yellow": "#ffd700"
 }
 
 def load_theme():
+    theme_data = DEFAULT_THEME.copy()
+    
+    # 1. Try loading override config first
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    merged = DEFAULT_THEME.copy()
-                    merged.update(data)
-                    return merged
+                    theme_data.update(data)
         except Exception:
             pass
-    return DEFAULT_THEME
+    elif DEFAULTS_FILE.exists():
+        # Fallback to checking defaults if override doesn't exist
+        try:
+            with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
+                all_defaults = json.load(f)
+                # If Orange is selected or stored, grab its Medium tier as a safe default
+                if "Orange" in all_defaults:
+                    theme_data.update(all_defaults["Orange"].get("Medium", {}))
+        except Exception:
+            pass
+
+    # Hard-sanitize any rogue blue hex codes lingering in the theme dictionary
+    blue_hexes = {"#7dd3fc", "#31a0ef", "#3b82f6", "#2e4a8c", "#1c7ed6"}
+    for key, val in list(theme_data.items()):
+        if isinstance(val, str) and val.lower() in blue_hexes:
+            theme_data[key] = "#ffedd5"
+
+    return theme_data
 
 THEME = load_theme()
 
