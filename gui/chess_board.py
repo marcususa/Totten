@@ -36,6 +36,7 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.board = chess.Board()
         self.flipped = False
         self.popout_window = None
+        self.is_analyzing = False  # Analysis toggle state for independent pop-out variations
 
         # Interaction state tracking for dragging and clicking
         self.dragging_piece = None
@@ -72,9 +73,12 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         button_width = panel_width - (4 if self.is_popout else 6)
         button_height = 35 if self.is_popout else 28
-        btn_fg = "transparent"
-        btn_hover = THEME.get("btn_hover", "#475569")
-        text_color = THEME.get("text_secondary", "#94a3b8")
+
+        # Consistent theme & appearance mode handling for button colors & text contrast
+        is_light = ctk.get_appearance_mode().lower() == "light"
+        btn_fg = "#cbd5e1" if is_light else "transparent"
+        btn_hover = "#94a3b8" if is_light else THEME.get("btn_hover", "#475569")
+        text_color = "#0f172a" if is_light else THEME.get("text_secondary", "#94a3b8")
 
         self.flip_button = ctk.CTkButton(
             self.control_panel, text="↻ Flip" if not self.is_popout else "↻",
@@ -84,13 +88,31 @@ class ChessBoardWidget(ctk.CTkFrame):
         )
         self.flip_button.pack(side="top", pady=(0, 4), anchor="w")
 
-        self.popout_button = ctk.CTkButton(
-            self.control_panel, text=f"Pop Out {chr(9703)}" if not self.is_popout else chr(9704),
-            width=button_width, height=button_height, fg_color=btn_fg,
-            hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
-            command=self.toggle_popout
-        )
-        self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
+        if self.is_popout:
+            # Pop-out control layout: Dock button + Bold 'A' Analysis toggle
+            self.popout_button = ctk.CTkButton(
+                self.control_panel, text=chr(9704),
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
+                command=self.toggle_popout
+            )
+            self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
+
+            self.analysis_button = ctk.CTkButton(
+                self.control_panel, text="A",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 14, "bold"),
+                command=self.toggle_analysis
+            )
+            self.analysis_button.pack(side="top", pady=(0, 4), anchor="w")
+        else:
+            self.popout_button = ctk.CTkButton(
+                self.control_panel, text=f"Pop Out {chr(9703)}",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
+                command=self.toggle_popout
+            )
+            self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
 
         self.prev_button = ctk.CTkButton(
             self.control_panel, text="Prev ◀" if not self.is_popout else "◀",
@@ -123,6 +145,18 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.canvas.bind("<B1-Motion>", self._on_drag_motion)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
+
+    def toggle_analysis(self):
+        """Toggles analysis mode for independent pop-out variation testing."""
+        self.is_analyzing = not self.is_analyzing
+        is_light = ctk.get_appearance_mode().lower() == "light"
+        if self.is_analyzing:
+            active_bg = THEME.get("btn_hover", "#2563eb")
+            self.analysis_button.configure(fg_color=active_bg, text_color="#ffffff")
+        else:
+            btn_fg = "#cbd5e1" if is_light else "transparent"
+            text_color = "#0f172a" if is_light else THEME.get("text_secondary", "#94a3b8")
+            self.analysis_button.configure(fg_color=btn_fg, text_color=text_color)
 
     def _get_chess_square(self, row, col):
         """Translates row/col grid coordinates to chess square index accounting for board orientation."""
@@ -182,6 +216,9 @@ class ChessBoardWidget(ctk.CTkFrame):
                 self.dragging_piece = self.press_piece
                 self.drag_start_square = self.press_square
 
+        if not self.dragging_piece:
+            return
+
         self.render_board()
 
         filename = PIECE_MAP.get(self.dragging_piece.symbol())
@@ -229,41 +266,42 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.is_dragging = False
             self.selected_square = None
             self.render_board()
+            return
+
+        if row is None or col is None:
+            self.selected_square = None
+            self.render_board()
+            return
+
+        clicked_square = self._get_chess_square(row, col)
+
+        if self.selected_square is None:
+            piece = self.board.piece_at(clicked_square)
+            if piece:
+                self.selected_square = clicked_square
+                self.render_board()
         else:
-            if row is None or col is None:
+            target_square = clicked_square
+
+            if self.selected_square == target_square:
                 self.selected_square = None
                 self.render_board()
                 return
 
-            clicked_square = self._get_chess_square(row, col)
+            promotion = None
+            selected_piece = self.board.piece_at(self.selected_square)
+            if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (
+                    0, 7):
+                promotion = chess.QUEEN
 
-            if self.selected_square is None:
-                piece = self.board.piece_at(clicked_square)
-                if piece:
-                    self.selected_square = clicked_square
-                    self.render_board()
-            else:
-                target_square = clicked_square
+            move = chess.Move(self.selected_square, target_square, promotion=promotion)
 
-                if self.selected_square == target_square:
-                    self.selected_square = None
-                    self.render_board()
-                    return
+            if move in self.board.legal_moves:
+                self.board.push(move)
+                self.sync_with_twin()
 
-                promotion = None
-                selected_piece = self.board.piece_at(self.selected_square)
-                if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (
-                        0, 7):
-                    promotion = chess.QUEEN
-
-                move = chess.Move(self.selected_square, target_square, promotion=promotion)
-
-                if move in self.board.legal_moves:
-                    self.board.push(move)
-                    self.sync_with_twin()
-
-                self.selected_square = None
-                self.render_board()
+            self.selected_square = None
+            self.render_board()
 
     def _on_canvas_resize(self, event):
         """Dynamically scales square size if window container resizes."""
@@ -320,81 +358,34 @@ class ChessBoardWidget(ctk.CTkFrame):
             except Exception:
                 pass
 
-    def toggle_popout(self):
-        if self.is_popout:
-            try:
-                if self.master and hasattr(self.master, 'destroy'):
-                    self.master.destroy()
-            except Exception:
-                pass
-            return
+    def _on_left_arrow(self):
+        if hasattr(self.master_widget, 'on_prev_move'):
+            self.master_widget.on_prev_move()
 
-        if self.popout_window is not None:
-            try:
-                self.popout_window.destroy()
-            except Exception:
-                pass
-            self.popout_window = None
-            return
-
-        self.popout_window = ctk.CTkToplevel(self)
-        self.popout_window.title("Chess Board")
-        self.popout_window.configure(fg_color=THEME.get("bg_panel", "#0f172a"))
-
-        win_w = (self.square_size * 8) + 90
-        win_h = (self.square_size * 8) + 20
-        self.popout_window.geometry(f"{win_w}x{win_h}")
-        self.popout_window.attributes("-topmost", True)
-
-        self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
-        self.popout_board.master_widget = self
-
-        self.popout_board.on_step_back = getattr(self, 'on_step_back', None)
-        self.popout_board.on_step_forward = getattr(self, 'on_step_forward', None)
-        self.popout_board.on_jump_to_move = getattr(self, 'on_jump_to_move', None)
-
-        self.popout_board.set_board(self.board)
-        self.popout_board.flipped = self.flipped
-        self.popout_board.render_board()
-
-        def on_popout_close():
-            try:
-                if self.popout_window:
-                    self.popout_window.destroy()
-            except Exception:
-                pass
-            self.popout_window = None
-            self.popout_board = None
-
-        self.popout_window.protocol("WM_DELETE_WINDOW", on_popout_close)
+    def _on_right_arrow(self):
+        if hasattr(self.master_widget, 'on_next_move'):
+            self.master_widget.on_next_move()
 
     def sync_with_twin(self):
-        if hasattr(self, 'master_widget') and self.master_widget:
+        """Synchronizes board states between main and pop-out unless analysis mode is active."""
+        if self.is_popout and self.is_analyzing:
+            return  # Analysis mode active: do not propagate moves back to main board
+
+        if self.is_popout and hasattr(self, 'master_widget') and self.master_widget:
             if hasattr(self.master_widget, 'board'):
                 self.master_widget.board = self.board.copy()
                 self.master_widget.render_board()
-        if hasattr(self, 'on_move_made') and self.on_move_made:
-            try:
-                self.on_move_made(self.board)
-            except Exception:
-                pass
-
-    def _on_left_arrow(self):
-        if hasattr(self, 'on_step_back') and self.on_step_back:
-            self.on_step_back()
-
-    def _on_right_arrow(self):
-        if hasattr(self, 'on_step_forward') and self.on_step_forward:
-            self.on_step_forward()
+        elif not self.is_popout and self.popout_window and hasattr(self, 'popout_board'):
+            if self.popout_board and not getattr(self.popout_board, 'is_analyzing', False):
+                self.popout_board.board = self.board.copy()
+                self.popout_board.render_board()
 
     def render_board(self):
         self.canvas.delete("all")
         self._canvas_images = []
 
-        # Theme-aware square colors adapting to light/dark themes
         bg_surface = THEME.get("bg_surface", "#1e293b")
 
-        # Helper to check if theme is dark
         def _is_dark(hex_col):
             hex_col = hex_col.lstrip('#')
             if len(hex_col) != 6:
@@ -402,7 +393,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             r, g, b = int(hex_col[0:2], 16), int(hex_col[2:4], 16), int(hex_col[4:6], 16)
             return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
 
-        # Helper to lift dark theme colors into a clear medium tone
         def _lighten_color(hex_col, amount=45):
             hex_col = hex_col.lstrip('#')
             if len(hex_col) != 6:
@@ -416,20 +406,16 @@ class ChessBoardWidget(ctk.CTkFrame):
                 return hex_col
 
         if _is_dark(bg_surface):
-            # Dark Theme: Take the theme's button/border color and lighten it into a proper medium square tone
             base_dark = THEME.get("btn_initial", THEME.get("border_color", "#555555"))
             dark_color = _lighten_color(base_dark, amount=45)
-            # Use theme eval_default or derive a soft light tint from bg_surface
             light_color = THEME.get("eval_default", THEME.get("text_secondary", "#e2e8f0"))
         else:
-            # Light Theme Formula: Derive squares from theme surface and border colors
             light_color = THEME.get("bg_surface", "#f8fafc")
             dark_color = THEME.get("border_color", THEME.get("text_secondary", "#cbd5e1"))
 
-        # Use theme btn_hover or border_color for highlights, avoiding any hardcoded blue
         default_highlight = THEME.get("border_color", "#ea580c")
         highlight_color = THEME.get("btn_hover", default_highlight)
-        border_color = THEME.get("border_color", bg_surface)
+        border_color = THEME.get("border_ring", THEME.get("border_color", THEME.get("btn_initial", bg_surface)))
 
         for row in range(8):
             for col in range(8):
@@ -448,7 +434,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                 if self.selected_square == chess_square:
                     square_color = highlight_color
 
-                # Draw squares touching each other with NO individual square borders
                 self.canvas.create_rectangle(
                     x1, y1, x2, y2,
                     fill=square_color,
@@ -474,10 +459,66 @@ class ChessBoardWidget(ctk.CTkFrame):
                         cy = y1 + (self.square_size / 2)
                         self.canvas.create_image(cx, cy, image=img_tk, anchor="center")
 
-        # Draw a single 2-pixel border strictly around the outer perimeter of the board
         board_pixel_size = self.square_size * 8
         self.canvas.create_rectangle(
             0, 0, board_pixel_size, board_pixel_size,
             outline=border_color,
             width=2
         )
+
+    def toggle_popout(self):
+        if self.is_popout:
+            try:
+                if self.master and hasattr(self.master, 'destroy'):
+                    self.master.destroy()
+            except Exception:
+                pass
+            return
+
+        if self.popout_window is not None:
+            try:
+                self.popout_window.destroy()
+            except Exception:
+                pass
+            self.popout_window = None
+            return
+
+        self.popout_window = ctk.CTkToplevel(self)
+        self.popout_window.title("Chessboard Analysis (Pop-Out)")
+        self.popout_window.configure(fg_color=THEME.get("bg_panel", "#0f172a"))
+
+        win_w = (self.square_size * 8) + 55
+        win_h = (self.square_size * 8) + 10
+
+        self.popout_window.update_idletasks()
+        screen_w = self.popout_window.winfo_screenwidth()
+        screen_h = self.popout_window.winfo_screenheight()
+        pos_x = (screen_w // 2) - (win_w // 2)
+        pos_y = (screen_h // 2) - (win_h // 2)
+
+        self.popout_window.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+        self.popout_window.minsize(200, 200)
+        self.popout_window.attributes("-topmost", True)
+
+        self.popout_window.grid_rowconfigure(0, weight=1)
+        self.popout_window.grid_columnconfigure(0, weight=1)
+
+        self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
+        self.popout_board.master_widget = self
+        self.popout_board.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.popout_board.set_board(self.board)
+
+        def on_window_resize(event):
+            if event.widget == self.popout_window:
+                new_size = min(event.width - 55, event.height - 10) // 8
+                if new_size > 15 and new_size != self.popout_board.square_size:
+                    self.popout_board.resize_board(new_size)
+
+        self.popout_window.bind("<Configure>", on_window_resize)
+
+        def on_close():
+            if self.popout_window:
+                self.popout_window.destroy()
+            self.popout_window = None
+
+        self.popout_window.protocol("WM_DELETE_WINDOW", on_close)
