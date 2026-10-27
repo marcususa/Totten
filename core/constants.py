@@ -34,9 +34,10 @@ DEFAULT_THEME = {
     "pattern_yellow": "#ffd700"
 }
 
+
 def load_theme():
     theme_data = DEFAULT_THEME.copy()
-    
+
     # 1. Try loading override config first
     if CONFIG_FILE.exists():
         try:
@@ -51,19 +52,13 @@ def load_theme():
         try:
             with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
                 all_defaults = json.load(f)
-                # If Orange is selected or stored, grab its Medium tier as a safe default
                 if "Orange" in all_defaults:
                     theme_data.update(all_defaults["Orange"].get("Medium", {}))
         except Exception:
             pass
 
-    # Hard-sanitize any rogue blue hex codes lingering in the theme dictionary
-    blue_hexes = {"#7dd3fc", "#31a0ef", "#3b82f6", "#2e4a8c", "#1c7ed6"}
-    for key, val in list(theme_data.items()):
-        if isinstance(val, str) and val.lower() in blue_hexes:
-            theme_data[key] = "#ffedd5"
-
     return theme_data
+
 
 THEME = load_theme()
 
