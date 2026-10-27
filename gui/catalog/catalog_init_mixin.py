@@ -108,16 +108,24 @@ class CatalogInitMixin:
         box = self.analysis_textbox
         target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
 
-        target_box.tag_config("red", foreground=THEME.get("eval_red", "#c92a2a"), spacing3=6)
-        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#f59f00"), spacing3=6)
-        target_box.tag_config("green", foreground=THEME.get("eval_green", "#2b8a3e"), spacing3=6)
-        target_box.tag_config("light_blue", foreground=THEME.get("eval_light_blue", "#1c7ed6"), spacing3=6)
-        target_box.tag_config("default", foreground=THEME["text_primary"], spacing3=6)
-        target_box.tag_config("comment_tag", foreground=THEME.get("text_secondary", "#94a3b8"), spacing3=6)
-        target_box.tag_config("header_tag", foreground=THEME.get("text_secondary", "#94a3b8"), spacing3=6)
-        target_box.tag_config("move_tag", foreground=THEME["text_primary"], spacing3=6)
-        target_box.tag_config("active_tracker", background=THEME["active_tracker_bg"],
-                              foreground=THEME["active_tracker_fg"])
+        # Dynamic theme colors
+        primary = THEME.get("text_primary", "#ffffff")
+        secondary = THEME.get("text_secondary", "#94a3b8")
+        accent = THEME.get("btn_hover", THEME.get("border_color", primary))
+
+        target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), spacing3=6)
+        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), spacing3=6)
+        target_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"), spacing3=6)
+
+        # Override light_blue tags to use the theme primary or secondary color instead of blue
+        target_box.tag_config("light_blue", foreground=THEME.get("eval_default", secondary), spacing3=6)
+
+        target_box.tag_config("default", foreground=primary, spacing3=6)
+        target_box.tag_config("comment_tag", foreground=secondary, spacing3=6)
+        target_box.tag_config("header_tag", foreground=secondary, spacing3=6)
+        target_box.tag_config("move_tag", foreground=primary, spacing3=6)
+        target_box.tag_config("active_tracker", background=THEME.get("active_tracker_bg", accent),
+                              foreground=THEME.get("active_tracker_fg", "#ffffff"))
 
     def render_pv_lines(self, pv_data):
         """Renders up to 4 Multi-PV engine lines into self.pv_textbox."""
