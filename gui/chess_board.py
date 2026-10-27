@@ -30,7 +30,7 @@ PIECE_MAP = {
 
 class ChessBoardWidget(ctk.CTkFrame):
     def __init__(self, parent, square_size=48, is_popout=False, **kwargs):
-        super().__init__(parent, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0, **kwargs)
+        super().__init__(parent, fg_color=THEME.get("bg_panel", "#0f172a"), corner_radius=0, **kwargs)
         self.square_size = square_size
         self.is_popout = is_popout
         self.board = chess.Board()
@@ -73,8 +73,8 @@ class ChessBoardWidget(ctk.CTkFrame):
         button_width = panel_width - (4 if self.is_popout else 6)
         button_height = 35 if self.is_popout else 28
         btn_fg = "transparent"
-        btn_hover = THEME.get("btn_hover", "#344268")
-        text_color = THEME.get("text_secondary", "#8292a8")
+        btn_hover = THEME.get("btn_hover", "#475569")
+        text_color = THEME.get("text_secondary", "#94a3b8")
 
         self.flip_button = ctk.CTkButton(
             self.control_panel, text="↻ Flip" if not self.is_popout else "↻",
@@ -113,7 +113,7 @@ class ChessBoardWidget(ctk.CTkFrame):
             self,
             width=board_pixel_size,
             height=board_pixel_size,
-            bg=THEME.get("bg_panel", "#172134"),
+            bg=THEME.get("bg_panel", "#0f172a"),
             highlightthickness=0
         )
         self.canvas.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
@@ -339,7 +339,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_window = ctk.CTkToplevel(self)
         self.popout_window.title("Chess Board")
-        self.popout_window.configure(fg_color=THEME.get("bg_panel", "#172134"))
+        self.popout_window.configure(fg_color=THEME.get("bg_panel", "#0f172a"))
 
         win_w = (self.square_size * 8) + 90
         win_h = (self.square_size * 8) + 20
@@ -417,16 +417,19 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         if _is_dark(bg_surface):
             # Dark Theme: Take the theme's button/border color and lighten it into a proper medium square tone
-            base_dark = THEME.get("btn_initial", THEME.get("border_color", "#344268"))
+            base_dark = THEME.get("btn_initial", THEME.get("border_color", "#555555"))
             dark_color = _lighten_color(base_dark, amount=45)
-            light_color = THEME.get("eval_default", "#adc3dc")
+            # Use theme eval_default or derive a soft light tint from bg_surface
+            light_color = THEME.get("eval_default", THEME.get("text_secondary", "#e2e8f0"))
         else:
             # Light Theme Formula: Derive squares from theme surface and border colors
             light_color = THEME.get("bg_surface", "#f8fafc")
             dark_color = THEME.get("border_color", THEME.get("text_secondary", "#cbd5e1"))
 
-        highlight_color = THEME.get("btn_hover", "#2e4a8c" if _is_dark(bg_surface) else "#3b82f6")
-        border_color = THEME.get("border_color", "#344268")
+        # Use theme btn_hover or border_color for highlights, avoiding any hardcoded blue
+        default_highlight = THEME.get("border_color", "#ea580c")
+        highlight_color = THEME.get("btn_hover", default_highlight)
+        border_color = THEME.get("border_color", bg_surface)
 
         for row in range(8):
             for col in range(8):
