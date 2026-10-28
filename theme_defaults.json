@@ -26,7 +26,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#fde8e8",
+      "dark_square": "#d98282"
     },
     "Medium": {
       "bg_panel": "#591010",
@@ -54,7 +56,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fca5a5",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#993333",
+      "dark_square": "#591010"
     },
     "Dark": {
       "bg_panel": "#450a0a",
@@ -82,7 +86,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#7a2222",
+      "dark_square": "#3b0505"
     }
   },
   "Orange": {
@@ -112,7 +118,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#ffedd5",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#fde2cb",
+      "dark_square": "#d99b6c"
     },
     "Medium": {
       "bg_panel": "#5c200b",
@@ -140,7 +148,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fdba74",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#a85324",
+      "dark_square": "#5c200b"
     },
     "Dark": {
       "bg_panel": "#431407",
@@ -168,7 +178,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#ea580c",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#873b16",
+      "dark_square": "#381005"
     }
   },
   "Green": {
@@ -198,7 +210,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#daf5e1",
+      "dark_square": "#8fc99e"
     },
     "Medium": {
       "bg_panel": "#0f3d20",
@@ -226,7 +240,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#bbf7d0",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#22753b",
+      "dark_square": "#0f3d20"
     },
     "Dark": {
       "bg_panel": "#052e16",
@@ -254,7 +270,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#1a5c31",
+      "dark_square": "#031c0e"
     }
   },
   "Blue": {
@@ -284,7 +302,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#e1f3fe",
+      "dark_square": "#8dcbf8"
     },
     "Medium": {
       "bg_panel": "#142865",
@@ -312,7 +332,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#bae6fd",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#2e52b8",
+      "dark_square": "#142865"
     },
     "Dark": {
       "bg_panel": "#0f172a",
@@ -340,7 +362,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#1c3166",
+      "dark_square": "#080d1a"
     }
   },
   "Purple": {
@@ -370,7 +394,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#f4eafa",
+      "dark_square": "#c492ed"
     },
     "Medium": {
       "bg_panel": "#471370",
@@ -398,7 +424,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#e9d5ff",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#7a2fa3",
+      "dark_square": "#471370"
     },
     "Dark": {
       "bg_panel": "#3b0764",
@@ -426,7 +454,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#62228f",
+      "dark_square": "#210238"
     }
   },
   "Brown": {
@@ -456,7 +486,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#f0d9b5",
+      "dark_square": "#b58863"
     },
     "Medium": {
       "bg_panel": "#371402",
@@ -484,7 +516,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fde68a",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#8c5830",
+      "dark_square": "#371402"
     },
     "Dark": {
       "bg_panel": "#291102",
@@ -512,7 +546,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#6e4221",
+      "dark_square": "#1a0901"
     }
   },
   "Black": {
@@ -542,7 +578,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#e2e8f0",
+      "dark_square": "#94a3b8"
     },
     "Medium": {
       "bg_panel": "#172134",
@@ -570,7 +608,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#475569",
+      "dark_square": "#172134"
     },
     "Dark": {
       "bg_panel": "#020617",
@@ -598,7 +638,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#334155",
+      "dark_square": "#020617"
     }
   },
   "Pink": {
@@ -628,7 +670,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#fae1ee",
+      "dark_square": "#d683b1"
     },
     "Medium": {
       "bg_panel": "#6b1337",
@@ -656,7 +700,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fbcfe8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#ab3c6b",
+      "dark_square": "#6b1337"
     },
     "Dark": {
       "bg_panel": "#500724",
@@ -684,7 +730,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#ffd700"
+      "pattern_yellow": "#ffd700",
+      "light_square": "#87204e",
+      "dark_square": "#330215"
     }
   },
   "Yellow": {
@@ -714,7 +762,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
-      "pattern_yellow": "#eab308"
+      "pattern_yellow": "#eab308",
+      "light_square": "#fef3c7",
+      "dark_square": "#d9b35b"
     },
     "Medium": {
       "bg_panel": "#59300c",
@@ -742,7 +792,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fef08a",
-      "pattern_yellow": "#eab308"
+      "pattern_yellow": "#eab308",
+      "light_square": "#a16207",
+      "dark_square": "#59300c"
     },
     "Dark": {
       "bg_panel": "#422006",
@@ -770,7 +822,9 @@
       "eval_light_blue": "#31a0ef",
       "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
-      "pattern_yellow": "#eab308"
+      "pattern_yellow": "#eab308",
+      "light_square": "#7a3e08",
+      "dark_square": "#261103"
     }
   }
 }
