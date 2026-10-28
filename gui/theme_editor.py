@@ -15,7 +15,6 @@ while ROOT_DIR != ROOT_DIR.parent:
 
 DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
 USER_THEMES_FILE = ROOT_DIR / "user_themes.json"
-CONFIG_FILE = ROOT_DIR / "theme_override.json"
 
 try:
     with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
@@ -29,31 +28,39 @@ class ThemeEditorWindow(ctk.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("Theme Editor")
-        self.geometry("520x740")
+        self.geometry("520x780")
         self.resizable(True, True)
         self.attributes("-topmost", True)
         self.configure(fg_color="#363636")
 
         self.update_idletasks()
         x = (self.winfo_screenwidth() - 520) // 2
-        y = (self.winfo_screenheight() - 740) // 2
-        self.geometry(f"520x740+{x}+{y}")
+        y = (self.winfo_screenheight() - 780) // 2
+        self.geometry(f"520x780+{x}+{y}")
 
         self.color_inputs = {}
         self.swatch_buttons = {}
         self.active_entry = None
 
         self.current_hue = 0.0
-        self.current_sat = 1.0
-        self.current_val = 1.0
+        self.current_sat = 0.85
+        self.current_val = 0.95
 
         self.active_themes = json.loads(json.dumps(THEME_DEFAULTS))
+        self.last_active_hue_loaded = None
+        self.last_active_tier_loaded = "Medium"
+
         if USER_THEMES_FILE.exists():
             try:
                 with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
                     u_data = json.load(f)
-                    if "custom_themes" in u_data and isinstance(u_data["custom_themes"], dict):
-                        self.active_themes.update(u_data["custom_themes"])
+                    if isinstance(u_data, dict):
+                        if "custom_themes" in u_data and isinstance(u_data["custom_themes"], dict):
+                            self.active_themes.update(u_data["custom_themes"])
+                        if "last_active_hue" in u_data:
+                            self.last_active_hue_loaded = u_data["last_active_hue"]
+                        if "last_active_tier" in u_data:
+                            self.last_active_tier_loaded = u_data["last_active_tier"]
             except Exception as e:
                 print(f"[THEME EDITOR] Error loading {USER_THEMES_FILE}: {e}")
 
@@ -62,7 +69,10 @@ class ThemeEditorWindow(ctk.CTkToplevel):
 
         self.hue_names = list(self.active_themes.keys())
         initial_hue = detected_hue if detected_hue in self.hue_names else (
-            "Red" if "Red" in self.hue_names else self.hue_names[0])
+            self.last_active_hue_loaded if self.last_active_hue_loaded in self.hue_names else (
+                "Red" if "Red" in self.hue_names else self.hue_names[0]
+            )
+        )
         self.selected_hue_var = ctk.StringVar(value=initial_hue)
         self.last_selected_hue = initial_hue
 
@@ -75,7 +85,6 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         top_bar = ctk.CTkFrame(inner_frame, fg_color="transparent")
         top_bar.pack(fill="x", pady=(0, 10))
 
-        # Option menu packed directly without border frame
         self.hue_menu = ctk.CTkOptionMenu(
             top_bar, values=self.hue_names,
             variable=self.selected_hue_var,
@@ -130,16 +139,30 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             command=self.apply_preview_to_active
         ).pack(side="left")
 
+        # Saturation Slider Bar
+        saturation_bar = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        saturation_bar.pack(fill="x", pady=(0, 4))
+
+        ctk.CTkLabel(saturation_bar, text="Saturation:", font=("Arial", 11)).pack(side="left", padx=(0, 10))
+
+        self.saturation_slider = ctk.CTkSlider(
+            saturation_bar, from_=0.0, to=1.0, number_of_steps=100,
+            command=self.on_saturation_changed
+        )
+        self.saturation_slider.set(self.current_sat)
+        self.saturation_slider.pack(side="left", fill="x", expand=True)
+
+        # Brightness Slider Bar
         brightness_bar = ctk.CTkFrame(bottom_frame, fg_color="transparent")
         brightness_bar.pack(fill="x", pady=(0, 6))
 
         ctk.CTkLabel(brightness_bar, text="Brightness:", font=("Arial", 11)).pack(side="left", padx=(0, 10))
 
         self.brightness_slider = ctk.CTkSlider(
-            brightness_bar, from_=0.0, to=1.0, number_of_steps=100,
+            brightness_bar, from_=0.1, to=1.0, number_of_steps=100,
             command=self.on_brightness_changed
         )
-        self.brightness_slider.set(1.0)
+        self.brightness_slider.set(self.current_val)
         self.brightness_slider.pack(side="left", fill="x", expand=True)
 
         self.spectrum_canvas = tk.Canvas(bottom_frame, height=28, bg="#121212", highlightthickness=1,
@@ -152,18 +175,13 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         self.build_editor_grid(initial_hue)
 
     def detect_active_hue(self):
-        if not CONFIG_FILE.exists():
+        if not USER_THEMES_FILE.exists():
             return None, "Medium"
         try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                current_override = json.load(f)
-                if not isinstance(current_override, dict):
-                    return None, "Medium"
-                for hue_name, tiers in self.active_themes.items():
-                    for tier_key, tier_data in tiers.items():
-                        if isinstance(tier_data, dict):
-                            if current_override.get("bg_panel") == tier_data.get("bg_panel"):
-                                return hue_name, tier_key
+            with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
+                user_data = json.load(f)
+                if isinstance(user_data, dict) and "last_active_hue" in user_data:
+                    return user_data["last_active_hue"], user_data.get("last_active_tier", "Medium")
         except Exception as e:
             print(f"[THEME EDITOR] Error detecting active hue: {e}")
         return None, "Medium"
@@ -180,7 +198,7 @@ class ThemeEditorWindow(ctk.CTkToplevel):
 
         for x in range(width):
             hue = x / width * 360
-            r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+            r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 0.75, 0.90)
             rgb_val = (int(r * 255), int(g * 255), int(b * 255))
             for y in range(height):
                 pixels[x, y] = rgb_val
@@ -194,6 +212,10 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             return
         x = max(0, min(event.x, width - 1))
         self.current_hue = (x / width) * 360
+        self.update_preview_from_hsv()
+
+    def on_saturation_changed(self, val):
+        self.current_sat = float(val)
         self.update_preview_from_hsv()
 
     def on_brightness_changed(self, val):
@@ -253,7 +275,6 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             dialog.destroy()
             self.sync_current_view_to_memory()
             self.last_selected_hue = hue_name
-            self.write_override_file(hue_name)
             self.build_editor_grid(hue_name)
 
         ctk.CTkButton(
@@ -273,34 +294,10 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         if current_hue in self.active_themes:
             for (tier_key, prop), entry in self.color_inputs.items():
                 val = entry.get().strip()
-                if not val.startswith("#") and len(val) > 0:
+                if val and not val.startswith("#"):
                     val = "#" + val
                 if tier_key in self.active_themes[current_hue]:
                     self.active_themes[current_hue][tier_key][prop] = val
-
-    def write_override_file(self, hue_name):
-        active_tier = getattr(self, "detected_tier", "Medium")
-        palette_to_save = {}
-        if hue_name in self.active_themes and active_tier in self.active_themes[hue_name]:
-            palette_to_save = dict(self.active_themes[hue_name][active_tier])
-
-        for tier_key in ["Light", "Medium", "Dark"]:
-            tier_data = self.active_themes.get(hue_name, {}).get(tier_key, {})
-            if isinstance(tier_data, dict):
-                for prop, val in tier_data.items():
-                    if tier_key == active_tier:
-                        palette_to_save[prop] = val
-                    else:
-                        palette_to_save[f"{tier_key.lower()}_{prop}"] = val
-
-        try:
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(palette_to_save, f, indent=4)
-                f.flush()
-                os.fsync(f.fileno())
-            print(f"[THEME EDITOR] Successfully updated override to {CONFIG_FILE} for {hue_name}")
-        except Exception as e:
-            print(f"[THEME EDITOR] Error saving override to {CONFIG_FILE}: {e}")
 
     def build_editor_grid(self, hue_name):
         for widget in self.content_container.winfo_children():
@@ -348,46 +345,50 @@ class ThemeEditorWindow(ctk.CTkToplevel):
                 cell_frame = ctk.CTkFrame(scroll_container, fg_color="transparent")
                 cell_frame.grid(row=row_idx, column=col_offset, padx=2, pady=3, sticky="w")
 
-                if val:
-                    initial_color = val if str(val).startswith("#") else "#3b82f6"
+                default_val = THEME_DEFAULTS.get(hue_name, {}).get(tier_key, {}).get(prop, "#3b82f6")
+                display_val = val if val is not None and str(val).strip() != "" else ""
+                initial_color = display_val if display_val.startswith("#") else default_val
 
-                    swatch_border = ctk.CTkFrame(cell_frame, fg_color="#000000", corner_radius=4)
-                    swatch_border.pack(side="left", padx=(0, 4), pady=1)
+                swatch_border = ctk.CTkFrame(cell_frame, fg_color="#000000", corner_radius=4)
+                swatch_border.pack(side="left", padx=(0, 4), pady=1)
 
-                    swatch = ctk.CTkButton(
-                        swatch_border, text="", width=20, height=16,
-                        fg_color=initial_color, hover_color=initial_color, corner_radius=2,
-                        state="disabled"
-                    )
-                    swatch.pack(padx=1, pady=1)
+                swatch = ctk.CTkButton(
+                    swatch_border, text="", width=20, height=16,
+                    fg_color=initial_color,
+                    hover_color=initial_color,
+                    corner_radius=2,
+                    state="disabled"
+                )
+                swatch.pack(padx=1, pady=1)
 
-                    vcmd = (self.register(self.validate_hex_input), '%P')
-                    entry = ctk.CTkEntry(
-                        cell_frame, width=75, height=22,
-                        font=("Consolas", 11),
-                        validate='key', validatecommand=vcmd
-                    )
-                    entry.insert(0, str(val))
-                    entry.pack(side="left")
+                vcmd = (self.register(self.validate_hex_input), '%P')
+                entry = ctk.CTkEntry(
+                    cell_frame, width=75, height=22,
+                    font=("Consolas", 11),
+                    validate='key', validatecommand=vcmd,
+                    placeholder_text=str(default_val)
+                )
+                entry.insert(0, str(display_val))
+                entry.pack(side="left")
 
-                    entry.bind("<FocusIn>", lambda e, en=entry, col=initial_color: self.set_active_entry(en, col))
-                    entry.bind("<KeyRelease>", lambda e, s=swatch, en=entry: self.update_swatch_live(s, en))
+                entry.bind("<FocusIn>", lambda e, en=entry, col=initial_color: self.set_active_entry(en, col))
+                entry.bind("<KeyRelease>", lambda e, s=swatch, en=entry, d_val=default_val: self.update_swatch_live(s, en, d_val))
 
-                    self.color_inputs[(tier_key, prop)] = entry
-                    self.swatch_buttons[entry] = swatch
+                self.color_inputs[(tier_key, prop)] = entry
+                self.swatch_buttons[entry] = swatch
 
-                    if self.active_entry is None:
-                        self.active_entry = entry
-                        self.set_active_entry(entry, initial_color)
-                else:
-                    ctk.CTkLabel(cell_frame, text="—", font=("Arial", 10), text_color="gray").pack(side="left")
+                if self.active_entry is None:
+                    self.active_entry = entry
+                    self.set_active_entry(entry, initial_color)
 
             row_idx += 1
 
     def set_active_entry(self, entry_widget, color_val):
         self.active_entry = entry_widget
         current_val = entry_widget.get().strip()
-        if not current_val.startswith("#") and len(current_val) > 0:
+        if not current_val and hasattr(entry_widget, "cget") and entry_widget.cget("placeholder_text"):
+            current_val = entry_widget.cget("placeholder_text")
+        if current_val and not current_val.startswith("#"):
             current_val = "#" + current_val
         if len(current_val) == 7:
             color_val = current_val
@@ -398,8 +399,8 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             h, s, v = colorsys.rgb_to_hsv(*rgb)
             self.current_hue = h * 360.0
             self.current_sat = s
-            if s > 0.05:
-                self.current_val = v
+            self.current_val = v
+            self.saturation_slider.set(self.current_sat)
             self.brightness_slider.set(self.current_val)
         except Exception:
             pass
@@ -412,12 +413,14 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             return False
         return True
 
-    def update_swatch_live(self, swatch_btn, entry_widget):
+    def update_swatch_live(self, swatch_btn, entry_widget, default_val):
         text = entry_widget.get().strip()
-        if not text.startswith("#") and len(text) > 0:
+        if text and not text.startswith("#"):
             text = "#" + text
 
-        if text.startswith("#") and len(text) == 7:
+        if not text:
+            swatch_btn.configure(fg_color=default_val, hover_color=default_val)
+        elif text.startswith("#") and len(text) == 7:
             try:
                 swatch_btn.configure(fg_color=text, hover_color=text)
             except Exception:
@@ -427,25 +430,20 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         self.sync_current_view_to_memory()
         current_hue = self.last_selected_hue
 
-        # 1. Save all custom edits to user_themes.json with forced OS disk flush
         try:
-            user_data = {}
-            if USER_THEMES_FILE.exists():
-                with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
-                    user_data = json.load(f)
-
-            user_data["custom_themes"] = self.active_themes
+            clean_data = {
+                "last_active_hue": current_hue,
+                "last_active_tier": getattr(self, "detected_tier", "Medium"),
+                "custom_themes": self.active_themes
+            }
 
             with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:
-                json.dump(user_data, f, indent=4)
+                json.dump(clean_data, f, indent=4)
                 f.flush()
                 os.fsync(f.fileno())
-            print(f"[THEME EDITOR] Saved all custom themes to {USER_THEMES_FILE}")
+            print(f"[THEME EDITOR] Saved clean structure to {USER_THEMES_FILE}")
         except Exception as e:
             print(f"[THEME EDITOR] Error saving to {USER_THEMES_FILE}: {e}")
-
-        # 2. Update theme_override.json with current active settings
-        self.write_override_file(current_hue)
 
         print(f"[THEME EDITOR] Restarting application...")
         python = sys.executable

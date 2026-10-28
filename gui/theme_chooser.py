@@ -12,7 +12,7 @@ while ROOT_DIR != ROOT_DIR.parent:
     ROOT_DIR = ROOT_DIR.parent
 
 DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
-CONFIG_FILE = ROOT_DIR / "theme_override.json"
+USER_THEMES_FILE = ROOT_DIR / "user_themes.json"
 
 # Load static defaults directly from JSON
 try:
@@ -82,7 +82,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                         fg_color=swatch_color,
                         hover_color=swatch_color,
                         corner_radius=4,
-                        command=lambda h=hue_name, t=tier_key, d=tier_data: self.apply_theme_live(h, t, d)
+                        command=lambda h=hue_name, t=tier_key: self.apply_theme_live(h, t)
                     )
                     swatch.grid(row=row_idx, column=col_offset, padx=4, pady=4)
                 else:
@@ -94,13 +94,32 @@ class ThemeChooserWindow(ctk.CTkToplevel):
 
             row_idx += 1
 
-    def apply_theme_live(self, hue, tier, palette_dict):
+    def apply_theme_live(self, hue, tier):
         try:
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(palette_dict, f, indent=4)
-            print(f"[THEME] Saved static palette for {hue} ({tier}) to {CONFIG_FILE}")
+            user_data = {}
+            if USER_THEMES_FILE.exists():
+                with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
+                    user_data = json.load(f)
+
+            if "custom_themes" not in user_data or not isinstance(user_data["custom_themes"], dict):
+                user_data["custom_themes"] = json.loads(json.dumps(THEME_DEFAULTS))
+            else:
+                for h_key, h_val in THEME_DEFAULTS.items():
+                    if h_key not in user_data["custom_themes"]:
+                        user_data["custom_themes"][h_key] = h_val
+
+            # Record both the hue and the specific tier (Light, Medium, Dark)
+            user_data["last_active_hue"] = hue
+            user_data["last_active_tier"] = tier
+
+            with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+
+            print(f"[THEME] Saved last active theme '{hue}' ({tier}) to {USER_THEMES_FILE}")
         except Exception as e:
-            print(f"[THEME] Error saving theme override: {e}")
+            print(f"[THEME] Error updating user themes: {e}")
             return
 
         print(f"[THEME] Restarting application...")

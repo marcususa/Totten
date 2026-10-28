@@ -386,32 +386,9 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         bg_surface = THEME.get("bg_surface", "#1e293b")
 
-        def _is_dark(hex_col):
-            hex_col = hex_col.lstrip('#')
-            if len(hex_col) != 6:
-                return True
-            r, g, b = int(hex_col[0:2], 16), int(hex_col[2:4], 16), int(hex_col[4:6], 16)
-            return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5
-
-        def _lighten_color(hex_col, amount=45):
-            hex_col = hex_col.lstrip('#')
-            if len(hex_col) != 6:
-                return hex_col
-            try:
-                r = min(255, int(hex_col[0:2], 16) + amount)
-                g = min(255, int(hex_col[2:4], 16) + amount)
-                b = min(255, int(hex_col[4:6], 16) + amount)
-                return f"#{r:02x}{g:02x}{b:02x}"
-            except Exception:
-                return hex_col
-
-        if _is_dark(bg_surface):
-            base_dark = THEME.get("btn_initial", THEME.get("border_color", "#555555"))
-            dark_color = _lighten_color(base_dark, amount=45)
-            light_color = THEME.get("eval_default", THEME.get("text_secondary", "#e2e8f0"))
-        else:
-            light_color = THEME.get("bg_surface", "#f8fafc")
-            dark_color = THEME.get("border_color", THEME.get("text_secondary", "#cbd5e1"))
+        # Pull light and dark squares directly from the active theme configuration
+        light_color = THEME.get("light_square", "#f0d9b5")
+        dark_color = THEME.get("dark_square", "#b58863")
 
         default_highlight = THEME.get("border_color", "#ea580c")
         highlight_color = THEME.get("btn_hover", default_highlight)
