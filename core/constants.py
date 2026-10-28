@@ -45,17 +45,19 @@ def load_theme():
                 data = json.load(f)
                 if isinstance(data, dict):
                     theme_data.update(data)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[THEME] Error loading override: {e}")
     elif DEFAULTS_FILE.exists():
-        # Fallback to checking defaults if override doesn't exist
+        # Fallback to defaults medium tier if no override exists
         try:
             with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
                 all_defaults = json.load(f)
-                if "Orange" in all_defaults:
-                    theme_data.update(all_defaults["Orange"].get("Medium", {}))
-        except Exception:
-            pass
+                # Default to Red Medium tier or first available
+                default_hue = list(all_defaults.keys())[0]
+                if default_hue in all_defaults:
+                    theme_data.update(all_defaults[default_hue].get("Medium", {}))
+        except Exception as e:
+            print(f"[THEME] Error loading defaults fallback: {e}")
 
     return theme_data
 
