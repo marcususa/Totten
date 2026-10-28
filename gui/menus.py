@@ -7,6 +7,7 @@ import gui.app_state as state
 from pgn.importer import import_pgn, import_fen, reset_importer_state
 from gui.sidebar import toggle_sidebar
 from gui.theme_chooser import ThemeChooserWindow
+from gui.theme_editor import ThemeEditorWindow
 
 # Import your core constants for centralized theming
 try:
@@ -97,7 +98,7 @@ def open_theme_chooser():
 def open_theme_editor():
     """Spawns the Theme Editor pop-out window."""
     print("[MENU] Triggering Theme Editor...")
-
+    ThemeEditorWindow()
 
 def show_about_dialog():
     """Displays application About information styled like the splash screen with credits, quotes, and references."""
