@@ -23,8 +23,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fca5a5",
-      "eval_light_blue_bg": "#4a1f1f",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -51,8 +51,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fca5a5",
-      "eval_light_blue_bg": "#4a1f1f",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fca5a5",
       "pattern_yellow": "#ffd700"
     },
@@ -79,13 +79,13 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fca5a5",
-      "eval_light_blue_bg": "#4a1f1f",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
   },
-"Orange": {
+  "Orange": {
     "Light": {
       "bg_panel": "#fff7ed",
       "bg_surface": "#ffedd5",
@@ -109,8 +109,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fed7aa",
-      "eval_light_blue_bg": "#4a2811",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#ffedd5",
       "pattern_yellow": "#ffd700"
     },
@@ -137,8 +137,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#ffedd5",
-      "eval_light_blue_bg": "#4a2811",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fdba74",
       "pattern_yellow": "#ffd700"
     },
@@ -165,8 +165,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#ffedd5",
-      "eval_light_blue_bg": "#4a2811",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#ea580c",
       "pattern_yellow": "#ffd700"
     }
@@ -195,8 +195,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#bbf7d0",
-      "eval_light_blue_bg": "#0f3d20",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -223,8 +223,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#bbf7d0",
-      "eval_light_blue_bg": "#0f3d20",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#bbf7d0",
       "pattern_yellow": "#ffd700"
     },
@@ -251,8 +251,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#bbf7d0",
-      "eval_light_blue_bg": "#0f3d20",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -281,8 +281,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#7dd3fc",
-      "eval_light_blue_bg": "#082f49",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -309,8 +309,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#7dd3fc",
-      "eval_light_blue_bg": "#082f49",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#bae6fd",
       "pattern_yellow": "#ffd700"
     },
@@ -337,8 +337,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#7dd3fc",
-      "eval_light_blue_bg": "#082f49",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -367,8 +367,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#e9d5ff",
-      "eval_light_blue_bg": "#471370",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -395,8 +395,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#e9d5ff",
-      "eval_light_blue_bg": "#471370",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#e9d5ff",
       "pattern_yellow": "#ffd700"
     },
@@ -423,8 +423,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#e9d5ff",
-      "eval_light_blue_bg": "#471370",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -453,8 +453,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#f5d0fe",
-      "eval_light_blue_bg": "#371402",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -481,8 +481,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fde68a",
-      "eval_light_blue_bg": "#371402",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fde68a",
       "pattern_yellow": "#ffd700"
     },
@@ -509,8 +509,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fde68a",
-      "eval_light_blue_bg": "#371402",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -539,8 +539,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#cbd5e1",
-      "eval_light_blue_bg": "#172134",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -567,8 +567,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#cbd5e1",
-      "eval_light_blue_bg": "#172134",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     },
@@ -595,8 +595,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#cbd5e1",
-      "eval_light_blue_bg": "#020617",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -625,8 +625,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fbcfe8",
-      "eval_light_blue_bg": "#500724",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#ffd700"
     },
@@ -653,8 +653,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fbcfe8",
-      "eval_light_blue_bg": "#500724",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fbcfe8",
       "pattern_yellow": "#ffd700"
     },
@@ -681,8 +681,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fbcfe8",
-      "eval_light_blue_bg": "#500724",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#ffd700"
     }
@@ -711,8 +711,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fef08a",
-      "eval_light_blue_bg": "#422006",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#334155",
       "pattern_yellow": "#eab308"
     },
@@ -739,8 +739,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fef08a",
-      "eval_light_blue_bg": "#422006",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#fef08a",
       "pattern_yellow": "#eab308"
     },
@@ -767,8 +767,8 @@
       "eval_orange_bg": "#4a331f",
       "eval_green": "#1fa73b",
       "eval_green_bg": "#00FF00",
-      "eval_light_blue": "#fef08a",
-      "eval_light_blue_bg": "#422006",
+      "eval_light_blue": "#31a0ef",
+      "eval_light_blue_bg": "#1f3852",
       "eval_default": "#94a3b8",
       "pattern_yellow": "#eab308"
     }
