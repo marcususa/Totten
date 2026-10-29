@@ -76,6 +76,11 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         self.selected_hue_var = ctk.StringVar(value=initial_hue)
         self.last_selected_hue = initial_hue
 
+        initial_tier = detected_tier if detected_tier in ["Light", "Medium", "Dark"] else (
+            self.last_active_tier_loaded if self.last_active_tier_loaded in ["Light", "Medium", "Dark"] else "Medium"
+        )
+        self.selected_tier_var = ctk.StringVar(value=initial_tier)
+
         main_frame = ctk.CTkFrame(self, fg_color="#363636", corner_radius=0)
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
 
@@ -91,9 +96,19 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             command=self.on_hue_selected,
             fg_color="#1e3a8a", button_color="#1e3a8a", button_hover_color="#172554",
             dropdown_fg_color="#2b2b2b", dropdown_hover_color="#1e3a8a",
-            width=140
+            width=130
         )
-        self.hue_menu.pack(side="left", padx=0, pady=0)
+        self.hue_menu.pack(side="left", padx=(0, 6), pady=0)
+
+        self.tier_menu = ctk.CTkOptionMenu(
+            top_bar, values=["Light", "Medium", "Dark"],
+            variable=self.selected_tier_var,
+            command=self.on_tier_selected,
+            fg_color="#1e3a8a", button_color="#1e3a8a", button_hover_color="#172554",
+            dropdown_fg_color="#2b2b2b", dropdown_hover_color="#1e3a8a",
+            width=100
+        )
+        self.tier_menu.pack(side="left", padx=0, pady=0)
 
         ctk.CTkButton(
             top_bar, text="Cancel", width=70, height=28,
@@ -289,13 +304,30 @@ class ThemeEditorWindow(ctk.CTkToplevel):
             command=on_confirm
         ).pack(side="right", padx=(20, 10))
 
+    def on_tier_selected(self, tier_name):
+        self.sync_current_view_to_memory()
+        self.build_editor_grid(self.last_selected_hue)
+
     def sync_current_view_to_memory(self):
         current_hue = self.last_selected_hue
+        active_tier = self.selected_tier_var.get()
         if current_hue in self.active_themes:
             for (tier_key, prop), entry in self.color_inputs.items():
+                if tier_key != active_tier:
+                    continue
                 val = entry.get().strip()
                 if val and not val.startswith("#"):
                     val = "#" + val
+
+                is_valid = (
+                    len(val) == 7
+                    and val.startswith("#")
+                    and all(c in "0123456789abcdefABCDEF" for c in val[1:])
+                )
+
+                if not is_valid:
+                    val = THEME_DEFAULTS.get(current_hue, {}).get(tier_key, {}).get(prop, "")
+
                 if tier_key in self.active_themes[current_hue]:
                     self.active_themes[current_hue][tier_key][prop] = val
 
@@ -306,6 +338,8 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         self.color_inputs.clear()
         self.swatch_buttons.clear()
         self.active_entry = None
+
+        active_tier = self.selected_tier_var.get()
 
         scroll_container = ctk.CTkScrollableFrame(self.content_container, fg_color="transparent")
         scroll_container.pack(fill="both", expand=True)
@@ -361,23 +395,29 @@ class ThemeEditorWindow(ctk.CTkToplevel):
                 )
                 swatch.pack(padx=1, pady=1)
 
-                vcmd = (self.register(self.validate_hex_input), '%P')
+                is_active_tier = (tier_key == active_tier)
+
+                vcmd = (self.register(self.validate_hex_input), '%P') if is_active_tier else None
                 entry = ctk.CTkEntry(
                     cell_frame, width=75, height=22,
                     font=("Consolas", 11),
-                    validate='key', validatecommand=vcmd,
+                    validate='key' if is_active_tier else 'none',
+                    validatecommand=vcmd,
                     placeholder_text=str(default_val)
                 )
                 entry.insert(0, str(display_val))
                 entry.pack(side="left")
 
-                entry.bind("<FocusIn>", lambda e, en=entry, col=initial_color: self.set_active_entry(en, col))
-                entry.bind("<KeyRelease>", lambda e, s=swatch, en=entry, d_val=default_val: self.update_swatch_live(s, en, d_val))
+                if is_active_tier:
+                    entry.bind("<FocusIn>", lambda e, en=entry, col=initial_color: self.set_active_entry(en, col))
+                    entry.bind("<KeyRelease>", lambda e, s=swatch, en=entry, d_val=default_val: self.update_swatch_live(s, en, d_val))
+                else:
+                    entry.bind("<Key>", lambda e: "break")
 
                 self.color_inputs[(tier_key, prop)] = entry
                 self.swatch_buttons[entry] = swatch
 
-                if self.active_entry is None:
+                if is_active_tier and self.active_entry is None:
                     self.active_entry = entry
                     self.set_active_entry(entry, initial_color)
 
@@ -433,7 +473,7 @@ class ThemeEditorWindow(ctk.CTkToplevel):
         try:
             clean_data = {
                 "last_active_hue": current_hue,
-                "last_active_tier": getattr(self, "detected_tier", "Medium"),
+                "last_active_tier": self.selected_tier_var.get(),
                 "custom_themes": self.active_themes
             }
 
