@@ -14,19 +14,19 @@ class AddCategoryDialog(ctk.CTkToplevel):
         self.grab_set()
         self.transient(parent)
 
-        self.configure(fg_color=THEME.get("progress_bg", "#0f172a"))
+        self.configure(fg_color=THEME["progress_bg"])
 
         self.grid_columnconfigure(0, weight=1)
 
         self.label = ctk.CTkLabel(
             self, text="Enter new category name:",
-            font=("Arial", 12), text_color=THEME.get("text_primary", "#f8fafc")
+            font=("Arial", 12), text_color=THEME["text_primary"]
         )
         self.label.pack(padx=20, pady=(20, 5), anchor="w")
 
         self.entry = ctk.CTkEntry(
             self, width=260, font=("Arial", 12),
-            fg_color=THEME.get("bg_surface", "#1e293b"), border_color=THEME.get("border_color", "#344268"), text_color=THEME.get("text_primary", "#f8fafc")
+            fg_color=THEME["bg_surface"], border_color=THEME["border_color"], text_color=THEME["text_primary"]
         )
         self.entry.pack(padx=20, pady=(0, 15))
         self.entry.focus()
@@ -37,15 +37,15 @@ class AddCategoryDialog(ctk.CTkToplevel):
 
         cancel_btn = ctk.CTkButton(
             btn_frame, text="Cancel",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=1, border_color=THEME.get("border_color", "#344268"), width=90, height=28, command=self.destroy
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=1, border_color=THEME["border_color"], width=90, height=28, command=self.destroy
         )
         cancel_btn.pack(side="right", padx=(5, 0))
 
         ok_btn = ctk.CTkButton(
             btn_frame, text="Add",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=2, border_color=THEME.get("border_color", "#344268"), width=90, height=28, command=self._on_ok
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=2, border_color=THEME["border_color"], width=90, height=28, command=self._on_ok
         )
         ok_btn.pack(side="right", padx=(0, 5))
 
@@ -67,12 +67,12 @@ class ConfirmationDialog(ctk.CTkToplevel):
         self.grab_set()
         self.transient(parent)
 
-        self.configure(fg_color=THEME.get("progress_bg", "#0f172a"))
+        self.configure(fg_color=THEME["progress_bg"])
         self.grid_columnconfigure(0, weight=1)
 
         msg_label = ctk.CTkLabel(
             self, text=message, font=("Arial", 12),
-            text_color=THEME.get("text_primary", "#f8fafc"), wraplength=310, justify="center", anchor="center"
+            text_color=THEME["text_primary"], wraplength=310, justify="center", anchor="center"
         )
         msg_label.pack(padx=20, pady=(25, 15), fill="x", expand=True)
 
@@ -84,15 +84,15 @@ class ConfirmationDialog(ctk.CTkToplevel):
 
         confirm_btn = ctk.CTkButton(
             btn_frame, text="Confirm",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=2, border_color=THEME.get("border_color", "#344268"), width=100, height=28, command=self._confirm
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=2, border_color=THEME["border_color"], width=100, height=28, command=self._confirm
         )
         confirm_btn.grid(row=0, column=0, sticky="e", padx=(0, 6))
 
         cancel_btn = ctk.CTkButton(
             btn_frame, text="Cancel",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=1, border_color=THEME.get("border_color", "#344268"), width=100, height=28, command=self.destroy
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=1, border_color=THEME["border_color"], width=100, height=28, command=self.destroy
         )
         cancel_btn.grid(row=0, column=1, sticky="w", padx=(6, 0))
 
@@ -109,19 +109,19 @@ class CollectionLimitDialog(ctk.CTkToplevel):
         self.resizable(False, False)
         self.grab_set()
         self.transient(parent)
-        self.configure(fg_color=THEME.get("progress_bg", "#0f172a"))
+        self.configure(fg_color=THEME["progress_bg"])
 
         msg = f"The selected files contain {count} games. Collections are currently recommended to stay under 300 games for optimal performance."
         msg_label = ctk.CTkLabel(
             self, text=msg, font=("Arial", 12),
-            text_color=THEME.get("text_primary", "#f8fafc"), wraplength=340, justify="left"
+            text_color=THEME["text_primary"], wraplength=340, justify="left"
         )
         msg_label.pack(padx=20, pady=(20, 15), anchor="w")
 
         ok_btn = ctk.CTkButton(
             self, text="OK",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=2, border_color=THEME.get("border_color", "#344268"), width=100, height=28, command=self.destroy
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=2, border_color=THEME["border_color"], width=100, height=28, command=self.destroy
         )
         ok_btn.pack(pady=(0, 20))
 
@@ -135,22 +135,22 @@ class GameSelectionDialog(ctk.CTkToplevel):
         self.geometry("500x400")
         self.grab_set()
         self.transient(parent)
-        self.configure(fg_color=THEME.get("progress_bg", "#0f172a"))
+        self.configure(fg_color=THEME["progress_bg"])
 
         header_label = ctk.CTkLabel(
             self, text=f"Found {len(games_data)} games to include:",
-            font=("Arial", 12, "bold"), text_color=THEME.get("text_primary", "#f8fafc")
+            font=("Arial", 12, "bold"), text_color=THEME["text_primary"]
         )
         header_label.pack(padx=20, pady=(15, 5), anchor="w")
 
-        self.scroll_frame = ctk.CTkScrollableFrame(self, width=460, height=270, fg_color=THEME.get("bg_surface", "#1e293b"))
+        self.scroll_frame = ctk.CTkScrollableFrame(self, width=460, height=270, fg_color=THEME["bg_surface"])
         self.scroll_frame.pack(padx=20, pady=5, fill="both", expand=True)
 
         for idx, item in enumerate(games_data):
             lbl = ctk.CTkLabel(
                 self.scroll_frame,
                 text=f"{idx + 1}. {item['white']} vs {item['black']} ({item['opening']})",
-                font=("Arial", 11), text_color=THEME.get("text_primary", "#f8fafc"), anchor="w"
+                font=("Arial", 11), text_color=THEME["text_primary"], anchor="w"
             )
             lbl.pack(fill="x", pady=2)
 
@@ -159,7 +159,7 @@ class GameSelectionDialog(ctk.CTkToplevel):
 
         ok_btn = ctk.CTkButton(
             btn_frame, text="Import All",
-            fg_color=THEME.get("btn_bg", "#344268"), hover_color=THEME.get("btn_hover", "#2e4a8c"),
-            border_width=2, border_color=THEME.get("border_color", "#344268"), width=110, height=28, command=self.destroy
+            fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            border_width=2, border_color=THEME["border_color"], width=110, height=28, command=self.destroy
         )
         ok_btn.pack(side="right")

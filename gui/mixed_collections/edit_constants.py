@@ -68,7 +68,15 @@ class ToolTip:
         self.tip_window = tw = ctk.CTkToplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
-        label = ctk.CTkLabel(tw, text=self.text, fg_color=THEME.get("bg_surface", "#2b2b2b"), text_color=THEME.get("text_main", "#ffffff"), corner_radius=4, padx=6, pady=4)
+        label = ctk.CTkLabel(
+            tw,
+            text=self.text,
+            fg_color=THEME["bg_surface"],
+            text_color=THEME["text_primary"],
+            corner_radius=4,
+            padx=6,
+            pady=4
+        )
         label.pack()
 
     def hide_tip(self, event=None):

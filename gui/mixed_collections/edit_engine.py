@@ -116,7 +116,10 @@ class EditEngineMixin:
         target_box = getattr(self, "pv_textbox", None)
         if target_box:
             try:
-                target_box.configure(fg_color=THEME["bg_surface"])
+                target_box.configure(
+                    fg_color=THEME["bg_surface"],
+                    text_color=THEME["text_primary"]
+                )
                 inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
                 inner_box.configure(state="normal")
                 inner_box.delete("1.0", "end")
