@@ -1,7 +1,4 @@
 {
-    "last_active_hue": "Brown",
-    "last_active_tier": "Medium",
-    "custom_themes": {
         "Red": {
             "Light": {
                 "bg_panel": "#fef2f2",
@@ -831,4 +828,3 @@
             }
         }
     }
-}
