@@ -81,8 +81,8 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
 
         bg_surface = THEME["bg_surface"]
         text_primary = THEME["text_primary"]
-        btn_bg = THEME["btn_bg"]
-        progress_bg = THEME["progress_bg"]
+        btn_initial = THEME["btn_initial"]
+        bg_panel = THEME["bg_panel"]
 
         style.configure(
             "Borderless.Treeview",
@@ -97,13 +97,13 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         )
         style.map(
             "Borderless.Treeview",
-            background=[("selected", btn_bg), ("focus", bg_surface), ("active", bg_surface)],
+            background=[("selected", btn_initial), ("focus", bg_surface), ("active", bg_surface)],
             foreground=[("selected", THEME["active_tracker_fg"]), ("focus", text_primary), ("active", text_primary)],
             borderwidth=[("focus", 0), ("active", 0)]
         )
         style.configure(
             "Borderless.Treeview.Heading",
-            background=progress_bg,
+            background=bg_panel,
             foreground=text_primary,
             font=("Arial", 10, "bold"),
             relief="flat",
@@ -111,7 +111,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         )
         style.map(
             "Borderless.Treeview.Heading",
-            background=[('active', progress_bg), ('selected', progress_bg)],
+            background=[('active', bg_panel), ('selected', bg_panel)],
             foreground=[('active', text_primary), ('selected', text_primary)]
         )
 
@@ -124,7 +124,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         self.grid_columnconfigure(1, weight=2)
 
         # Left Column: Structured Game Table View
-        left_box = ctk.CTkFrame(self, fg_color=THEME["progress_bg"], corner_radius=8, border_color=THEME["border_color"], border_width=1)
+        left_box = ctk.CTkFrame(self, fg_color=THEME["bg_panel"], corner_radius=8, border_color=THEME["border_color"], border_width=1)
         left_box.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         left_box.grid_rowconfigure(0, weight=1)
         left_box.grid_columnconfigure(0, weight=1)
@@ -229,7 +229,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         btn_add_cat = ctk.CTkButton(
             right_box,
             text="+ Category",
-            fg_color=THEME["btn_bg"],
+            fg_color=THEME["btn_initial"],
             hover_color=THEME["btn_hover"],
             border_width=0,
             height=28,
@@ -241,10 +241,10 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         move_row = ctk.CTkFrame(right_box, fg_color="transparent")
         move_row.pack(fill="x", padx=10, pady=(5, 2))
         move_row.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(move_row, text="Up", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"], border_width=0,
+        ctk.CTkButton(move_row, text="Up", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], border_width=0,
                       height=28, font=("Arial", 12),
                       command=lambda: self._move_category(-1)).grid(row=0, column=0, sticky="ew", padx=(0, 2))
-        ctk.CTkButton(move_row, text="Down", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"], border_width=0,
+        ctk.CTkButton(move_row, text="Down", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], border_width=0,
                       height=28, font=("Arial", 12),
                       command=lambda: self._move_category(1)).grid(row=0, column=1, sticky="ew", padx=(2, 0))
 
@@ -258,20 +258,20 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         action_row.pack(fill="x", padx=10, pady=(2, 10))
 
         self.btn_undo_pgn = ctk.CTkButton(
-            action_row, text="✕", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            action_row, text="✕", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
             border_width=0, width=26, height=30, font=("Arial", 12, "bold"),
             text_color=THEME["text_primary"], command=self._undo_last_pgn
         )
 
         self.btn_select_pgns = ctk.CTkButton(
-            action_row, text="Select PGNs", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            action_row, text="Select PGNs", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
             border_width=0, width=95, height=30, font=("Arial", 12),
             command=self._select_pgn_files
         )
         self.btn_select_pgns.pack(side="left", padx=(0, 3))
 
         ctk.CTkButton(
-            action_row, text="+ Collection", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"],
+            action_row, text="+ Collection", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
             border_width=0, width=125, height=30, font=("Arial", 12, "bold"),
             command=self._create_collection
         ).pack(side="left", padx=(3, 0))
@@ -290,7 +290,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         ctk.CTkButton(
             del_row,
             text="Delete Category",
-            fg_color=THEME["btn_bg"],
+            fg_color=THEME["btn_initial"],
             hover_color=THEME["btn_hover"],
             border_width=0,
             height=28,
@@ -305,7 +305,7 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         eco_box = ctk.CTkFrame(right_box, fg_color="transparent")
         eco_box.pack(fill="x", padx=10, pady=2)
         ctk.CTkLabel(eco_box, text="ECO Tag Repair", font=("Arial", 12, "bold"), text_color=THEME["text_primary"]).pack(anchor="w")
-        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"], border_width=0,
+        ctk.CTkButton(eco_box, text="Scan & Repair ECOs", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], border_width=0,
                       height=30, font=("Arial", 12), command=self._repair_eco_tags).pack(fill="x", pady=(4, 0))
 
         engine_box = ctk.CTkFrame(right_box, fg_color="transparent")
@@ -313,9 +313,9 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin):
         ctk.CTkLabel(engine_box, text="Engine Manager", font=("Arial", 12, "bold"), text_color=THEME["text_primary"]).pack(anchor="w")
         eng_row = ctk.CTkFrame(engine_box, fg_color="transparent")
         eng_row.pack(fill="x", pady=(4, 0))
-        ctk.CTkButton(eng_row, text="Browse Engine", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"], border_width=0,
+        ctk.CTkButton(eng_row, text="Browse Engine", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], border_width=0,
                       height=30, font=("Arial", 12), command=self._browse_engine).pack(side="left", fill="x", expand=True, padx=(0, 2))
-        ctk.CTkButton(eng_row, text="Save Settings", fg_color=THEME["btn_bg"], hover_color=THEME["btn_hover"], border_width=0,
+        ctk.CTkButton(eng_row, text="Save Settings", fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"], border_width=0,
                       height=30, font=("Arial", 12), command=self._save_engine_settings).pack(side="right", fill="x", expand=True, padx=(2, 0))
 
     def _refresh_categories_list(self):
