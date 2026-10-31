@@ -111,7 +111,7 @@ class CatalogInitMixin:
         # Dynamic theme colors
         primary = THEME.get("text_primary", "#ffffff")
         secondary = THEME.get("text_secondary", "#94a3b8")
-        accent = THEME.get("btn_hover", THEME.get("border_color", primary))
+        accent = THEME.get("btn_hover", primary)
 
         target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), spacing3=6)
         target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), spacing3=6)
@@ -249,7 +249,7 @@ class CatalogInitMixin:
 
         self.left_board_panel = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"], corner_radius=8,
                                              border_width=1,
-                                             border_color=THEME.get("border_color", THEME["bg_surface"]))
+                                             border_color=THEME.get("border_ring", THEME["bg_surface"]))
         self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
         self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color=THEME["bg_surface"],
@@ -273,7 +273,7 @@ class CatalogInitMixin:
         self.engine_results_container_frame = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"],
                                                            corner_radius=8,
                                                            border_width=1,
-                                                           border_color=THEME.get("border_color", THEME["bg_surface"]))
+                                                           border_color=THEME.get("border_ring", THEME["bg_surface"]))
         self.engine_results_container_frame.pack(side="top", fill="both", expand=True, padx=0, pady=0)
 
         self.engine_results_header_frame = ctk.CTkFrame(self.engine_results_container_frame, fg_color="transparent")
@@ -332,7 +332,7 @@ class CatalogInitMixin:
             btn_hover = THEME["btn_hover"]
             btn_initial = THEME["btn_initial"]
             text_color = THEME["text_primary"]
-            border_color = THEME.get("border_color", THEME["bg_surface"])
+            border_color = THEME.get("border_ring", THEME["bg_surface"])
 
             def create_compact_mode_button(text, mode_key=None, is_action=False):
                 frm = ctk.CTkFrame(
@@ -407,7 +407,7 @@ class CatalogInitMixin:
 
         self.top_catalog_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
                                               border_width=1,
-                                              border_color=THEME.get("border_color", THEME["bg_surface"]))
+                                              border_color=THEME.get("border_ring", THEME["bg_surface"]))
         self.top_catalog_panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         style = ttk.Style()
@@ -496,7 +496,7 @@ class CatalogInitMixin:
         self.analysis_container_frame = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"],
                                                      corner_radius=8,
                                                      border_width=1,
-                                                     border_color=THEME.get("border_color", THEME["bg_surface"]))
+                                                     border_color=THEME.get("border_ring", THEME["bg_surface"]))
         self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         self.analysis_header_frame = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
@@ -517,7 +517,7 @@ class CatalogInitMixin:
         btn_hover = THEME["btn_hover"]
         btn_initial = THEME["btn_initial"]
         text_color = THEME["text_primary"]
-        border_color = THEME.get("border_color", THEME["bg_surface"])
+        border_color = THEME.get("border_ring", THEME["bg_surface"])
 
         def create_chunk_mode_button(text, command_func):
             frm = ctk.CTkFrame(
@@ -558,7 +558,7 @@ class CatalogInitMixin:
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
         self.pgn_data_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
-                                           border_width=1, border_color=THEME.get("border_color", THEME["bg_surface"]))
+                                           border_width=1, border_color=THEME.get("border_ring", THEME["bg_surface"]))
         self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
         self.pgn_data_header = ctk.CTkFrame(self.pgn_data_panel, fg_color="transparent")
@@ -573,7 +573,7 @@ class CatalogInitMixin:
         self.btn_close_pgn_data = ctk.CTkButton(
             self.pgn_data_header, text="X", width=26, height=26,
             fg_color="transparent", text_color=THEME.get("text_secondary", "#94a3b8"),
-            hover_color=THEME.get("border_color", THEME["bg_surface"]),
+            hover_color=THEME.get("border_ring", THEME["bg_surface"]),
             font=ctk.CTkFont(size=15, weight="bold"),
             command=self.toggle_pgn_data_panel
         )
@@ -590,6 +590,7 @@ class CatalogInitMixin:
         self.pgn_data_text._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
         self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.pgn_data_text.insert("end", "[No game selected. Click a game to load its details...]\n")
+        self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
         def _bind_keys(event=None):
             top = self.winfo_toplevel()
@@ -602,3 +603,4 @@ class CatalogInitMixin:
 
         self.bind("<Map>", _bind_keys)
         self.after(100, _bind_keys)
+
