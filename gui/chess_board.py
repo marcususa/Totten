@@ -392,7 +392,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         default_highlight = THEME.get("border_color", "#ea580c")
         highlight_color = THEME.get("btn_hover", default_highlight)
-        border_color = THEME.get("border_ring", THEME.get("border_color", THEME.get("btn_initial", bg_surface)))
+        border_color = THEME.get("border_color", bg_surface)
 
         for row in range(8):
             for col in range(8):
