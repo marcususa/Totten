@@ -1,13 +1,22 @@
 import io
-from PIL import Image, ImageTk
+import tkinter as tk
+from pathlib import Path
+from PIL import Image, ImageTk, ImageDraw
 import customtkinter as ctk
 import chess
 from core.constants import THEME
+import gui.app_state as state
 
 PIECE_PATH = "assets/pieces/"
 
+ROOT_DIR = Path(__file__).resolve().parent
+while ROOT_DIR != ROOT_DIR.parent:
+    if (ROOT_DIR / "main.py").exists() or (ROOT_DIR / "core").exists():
+        break
+    ROOT_DIR = ROOT_DIR.parent
 
-def load_piece_image(filename, size=55):
+
+def load_piece_image(filename, size=64):
     """Loads SVG piece using cairosvg and converts to PIL Image for canvas rendering."""
     import cairosvg
     try:
@@ -29,21 +38,21 @@ PIECE_MAP = {
 
 
 class ChessBoardWidget(ctk.CTkFrame):
-    def __init__(self, parent, square_size=48, is_popout=False, **kwargs):
+    def __init__(self, parent, square_size=64, is_popout=False, **kwargs):
         super().__init__(parent, fg_color=THEME.get("bg_panel", "#0f172a"), corner_radius=0, **kwargs)
         self.square_size = square_size
         self.is_popout = is_popout
         self.board = chess.Board()
         self.flipped = False
         self.popout_window = None
-        self.is_analyzing = False  # Analysis toggle state for independent pop-out variations
+        self.is_analyzing = False  # Analysis toggle state for pop-out window
 
         # Interaction state tracking for dragging and clicking
         self.dragging_piece = None
         self.drag_start_square = None
         self.drag_image_ref = None
         self.drag_image_item = None
-        self.selected_square = None  # For click-to-move support
+        self.selected_square = None
 
         # Press tracking for hybrid click/drag motion
         self.press_x = 0
@@ -58,7 +67,7 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.render_board()
 
     def _build_ui(self):
-        """Builds control panel layout alongside an interactive canvas board."""
+        """Builds control panel layout tailored specifically for main vs pop-out views."""
         for widget in self.winfo_children():
             widget.destroy()
 
@@ -66,71 +75,104 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        panel_width = 45 if self.is_popout else 55
-        self.control_panel = ctk.CTkFrame(self, fg_color="transparent", width=panel_width)
-        self.control_panel.grid(row=0, column=0, sticky="sw", padx=0, pady=0)
+        panel_width = 45 if self.is_popout else 72
+        board_pixel_size = self.square_size * 8
+
+        self.control_panel = ctk.CTkFrame(self, fg_color="transparent", width=panel_width, corner_radius=0)
+        self.control_panel.grid(row=0, column=0, sticky="ns", padx=0, pady=0)
         self.control_panel.grid_propagate(False)
 
-        button_width = panel_width - (4 if self.is_popout else 6)
-        button_height = 35 if self.is_popout else 28
+        # Inner button container centered vertically
+        self.buttons_container = ctk.CTkFrame(self.control_panel, fg_color="transparent", corner_radius=0)
+        self.buttons_container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Consistent theme & appearance mode handling for button colors & text contrast
         is_light = ctk.get_appearance_mode().lower() == "light"
-        btn_fg = "#cbd5e1" if is_light else "transparent"
+        btn_fg = "#cbd5e1" if is_light else ("transparent" if self.is_popout else THEME.get("bg_surface"))
         btn_hover = "#94a3b8" if is_light else THEME.get("btn_hover", "#475569")
-        text_color = "#0f172a" if is_light else THEME.get("text_secondary", "#94a3b8")
-
-        self.flip_button = ctk.CTkButton(
-            self.control_panel, text="↻ Flip" if not self.is_popout else "↻",
-            width=button_width, height=button_height, fg_color=btn_fg,
-            hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
-            command=self.toggle_flip
-        )
-        self.flip_button.pack(side="top", pady=(0, 4), anchor="w")
+        text_color = "#0f172a" if is_light else (THEME.get("text_secondary", "#94a3b8"))
 
         if self.is_popout:
-            # Pop-out control layout: Dock button + Bold 'A' Analysis toggle
+            # Pop-out layout: Compact buttons with symbols and analysis toggle 'A'
+            button_width = panel_width - 4
+            button_height = 35
+
+            self.flip_button = ctk.CTkButton(
+                self.buttons_container, text="↻",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
+                command=self.toggle_flip
+            )
+            self.flip_button.pack(side="top", pady=(0, 4), anchor="center")
+
             self.popout_button = ctk.CTkButton(
-                self.control_panel, text=chr(9704),
+                self.buttons_container, text=chr(9704),
                 width=button_width, height=button_height, fg_color=btn_fg,
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
                 command=self.toggle_popout
             )
-            self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
+            self.popout_button.pack(side="top", pady=(0, 4), anchor="center")
 
             self.analysis_button = ctk.CTkButton(
-                self.control_panel, text="A",
+                self.buttons_container, text="A",
                 width=button_width, height=button_height, fg_color=btn_fg,
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14, "bold"),
                 command=self.toggle_analysis
             )
-            self.analysis_button.pack(side="top", pady=(0, 4), anchor="w")
-        else:
-            self.popout_button = ctk.CTkButton(
-                self.control_panel, text=f"Pop Out {chr(9703)}",
+            self.analysis_button.pack(side="top", pady=(0, 4), anchor="center")
+
+            self.prev_button = ctk.CTkButton(
+                self.buttons_container, text="◀",
                 width=button_width, height=button_height, fg_color=btn_fg,
-                hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 12),
+                command=self._on_left_arrow
+            )
+            self.prev_button.pack(side="top", pady=(0, 4), anchor="center")
+
+            self.next_button = ctk.CTkButton(
+                self.buttons_container, text="▶",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 12),
+                command=self._on_right_arrow
+            )
+            self.next_button.pack(side="top", anchor="center")
+
+        else:
+            # Main app layout: Full descriptive buttons
+            button_width = panel_width - 8
+            button_height = 32
+
+            self.flip_button = ctk.CTkButton(
+                self.buttons_container, text="↻ Flip",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 14, "bold"),
+                command=self.toggle_flip
+            )
+            self.flip_button.pack(side="top", pady=(0, 6), anchor="center")
+
+            self.popout_button = ctk.CTkButton(
+                self.buttons_container, text="Pop Out",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 13, "bold"),
                 command=self.toggle_popout
             )
-            self.popout_button.pack(side="top", pady=(0, 4), anchor="w")
+            self.popout_button.pack(side="top", pady=(0, 6), anchor="center")
 
-        self.prev_button = ctk.CTkButton(
-            self.control_panel, text="Prev ◀" if not self.is_popout else "◀",
-            width=button_width, height=button_height, fg_color=btn_fg,
-            hover_color=btn_hover, text_color=text_color, font=("Arial", 12),
-            command=self._on_left_arrow
-        )
-        self.prev_button.pack(side="top", pady=(0, 4), anchor="w")
+            self.prev_button = ctk.CTkButton(
+                self.buttons_container, text="◀ Prev",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 13, "bold"),
+                command=self._on_left_arrow
+            )
+            self.prev_button.pack(side="top", pady=(0, 6), anchor="center")
 
-        self.next_button = ctk.CTkButton(
-            self.control_panel, text="Next ▶" if not self.is_popout else "▶",
-            width=button_width, height=button_height, fg_color=btn_fg,
-            hover_color=btn_hover, text_color=text_color, font=("Arial", 12),
-            command=self._on_right_arrow
-        )
-        self.next_button.pack(side="top", anchor="w")
+            self.next_button = ctk.CTkButton(
+                self.buttons_container, text="Next ▶",
+                width=button_width, height=button_height, fg_color=btn_fg,
+                hover_color=btn_hover, text_color=text_color, font=("Arial", 13, "bold"),
+                command=self._on_right_arrow
+            )
+            self.next_button.pack(side="top", anchor="center")
 
-        board_pixel_size = self.square_size * 8
         self.canvas = ctk.CTkCanvas(
             self,
             width=board_pixel_size,
@@ -140,7 +182,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         )
         self.canvas.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
 
-        # Bind canvas interaction for all boards
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag_motion)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
@@ -159,7 +200,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.analysis_button.configure(fg_color=btn_fg, text_color=text_color)
 
     def _get_chess_square(self, row, col):
-        """Translates row/col grid coordinates to chess square index accounting for board orientation."""
         if self.flipped:
             chess_rank = row
             chess_file = 7 - col
@@ -169,7 +209,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         return chess.square(chess_file, chess_rank)
 
     def _get_row_col_from_chess_square(self, chess_square):
-        """Maps a python-chess square index back to canvas grid row and col."""
         chess_file = chess.square_file(chess_square)
         chess_rank = chess.square_rank(chess_square)
         if self.flipped:
@@ -181,7 +220,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         return row, col
 
     def _get_row_col_from_coords(self, x, y):
-        """Maps canvas pixel coordinates back to grid row and column."""
         col = int(x // self.square_size)
         row = int(y // self.square_size)
         if 0 <= row < 8 and 0 <= col < 8:
@@ -189,7 +227,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         return None, None
 
     def _on_press(self, event):
-        """Records initial press location for both click-to-move and potential dragging."""
         row, col = self._get_row_col_from_coords(event.x, event.y)
         if row is None or col is None:
             return
@@ -204,7 +241,6 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.is_dragging = False
 
     def _on_drag_motion(self, event):
-        """Triggers dragging mode if the mouse moves away from the press origin without mutating board state."""
         if not self.press_piece:
             return
 
@@ -238,7 +274,6 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.canvas.coords(self.drag_image_item, event.x, event.y)
 
     def _on_release(self, event):
-        """Handles mouse release for drag-and-drop or click-to-move with strict python-chess legal move enforcement."""
         if self.drag_image_item:
             self.canvas.delete(self.drag_image_item)
             self.drag_image_item = None
@@ -290,8 +325,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
             promotion = None
             selected_piece = self.board.piece_at(self.selected_square)
-            if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (
-                    0, 7):
+            if selected_piece and selected_piece.piece_type == chess.PAWN and chess.square_rank(target_square) in (0, 7):
                 promotion = chess.QUEEN
 
             move = chess.Move(self.selected_square, target_square, promotion=promotion)
@@ -304,19 +338,19 @@ class ChessBoardWidget(ctk.CTkFrame):
             self.render_board()
 
     def _on_canvas_resize(self, event):
-        """Dynamically scales square size if window container resizes."""
-        new_size = event.height // 8
+        new_size = min(event.width, event.height) // 8
         if new_size > 10 and new_size != self.square_size:
-            self.square_size = new_size
-            self.image_cache.clear()
-            self.render_board()
+            self.resize_board(new_size)
 
     def resize_board(self, new_square_size):
         if new_square_size == self.square_size or new_square_size < 15:
             return
         self.square_size = new_square_size
         self.image_cache.clear()
-        self.canvas.configure(width=new_square_size * 8, height=new_square_size * 8)
+        board_pixel_size = new_square_size * 8
+        self.canvas.configure(width=board_pixel_size, height=board_pixel_size)
+        if hasattr(self, 'control_panel') and self.control_panel:
+            self.control_panel.configure(height=board_pixel_size)
         self.render_board()
 
     def set_position(self, position):
@@ -359,17 +393,34 @@ class ChessBoardWidget(ctk.CTkFrame):
                 pass
 
     def _on_left_arrow(self):
-        if hasattr(self.master_widget, 'on_prev_move'):
-            self.master_widget.on_prev_move()
+        targets = [
+            getattr(self, 'master_widget', None),
+            self.master,
+            getattr(state, 'workspace', None)
+        ]
+        for target in targets:
+            if target is not None:
+                for method_name in ('on_prev_move', 'prev_move', 'step_backward', 'previous_move', 'go_back', 'prev'):
+                    if hasattr(target, method_name):
+                        getattr(target, method_name)()
+                        return
 
     def _on_right_arrow(self):
-        if hasattr(self.master_widget, 'on_next_move'):
-            self.master_widget.on_next_move()
+        targets = [
+            getattr(self, 'master_widget', None),
+            self.master,
+            getattr(state, 'workspace', None)
+        ]
+        for target in targets:
+            if target is not None:
+                for method_name in ('on_next_move', 'next_move', 'step_forward', 'next', 'forward'):
+                    if hasattr(target, method_name):
+                        getattr(target, method_name)()
+                        return
 
     def sync_with_twin(self):
-        """Synchronizes board states between main and pop-out unless analysis mode is active."""
         if self.is_popout and self.is_analyzing:
-            return  # Analysis mode active: do not propagate moves back to main board
+            return
 
         if self.is_popout and hasattr(self, 'master_widget') and self.master_widget:
             if hasattr(self.master_widget, 'board'):
@@ -385,37 +436,96 @@ class ChessBoardWidget(ctk.CTkFrame):
         self._canvas_images = []
 
         bg_surface = THEME.get("bg_surface", "#1e293b")
-
-        # Pull light and dark squares directly from the active theme configuration
         light_color = THEME.get("light_square", "#f0d9b5")
         dark_color = THEME.get("dark_square", "#b58863")
-
         default_highlight = THEME.get("border_color", "#ea580c")
         highlight_color = THEME.get("btn_hover", default_highlight)
         border_color = THEME.get("border_color", bg_surface)
 
+        board_pixel_size = self.square_size * 8
+
+        # Check if board_background image exists in project root
+        bg_img_file = None
+        for ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"]:
+            candidate = ROOT_DIR / f"board_background{ext}"
+            if candidate.exists():
+                bg_img_file = candidate
+                break
+
+        base_pil_img = None
+        if bg_img_file:
+            try:
+                img = Image.open(bg_img_file).convert("RGBA")
+                base_pil_img = img.resize((board_pixel_size, board_pixel_size), Image.Resampling.LANCZOS)
+            except Exception as e:
+                print(f"Error loading board background image: {e}")
+
+        if base_pil_img:
+            overlay = Image.new("RGBA", base_pil_img.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+
+            def hex_to_rgba(hex_str, alpha=140):
+                hex_str = hex_str.lstrip('#')
+                if len(hex_str) == 6:
+                    r = int(hex_str[0:2], 16)
+                    g = int(hex_str[2:4], 16)
+                    b = int(hex_str[4:6], 16)
+                    return (r, g, b, alpha)
+                return (181, 136, 99, alpha)
+
+            for row in range(8):
+                for col in range(8):
+                    x1 = col * self.square_size
+                    y1 = row * self.square_size
+                    x2 = x1 + self.square_size
+                    y2 = y1 + self.square_size
+
+                    chess_square = self._get_chess_square(row, col)
+
+                    if (row + col) % 2 == 1:
+                        sq_color = hex_to_rgba(dark_color, alpha=200)
+                    else:
+                        sq_color = hex_to_rgba(light_color, alpha=140)
+
+                    if self.selected_square == chess_square:
+                        sq_color = hex_to_rgba(highlight_color, alpha=180)
+
+                    draw.rectangle([x1, y1, x2 - 1, y2 - 1], fill=sq_color)
+
+            composite_img = Image.alpha_composite(base_pil_img, overlay)
+            bg_tk_img = ImageTk.PhotoImage(composite_img)
+            self._canvas_images.append(bg_tk_img)
+            self.canvas.create_image(0, 0, image=bg_tk_img, anchor="nw")
+        else:
+            for row in range(8):
+                for col in range(8):
+                    x1 = col * self.square_size
+                    y1 = row * self.square_size
+                    x2 = x1 + self.square_size
+                    y2 = y1 + self.square_size
+
+                    chess_square = self._get_chess_square(row, col)
+
+                    if (row + col) % 2 == 1:
+                        square_color = dark_color
+                    else:
+                        square_color = light_color
+
+                    if self.selected_square == chess_square:
+                        square_color = highlight_color
+
+                    self.canvas.create_rectangle(
+                        x1, y1, x2, y2,
+                        fill=square_color,
+                        outline=""
+                    )
+
+        # Render pieces
         for row in range(8):
             for col in range(8):
                 x1 = col * self.square_size
                 y1 = row * self.square_size
-                x2 = x1 + self.square_size
-                y2 = y1 + self.square_size
-
                 chess_square = self._get_chess_square(row, col)
-
-                if (row + col) % 2 == 1:
-                    square_color = dark_color
-                else:
-                    square_color = light_color
-
-                if self.selected_square == chess_square:
-                    square_color = highlight_color
-
-                self.canvas.create_rectangle(
-                    x1, y1, x2, y2,
-                    fill=square_color,
-                    outline=""
-                )
 
                 piece = self.board.piece_at(chess_square)
                 if piece and not (self.is_dragging and chess_square == self.drag_start_square):
@@ -436,7 +546,6 @@ class ChessBoardWidget(ctk.CTkFrame):
                         cy = y1 + (self.square_size / 2)
                         self.canvas.create_image(cx, cy, image=img_tk, anchor="center")
 
-        board_pixel_size = self.square_size * 8
         self.canvas.create_rectangle(
             0, 0, board_pixel_size, board_pixel_size,
             outline=border_color,
@@ -464,8 +573,8 @@ class ChessBoardWidget(ctk.CTkFrame):
         self.popout_window.title("Chessboard Analysis (Pop-Out)")
         self.popout_window.configure(fg_color=THEME.get("bg_panel", "#0f172a"))
 
-        win_w = (self.square_size * 8) + 55
-        win_h = (self.square_size * 8) + 10
+        win_w = (self.square_size * 8) + 45
+        win_h = (self.square_size * 8) + 15
 
         self.popout_window.update_idletasks()
         screen_w = self.popout_window.winfo_screenwidth()
@@ -482,12 +591,12 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
         self.popout_board.master_widget = self
-        self.popout_board.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        self.popout_board.grid(row=0, column=0, sticky="nsew", padx=0, pady=(5, 0))
         self.popout_board.set_board(self.board)
 
         def on_window_resize(event):
             if event.widget == self.popout_window:
-                new_size = min(event.width - 55, event.height - 10) // 8
+                new_size = min(event.width - 45, event.height - 15) // 8
                 if new_size > 15 and new_size != self.popout_board.square_size:
                     self.popout_board.resize_board(new_size)
 

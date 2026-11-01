@@ -2,7 +2,9 @@ import json
 import sys
 import os
 from pathlib import Path
+import shutil
 import customtkinter as ctk
+from tkinter import filedialog
 
 # Robustly locate the actual project root directory
 ROOT_DIR = Path(__file__).resolve().parent
@@ -73,7 +75,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             "Extras": 3
         }
 
-        # Load persisted mixer state from user_themes.json if available
+        # Load persisted state from user_themes.json if available
         user_data = {}
         if USER_THEMES_FILE.exists():
             try:
@@ -82,14 +84,18 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             except Exception:
                 pass
 
+        # Pull state from mixer_state or latest current_themes entry
         mixer_state = user_data.get("mixer_state", {})
-        saved_hue1 = mixer_state.get("color1_hue")
-        saved_hue2 = mixer_state.get("color2_hue")
-        saved_tier1 = mixer_state.get("color1_tier", "Medium")
-        saved_tier2 = mixer_state.get("color2_tier", "Medium")
-        saved_group_cols = mixer_state.get("group_columns", {})
-        saved_group_locks = mixer_state.get("group_locks", {})
-        saved_var_cols = mixer_state.get("var_columns", {})
+        current_themes_list = user_data.get("current_themes", [])
+        latest_theme = current_themes_list[0] if current_themes_list else mixer_state
+
+        saved_hue1 = latest_theme.get("color1_hue") or mixer_state.get("color1_hue")
+        saved_hue2 = latest_theme.get("color2_hue") or mixer_state.get("color2_hue")
+        saved_tier1 = latest_theme.get("color1_tier") or mixer_state.get("color1_tier", "Medium")
+        saved_tier2 = latest_theme.get("color2_tier") or mixer_state.get("color2_tier", "Medium")
+        saved_group_cols = latest_theme.get("group_columns") or mixer_state.get("group_columns", {})
+        saved_group_locks = latest_theme.get("group_locks") or mixer_state.get("group_locks", {})
+        saved_var_cols = latest_theme.get("var_columns") or mixer_state.get("var_columns", {})
 
         hue_choices = list(THEME_DEFAULTS.keys())
         default_hue = hue_choices[0] if hue_choices else "Red"
@@ -118,7 +124,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         # Single-selection tier variables (Mutually exclusive: Light, Medium, or Dark)
         self.board_tier_var = ctk.StringVar(
             value=saved_tier1 if saved_tier1 in ["Light", "Medium", "Dark"] else "Medium")
-        self.ui_tier_var = ctk.StringVar(value=saved_tier2 if saved_tier2 in ["Light", "Medium", "Dark"] else "Medium")
+        self.ui_tier_var = ctk.StringVar(
+            value=saved_tier2 if saved_tier2 in ["Light", "Medium", "Dark"] else "Medium")
 
         # Main background container
         main_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -142,6 +149,20 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             header_frame, text="Theme Colors",
             font=("Arial", 16, "bold")
         ).pack(side="left")
+
+        # + board background button positioned below Theme Colors
+        existing_bg = any(
+            (ROOT_DIR / f"board_background{ext}").exists() for ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"])
+        btn_bg_text = "Change Board Background" if existing_bg else "+ Board Background"
+
+        self.board_bg_btn = ctk.CTkButton(
+            col1_frame, text=btn_bg_text,
+            font=("Arial", 11, "bold"), height=26,
+            fg_color=("#374151", "#2d3748"),
+            hover_color=("#4b5563", "#4a5568"),
+            command=self.select_board_background
+        )
+        self.board_bg_btn.pack(anchor="w", pady=(0, 8))
 
         instruction_frame = ctk.CTkFrame(col1_frame, fg_color="transparent")
         instruction_frame.pack(anchor="w", pady=(0, 12))
@@ -311,16 +332,62 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         self.geometry(f"{window_width}x{window_height}+{x_cordinate}+{y_cordinate}")
         self.minsize(window_width, window_height)
 
-    def save_mixer_state(self):
-        """Persists the current mixer state to user_themes.json."""
+    def select_board_background(self):
+        """Copies selected image to project root as 'board_background.[ext]' and saves reference."""
+        # Temporarily drop topmost attribute so file dialog is not hidden behind ThemeChooserWindow
+        self.attributes("-topmost", False)
         try:
+            file_path = filedialog.askopenfilename(
+                title="Select Board Background Image",
+                filetypes=[("Image Files", "*.png *.jpg *.jpeg *.bmp *.gif")],
+                parent=self
+            )
+        finally:
+            self.attributes("-topmost", True)
+
+        if not file_path:
+            return
+
+        try:
+            src_path = Path(file_path)
+            ext = src_path.suffix.lower()
+
+            # Remove any existing board_background files with different extensions
+            for existing_ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"]:
+                old_file = ROOT_DIR / f"board_background{existing_ext}"
+                if old_file.exists():
+                    old_file.unlink()
+
+            dest_path = ROOT_DIR / f"board_background{ext}"
+            shutil.copy2(src_path, dest_path)
+
             user_data = {}
             if USER_THEMES_FILE.exists():
                 with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
                     user_data = json.load(f)
 
-            if "custom_themes" not in user_data or not isinstance(user_data["custom_themes"], dict):
-                user_data["custom_themes"] = json.loads(json.dumps(THEME_DEFAULTS))
+            user_data["board_bg_image"] = str(dest_path.name)
+
+            with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+
+            print(f"[THEME] Successfully copied background to root: {dest_path.name}")
+
+            # Close the theme chooser window after selection
+            self.destroy()
+
+        except Exception as e:
+            print(f"[THEME] Error copying board background image: {e}")
+
+    def save_mixer_state(self):
+        """Saves current mixer state to mixer_state for compatibility."""
+        try:
+            user_data = {}
+            if USER_THEMES_FILE.exists():
+                with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
+                    user_data = json.load(f)
 
             user_data["mixer_state"] = {
                 "color1_hue": self.board_combo_var.get(),
@@ -339,8 +406,39 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         except Exception as e:
             print(f"[THEME] Error saving mixer state: {e}")
 
+    def _push_current_theme(self, new_theme):
+        """Maintains the rolling list of up to 10 current_themes entries (variable strings without hexcodes)."""
+        try:
+            user_data = {}
+            if USER_THEMES_FILE.exists():
+                try:
+                    with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
+                        user_data = json.load(f)
+                except Exception:
+                    pass
+
+            themes_list = user_data.get("current_themes", [])
+            themes_list.insert(0, new_theme)
+            if len(themes_list) > 10:
+                themes_list = themes_list[:10]
+
+            user_data["current_themes"] = themes_list
+            user_data["mixer_state"] = {
+                "color1_hue": new_theme.get("color1_hue"),
+                "color2_hue": new_theme.get("color2_hue"),
+                "color1_tier": new_theme.get("color1_tier"),
+                "color2_tier": new_theme.get("color2_tier"),
+                "group_columns": self.group_columns,
+                "group_locks": self.group_locked,
+                "var_columns": self.var_columns
+            }
+            return user_data
+        except Exception as e:
+            print(f"[THEME] Error updating current_themes list: {e}")
+            return {}
+
     def set_tier(self, tier_var, selected_name):
-        """Sets the selected tier variable mutually exclusively, updates button appearances, and saves state."""
+        """Sets the selected tier variable mutually exclusively and updates button appearances."""
         tier_var.set(selected_name)
         if tier_var == self.board_tier_var:
             self.update_tier_buttons(self.board_tier_var, self.board_tier_btns)
@@ -396,7 +494,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             right_ctrls = ctk.CTkFrame(g_header, fg_color="transparent")
             right_ctrls.pack(side="right")
 
-            # Expand/Collapse Toggle Button ('+' when locked, '-' when unlocked with muted in-between text color)
+            # Expand/Collapse Toggle Button ('+' when locked, '-' when unlocked)
             lock_text = "+" if is_locked else "-"
             lock_btn = ctk.CTkButton(
                 right_ctrls, text=lock_text, width=24, height=18,
@@ -409,7 +507,6 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             lock_btn.pack(side="left", padx=(0, 2))
 
             if is_locked:
-                # Group-level Swap Arrow (Right '▶' if in col 2, Left '◀' if in col 3)
                 arrow_text = "▶" if g_col == 2 else "◀"
                 swap_group_btn = ctk.CTkButton(
                     right_ctrls, text=arrow_text, width=28, height=18,
@@ -421,7 +518,6 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                 )
                 swap_group_btn.pack(side="left")
             else:
-                # If unlocked, show individual variable rows inside the group container
                 for var in variables:
                     v_col = self.var_columns[var]
                     if v_col != g_col:
@@ -443,7 +539,6 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                     )
                     var_swap_btn.pack(side="right")
 
-            # Handle variables whose individual column differs from group column when unlocked
             if not is_locked:
                 for var in variables:
                     if self.var_columns[var] != g_col:
@@ -497,56 +592,26 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         self.populate_variable_lists()
         self.save_mixer_state()
 
-    def clone_current_theme_choice(self, source_name):
-        """Clones an existing theme configuration, appends a copy, and refreshes the UI state."""
-        import copy
-
-        try:
-            user_data = {}
-            if USER_THEMES_FILE.exists():
-                with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
-                    user_data = json.load(f)
-
-            themes_source = user_data.get("custom_themes", THEME_DEFAULTS)
-            if source_name not in themes_source:
-                return
-
-            counter = 1
-            new_name = f"{source_name} (Copy)"
-            while new_name in themes_source:
-                counter += 1
-                new_name = f"{source_name} (Copy {counter})"
-
-            cloned_data = copy.deepcopy(themes_source[source_name])
-            themes_source[new_name] = cloned_data
-            user_data["custom_themes"] = themes_source
-
-            with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:
-                json.dump(user_data, f, indent=4)
-                f.flush()
-                os.fsync(f.fileno())
-
-            if hasattr(self, "populate_variable_lists") and callable(self.populate_variable_lists):
-                self.populate_variable_lists()
-
-            print(f"[THEME] Successfully cloned theme choice '{source_name}' to '{new_name}'")
-        except Exception as e:
-            print(f"[THEME] Error cloning theme choice: {e}")
-
     def apply_theme_live(self, hue, tier):
+        """Applies a standard theme, writing active_theme, last_active keys, and current_themes."""
         try:
-            user_data = {}
-            if USER_THEMES_FILE.exists():
-                with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
-                    user_data = json.load(f)
+            tier_data = THEME_DEFAULTS.get(hue, {}).get(tier, {})
 
-            if "custom_themes" not in user_data or not isinstance(user_data["custom_themes"], dict):
-                user_data["custom_themes"] = json.loads(json.dumps(THEME_DEFAULTS))
-            else:
-                for h_key, h_val in THEME_DEFAULTS.items():
-                    if h_key not in user_data["custom_themes"]:
-                        user_data["custom_themes"][h_key] = h_val
+            theme_entry = {
+                "label": f"{hue} ({tier})",
+                "type": "standard",
+                "color1_hue": hue,
+                "color1_tier": tier,
+                "color2_hue": hue,
+                "color2_tier": tier,
+                "group_columns": self.group_columns,
+                "group_locks": self.group_locked,
+                "var_columns": self.var_columns
+            }
 
+            user_data = self._push_current_theme(theme_entry)
+            user_data["active_theme"] = tier_data
+            user_data["custom_mixed_theme"] = tier_data
             user_data["last_active_hue"] = hue
             user_data["last_active_tier"] = tier
 
@@ -555,9 +620,9 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                 f.flush()
                 os.fsync(f.fileno())
 
-            print(f"[THEME] Saved last active theme '{hue}' ({tier}) to {USER_THEMES_FILE}")
+            print(f"[THEME] Applied active standard theme '{hue}' ({tier})")
         except Exception as e:
-            print(f"[THEME] Error updating user themes: {e}")
+            print(f"[THEME] Error saving theme state: {e}")
             return
 
         print(f"[THEME] Restarting application...")
@@ -565,19 +630,17 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         os.execv(python, [python] + sys.argv)
 
     def apply_mixed_theme(self):
-        """Applies the mixed theme live in-memory without permanently saving it to user_themes.json."""
+        """Applies a mixed theme, writing active_theme, last_active keys, and current_themes."""
         color1_hue = self.board_combo_var.get()
         color2_hue = self.ui_combo_var.get()
+        c1_tier = self.board_tier_var.get()
+        c2_tier = self.ui_tier_var.get()
 
         try:
-            c1_tier = self.board_tier_var.get()
-            c2_tier = self.ui_tier_var.get()
-
             c1_base = THEME_DEFAULTS.get(color1_hue, {})
             c2_base = THEME_DEFAULTS.get(color2_hue, {})
 
             mixed_tier = {}
-
             for var, col in self.var_columns.items():
                 if col == 2:
                     found_val = c1_base.get(c1_tier, {}).get(var)
@@ -592,15 +655,35 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                     if found_val is not None:
                         mixed_tier[var] = found_val
 
-            # Optional: If your app supports an in-memory active theme override before restart,
-            # you can pass or apply `mixed_tier` directly here without touching JSON.
-            print(f"[THEME] Applied temporary mixed theme combining {color1_hue} and {color2_hue}")
+            theme_entry = {
+                "label": f"{color1_hue} ({c1_tier}) + {color2_hue} ({c2_tier}) [Mixed]",
+                "type": "mixed",
+                "color1_hue": color1_hue,
+                "color1_tier": c1_tier,
+                "color2_hue": color2_hue,
+                "color2_tier": c2_tier,
+                "group_columns": self.group_columns,
+                "group_locks": self.group_locked,
+                "var_columns": self.var_columns
+            }
+
+            user_data = self._push_current_theme(theme_entry)
+            user_data["active_theme"] = mixed_tier
+            user_data["custom_mixed_theme"] = mixed_tier
+            user_data["last_active_hue"] = f"{color1_hue} + {color2_hue} (Mixed)"
+            user_data["last_active_tier"] = f"{c1_tier}/{c2_tier}"
+
+            with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+
+            print(f"[THEME] Successfully applied mixed theme.")
 
         except Exception as e:
             print(f"[THEME] Applied mixed theme error: {e}")
             return
 
-        # If your app applies the theme by restarting or reloading state, keep the restart hook:
         print(f"[THEME] Restarting application...")
         python = sys.executable
         os.execv(python, [python] + sys.argv)
