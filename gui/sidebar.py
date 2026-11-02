@@ -242,9 +242,11 @@ class Sidebar(ctk.CTkFrame):
         current_user = self.cc_saved_username if platform == "chess_com" else self.lich_saved_username
 
         if not current_user:
-            set_status_message(f"No username configured for {platform}.")
+            set_status_message(f"No username for {platform}. Redirecting to Mixed.")
+            state.show_workspace("mixed")
             return
 
+        # ... rest of the method ...
         top_level = self.winfo_toplevel()
         action_label = "last game" if action == "last" else "up to 100 games"
         set_status_message(f"Fetching {action_label} for {current_user} ({platform})...")
