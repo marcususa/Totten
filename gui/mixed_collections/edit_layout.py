@@ -71,6 +71,28 @@ class EditLayoutMixin:
             foreground=[('active', text_primary), ('selected', text_primary)]
         )
 
+    def _save_cc_account(self):
+        username = self.entry_cc_username.get().strip()
+        if not username:
+            return
+        self.cc_saved_username = username
+        self.save_account_to_disk("chess_com", username)
+
+        self.cc_input_row.pack_forget()
+        self.btn_cc_quick.configure(text=username)
+        self.cc_active_frame.pack(fill="x", pady=0)
+
+    def _save_lich_account(self):
+        username = self.entry_lich_username.get().strip()
+        if not username:
+            return
+        self.lich_saved_username = username
+        self.save_account_to_disk("lichess", username)
+
+        self.lich_input_row.pack_forget()
+        self.btn_lich_quick.configure(text=username)
+        self.lich_active_frame.pack(fill="x", pady=0)
+
     def _build_ui(self):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=3)
@@ -150,7 +172,6 @@ class EditLayoutMixin:
 
         # Input state frame
         self.cc_input_row = ctk.CTkFrame(cc_section, fg_color="transparent")
-        self.cc_input_row.pack(fill="x", pady=0)
 
         self.entry_cc_username = ctk.CTkEntry(
             self.cc_input_row, placeholder_text="Username...", height=30, width=160, font=("Arial", 12)
@@ -222,7 +243,8 @@ class EditLayoutMixin:
         ).pack(anchor="w", pady=(2, 0))
 
         # Vertical Divider between columns
-        ctk.CTkFrame(columns_frame, fg_color=THEME["divider"], width=1).grid(row=0, column=0, sticky="nse", padx=0, pady=2)
+        ctk.CTkFrame(columns_frame, fg_color=THEME["divider"], width=1).grid(row=0, column=0, sticky="nse", padx=0,
+                                                                             pady=2)
 
         # ------------------- Lichess.org Section (Right Column) -------------------
         lich_section = ctk.CTkFrame(columns_frame, fg_color="transparent")
@@ -237,7 +259,6 @@ class EditLayoutMixin:
 
         # Input state frame
         self.lich_input_row = ctk.CTkFrame(lich_section, fg_color="transparent")
-        self.lich_input_row.pack(fill="x", pady=0)
 
         self.entry_lich_username = ctk.CTkEntry(
             self.lich_input_row, placeholder_text="Username...", height=30, width=160, font=("Arial", 12)
@@ -307,6 +328,19 @@ class EditLayoutMixin:
             lich_col_right, text="100", width=65, height=24, fg_color=THEME["btn_initial"],
             hover_color=THEME["btn_hover"], font=("Arial", 10, "bold"), command=self._batch_lich_download
         ).pack(anchor="w", pady=(2, 0))
+
+        # Conditional Startup Check: Display input row or active saved button frame
+        if getattr(self, "cc_saved_username", None):
+            self.btn_cc_quick.configure(text=self.cc_saved_username)
+            self.cc_active_frame.pack(fill="x", pady=0)
+        else:
+            self.cc_input_row.pack(fill="x", pady=0)
+
+        if getattr(self, "lich_saved_username", None):
+            self.btn_lich_quick.configure(text=self.lich_saved_username)
+            self.lich_active_frame.pack(fill="x", pady=0)
+        else:
+            self.lich_input_row.pack(fill="x", pady=0)
 
         # Single unified instruction block positioned snugly right below the Save buttons, once only
         ctk.CTkLabel(
