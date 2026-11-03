@@ -11,17 +11,15 @@ class CatalogLoaderMixin:
         Loads catalog data directly from DuckDB.
         On startup, fetches a fast random sample of 500 games from DuckDB.
         """
-        # Enforce strict boolean value
         is_startup = True if not isinstance(is_startup, bool) else is_startup
 
         if self.db_path.exists():
             try:
                 conn = duckdb.connect(str(self.db_path), read_only=True)
 
-                # Check if table exists
+                # Robust DuckDB native table check
                 table_check = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='catalog_headers' "
-                    "UNION ALL SELECT table_name FROM information_schema.tables WHERE table_name='catalog_headers'"
+                    "SELECT table_name FROM information_schema.tables WHERE table_name = 'catalog_headers'"
                 ).fetchone()
 
                 if not table_check:
@@ -29,7 +27,7 @@ class CatalogLoaderMixin:
                     print("[Catalog Loader] Table 'catalog_headers' not found in DuckDB.")
                     self.aggregated_games_data = []
                     self.refresh_current_view()
-                    set_status_message("Catalog is empty. Import a PGN to begin.")
+                    set_status_message("Catalog is empty. Import a Pgn to begin.")
                     return
 
                 if is_startup:
@@ -52,7 +50,6 @@ class CatalogLoaderMixin:
 
                 print(f"[Catalog Loader] Successfully retrieved {len(rows)} records from DuckDB.")
 
-                # Aggregate rows into view structure
                 aggregated = {}
                 for eco, opening, variation, white, black, headers_json in rows:
                     eco = eco or "A00"
@@ -81,6 +78,10 @@ class CatalogLoaderMixin:
                     })
 
                 self.aggregated_games_data = list(aggregated.values())
+
+                # Ensure the UI thread repaints and builds the 12 opening buttons immediately
+                if hasattr(self, "update_idletasks"):
+                    self.update_idletasks()
                 self.refresh_current_view()
 
                 if is_startup:
@@ -92,7 +93,6 @@ class CatalogLoaderMixin:
             except Exception as e:
                 print(f"[Catalog Loader Error] Failed to query DuckDB: {e}")
 
-        # If DuckDB file doesn't exist yet
         print("[Catalog Loader] DuckDB file not found. Initializing empty view.")
         self.aggregated_games_data = []
         self.refresh_current_view()
