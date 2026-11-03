@@ -45,37 +45,26 @@ class Totten(ctk.CTk):
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         state.left_frame = self.sidebar
 
-        # Initialize Catalog Workspace instantly via byte-seeking
+        # --- STREAMLINED STARTUP ROUTING ---
         initial_games = state.catalog_state.get("active_games")
         target_game = state.catalog_state.get("active_focus")
         active_index = state.catalog_state.get("active_index", 0)
 
-        try:
-            self.catalog_workspace = create_workspace(
-                self,
-                initial_games=initial_games,
-                target_game=target_game,
-                active_index=active_index
-            )
-        except TypeError:
-            try:
-                self.catalog_workspace = create_workspace(self, initial_games=initial_games)
-            except TypeError:
-                self.catalog_workspace = create_workspace(self)
-
-        self.catalog_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        self.show_workspace(
+            "analysis",
+            initial_games=initial_games,
+            target_game=target_game,
+            active_index=active_index
+        )
 
         # Keep other workspaces uninitialized until navigated to
         self.edit_workspace = None
         self.mixed_workspace = None
-        self.analysis_workspace = None
         self.patterns_analysis_workspace = None
         self.patterns_workspace = None
         self.calendar_workspace = None
 
         # Register references in state
-        state.workspace = self.catalog_workspace
-        state.catalog_workspace = self.catalog_workspace
         state.app_root = self
         state.show_workspace = self.show_workspace
 
@@ -96,27 +85,43 @@ class Totten(ctk.CTk):
             self.show_workspace("mixed_analysis", initial_games=state.mixed_state.get("active_games"),
                                 filename=state.mixed_state.get("current_filename"))
         elif target_view == "patterns_analysis":
-            self.show_workspace("patterns_analysis", initial_games=state.patterns_state.get("active_games"),
-                                target_game=state.patterns_state.get("active_focus"),
-                                active_index=state.patterns_state.get("active_index"))
+            initial_games = state.patterns_state.get("active_games")
+            target_game = state.patterns_state.get("active_focus")
+            active_index = state.patterns_state.get("active_index", 0)
+
+            if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
+                state.patterns_analysis_workspace.destroy()
+
+            from gui.patterns.patterns_layout import PatternsAnalysis
+            try:
+                state.patterns_analysis_workspace = PatternsAnalysis(
+                    self,
+                    initial_games=initial_games,
+                    target_game=target_game,
+                    active_index=active_index
+                )
+            except TypeError:
+                try:
+                    state.patterns_analysis_workspace = PatternsAnalysis(
+                        self,
+                        initial_games=initial_games,
+                        target_game=target_game
+                    )
+                except TypeError:
+                    state.patterns_analysis_workspace = PatternsAnalysis(self)
+
+            state.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.patterns_analysis_workspace.tkraise()
+            state.workspace = state.patterns_analysis_workspace
 
     def show_workspace(self, target, *args, **kwargs):
-        """Persistent switchboard router that toggles or re-creates workspaces based on navigation flow."""
+        """Persistent switchboard router that toggles or re-creates core workspaces."""
         # Hide all main workspaces first
-        if hasattr(state, "catalog_workspace") and state.catalog_workspace:
-            state.catalog_workspace.grid_remove()
-        if hasattr(state, "edit_workspace") and state.edit_workspace:
-            state.edit_workspace.grid_remove()
-        if hasattr(state, "mixed_workspace") and state.mixed_workspace:
-            state.mixed_workspace.grid_remove()
-        if hasattr(state, "analysis_workspace") and state.analysis_workspace:
-            state.analysis_workspace.grid_remove()
-        if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
-            state.patterns_analysis_workspace.grid_remove()
-        if hasattr(state, "patterns_workspace") and state.patterns_workspace:
-            state.patterns_workspace.grid_remove()
-        if hasattr(state, "calendar_workspace") and state.calendar_workspace:
-            state.calendar_workspace.grid_remove()
+        for ws_attr in ["catalog_workspace", "edit_workspace", "mixed_workspace",
+                        "analysis_workspace", "patterns_analysis_workspace",
+                        "patterns_workspace", "calendar_workspace"]:
+            if hasattr(state, ws_attr) and getattr(state, ws_attr):
+                getattr(state, ws_attr).grid_remove()
 
         if hasattr(state, "transient_workspace") and state.transient_workspace:
             state.transient_workspace.destroy()
@@ -127,7 +132,6 @@ class Totten(ctk.CTk):
             if not getattr(state, "edit_workspace", None):
                 state.edit_workspace = EditWorkspace(self)
             else:
-                # Reload categories from disk and refresh UI every time we navigate back here
                 state.edit_workspace.categories = load_categories_config()
                 if hasattr(state.edit_workspace, "_refresh_categories_list"):
                     state.edit_workspace._refresh_categories_list()
@@ -144,11 +148,7 @@ class Totten(ctk.CTk):
                 state.catalog_workspace.destroy()
 
             try:
-                state.catalog_workspace = create_workspace(
-                    self,
-                    name=target,
-                    **kwargs
-                )
+                state.catalog_workspace = create_workspace(self, name=target, **kwargs)
             except TypeError:
                 state.catalog_workspace = create_workspace(self, name=target)
 
@@ -212,57 +212,10 @@ class Totten(ctk.CTk):
             else:
                 set_status_message("Loaded full personal_catalog.pgn")
 
-        elif target == "patterns":
-            if not getattr(state, "patterns_workspace", None):
-                from gui.patterns.patterns_workspace import PatternsWorkspace
-                state.patterns_workspace = PatternsWorkspace(self)
-                self.patterns_workspace = state.patterns_workspace
-
-            state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.patterns_workspace.tkraise()
-            state.workspace = state.patterns_workspace
-
-            if hasattr(state.patterns_workspace, "refresh_view"):
-                state.patterns_workspace.refresh_update() if hasattr(state.patterns_workspace,
-                                                                     "refresh_update") else state.patterns_workspace.refresh_view()
-
-        elif target == "patterns_analysis":
-            initial_games = kwargs.get("initial_games") or state.patterns_state.get("active_games")
-            target_game = kwargs.get("target_game") or state.patterns_state.get("active_focus")
-            active_index = kwargs.get("active_index")
-            if active_index is None:
-                active_index = state.patterns_state.get("active_index", 0)
-
-            if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
-                state.patterns_analysis_workspace.destroy()
-
-            from gui.patterns.patterns_layout import PatternsAnalysis
-            try:
-                state.patterns_analysis_workspace = PatternsAnalysis(
-                    self,
-                    initial_games=initial_games,
-                    target_game=target_game,
-                    active_index=active_index
-                )
-            except TypeError:
-                try:
-                    state.patterns_analysis_workspace = PatternsAnalysis(
-                        self,
-                        initial_games=initial_games,
-                        target_game=target_game
-                    )
-                except TypeError:
-                    state.patterns_analysis_workspace = PatternsAnalysis(self)
-
-            state.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.patterns_analysis_workspace.tkraise()
-            state.workspace = state.patterns_analysis_workspace
-
         elif target == "calendar":
             if not getattr(state, "calendar_workspace", None):
                 from gui.calendar_workspace import CalendarWorkspace
                 state.calendar_workspace = CalendarWorkspace(self)
-                state.calendar_workspace = state.calendar_workspace
 
             state.calendar_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
             state.calendar_workspace.tkraise()
