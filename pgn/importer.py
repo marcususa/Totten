@@ -47,10 +47,8 @@ def import_pgn():
     if not filename:
         return
 
-    # Set active importing flag for external menu tracking / pollers
     state.is_importing = True
 
-    # WorkspaceManager safe lookup helper
     ws_manager = getattr(state, "workspace", None)
     root_window = None
     if ws_manager:
@@ -81,17 +79,14 @@ def import_pgn():
     if not hasattr(state, 'pgn_lookup'):
         state.pgn_lookup = {}
 
-    # Check duplicate in memory
     if filename in state.imported_files:
         set_status_message(f"{short_name} is already imported.")
         state.is_importing = False
         return
 
-    # Start progress bar for Phase 1 (Reading file)
     start_progress(indeterminate=False)
-    set_status_message(f"Reading {short_name}...")
+    set_status_message(f"Reading and caching {short_name}...")
 
-    # Smoothly climb from 0% to 48% while reading
     def start_phase_1_ticker():
         def tick(val=0.0):
             if getattr(state, "is_importing", False) and val < 0.48:
@@ -104,7 +99,7 @@ def import_pgn():
 
     start_phase_1_ticker()
 
-    # --- 1. Parse PGN Games into memory ---
+    # --- 1. Parse PGN Games into memory with raw string caching ---
     games = []
     try:
         with open(filename, "r", encoding="utf-8", errors="replace") as pgn_file:
@@ -112,6 +107,8 @@ def import_pgn():
                 game = chess.pgn.read_game(pgn_file)
                 if game is None:
                     break
+                exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+                game.cached_pgn_text = game.accept(exporter)
                 games.append(game)
     except Exception as e:
         print(f"Error reading PGN file: {e}")
@@ -127,13 +124,11 @@ def import_pgn():
 
     print(f"3 - Successfully loaded {len(games)} games from {short_name}")
 
-    # --- 2. Handle progress animation events from background thread ---
     def handle_catalog_progress(event_type):
         if event_type == "phase_1_complete":
             update_progress(0.5)
             set_status_message("Saving to database...")
 
-            # Smoothly climb from 50% to 95% while DuckDB saves
             def tick_db(val=0.5):
                 if getattr(state, "is_importing", False) and val < 0.95:
                     new_val = val + 0.02
@@ -151,51 +146,52 @@ def import_pgn():
         state.is_importing = False
         stop_progress()
 
-        # Update Sidebar Tree
         tree_widget = getattr(state, 'sidebar_tree', getattr(state, 'tree', None))
         parent_node = getattr(state, 'pgn_games_node', '')
 
         if tree_widget and hasattr(tree_widget, 'insert'):
-            pgn_item = tree_widget.insert(
-                parent_node,
-                0,
-                text=short_name,
-                open=True
-            )
-            if not hasattr(state, 'pgn_item_lookup'):
-                state.pgn_item_lookup = {}
-            state.pgn_item_lookup[filename] = pgn_item
+            try:
+                pgn_item = tree_widget.insert(
+                    parent_node,
+                    0,
+                    text=short_name,
+                    open=True
+                )
+                if not hasattr(state, 'pgn_item_lookup'):
+                    state.pgn_item_lookup = {}
+                state.pgn_item_lookup[filename] = pgn_item
+                tree_widget.insert(pgn_item, "end", text="Game Data")
+            except Exception:
+                pass
 
-            tree_widget.insert(pgn_item, "end", text="Game Data")
+        def execute_full_refresh():
+            # 1. Switch active workspace view using state.show_workspace if available
+            if hasattr(state, "show_workspace") and callable(state.show_workspace):
+                for key in ["search_catalog", "catalog", "search", "catalog_workspace"]:
+                    try:
+                        state.show_workspace(key)
+                        break
+                    except Exception:
+                        continue
 
-        # Refresh Workspace Views safely using attribute checks
-        ws = getattr(state, 'workspace', None)
-        if ws:
-            for cat_key in ["catalog", "search_catalog", "search", "catalog_workspace"]:
-                cat_ws = getattr(ws, cat_key, None)
-                if cat_ws:
-                    if hasattr(cat_ws, 'load_catalog'):
-                        cat_ws.load_catalog()
-                    elif hasattr(cat_ws, 'load_data'):
-                        cat_ws.load_data()
-
-            imp_ws = getattr(ws, 'import_ws', getattr(ws, 'import', None))
-            if imp_ws:
-                if hasattr(imp_ws, "filename"):
-                    imp_ws.filename = filename
-                if hasattr(imp_ws, "refresh_view"):
-                    imp_ws.refresh_view()
-
-            # Ensure we affirmatively land and stay on the search catalog workspace
-            if hasattr(ws, 'show_workspace'):
-                for key in ["search_catalog", "catalog_workspace", "catalog", "search"]:
-                    if hasattr(ws, key):
-                        ws.show_workspace(key)
+            # 2. Directly grab the workspace manager or frame and force load_catalog()
+            ws_mgr = getattr(state, "workspace", None)
+            if ws_mgr:
+                for key in ["search_catalog", "catalog", "search", "catalog_workspace"]:
+                    workspace_instance = getattr(ws_mgr, key, None)
+                    if workspace_instance and hasattr(workspace_instance, "load_catalog"):
+                        workspace_instance.load_catalog()
+                        if hasattr(workspace_instance, "update_idletasks"):
+                            workspace_instance.update_idletasks()
                         break
 
-        set_status_message(f"Added {short_name} ({len(games)} games) to catalog.")
+            set_status_message(f"Added {short_name} ({len(games)} games) to catalog.")
 
-    # --- 3. Kick off database building in the background thread ---
+        if root_window and hasattr(root_window, "after"):
+            root_window.after(100, execute_full_refresh)
+        else:
+            execute_full_refresh()
+
     try:
         if hasattr(catalog_builder, "run_import_in_background"):
             catalog_builder.run_import_in_background(
