@@ -36,17 +36,18 @@ def catalog_pgns(filename, progress_callback=None):
 
     con = duckdb.connect(str(DB_Path))
     con.execute("""
-        CREATE TABLE IF NOT EXISTS catalog_headers
-        (
-            game_index INTEGER,
-            eco VARCHAR,
-            opening VARCHAR,
-            variation VARCHAR,
-            white VARCHAR,
-            black VARCHAR,
-            headers_json VARCHAR
-        )
-    """)
+            CREATE TABLE IF NOT EXISTS catalog_headers
+            (
+                game_index INTEGER,
+                eco VARCHAR,
+                opening VARCHAR,
+                variation VARCHAR,
+                white VARCHAR,
+                black VARCHAR,
+                headers_json VARCHAR,
+                pgn_text VARCHAR
+            )
+        """)
 
     # Get current max index to append properly
     max_idx_res = con.execute("SELECT MAX(game_index) FROM catalog_headers").fetchone()
@@ -85,7 +86,8 @@ def catalog_pgns(filename, progress_callback=None):
                 variation,
                 white,
                 black,
-                json.dumps(headers)
+                json.dumps(headers),
+                pgn_string
             ))
             added_count += 1
 
@@ -97,9 +99,9 @@ def catalog_pgns(filename, progress_callback=None):
     if games_to_insert:
         set_status_message("Saving to database...")
         con.executemany("""
-            INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, games_to_insert)
+                INSERT INTO catalog_headers (game_index, eco, opening, variation, white, black, headers_json, pgn_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, games_to_insert)
 
     con.close()
 
