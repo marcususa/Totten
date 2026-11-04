@@ -26,8 +26,8 @@ class CatalogLoaderMixin:
                     conn.close()
                     print("[Catalog Loader] Table 'catalog_headers' not found in DuckDB.")
                     self.aggregated_games_data = []
-                    self.refresh_current_view()
-                    set_status_message("Catalog is empty. Import a Pgn to begin.")
+                    self._safe_refresh_view()
+                    set_status_message("Catalog is empty. Import a PGN to begin.")
                     return
 
                 if is_startup:
@@ -79,10 +79,8 @@ class CatalogLoaderMixin:
 
                 self.aggregated_games_data = list(aggregated.values())
 
-                # Ensure the UI thread repaints and builds the 12 opening buttons immediately
-                if hasattr(self, "update_idletasks"):
-                    self.update_idletasks()
-                self.refresh_current_view()
+                # Safely repaint the UI via our debounced safe refresh dispatcher
+                self._safe_refresh_view()
 
                 if is_startup:
                     set_status_message("Catalog loaded (Startup Sample - 500 games).")
@@ -95,7 +93,7 @@ class CatalogLoaderMixin:
 
         print("[Catalog Loader] DuckDB file not found. Initializing empty view.")
         self.aggregated_games_data = []
-        self.refresh_current_view()
+        self._safe_refresh_view()
         set_status_message("Catalog database not found. Import a PGN.")
 
     def load_catalog(self):
@@ -197,6 +195,6 @@ class CatalogLoaderMixin:
                     "instances": instances
                 })
 
-        self.refresh_current_view()
+        self._safe_refresh_view()
         set_status_message(f"ECO {target_cat} loaded.")
         update_progress(1.0)

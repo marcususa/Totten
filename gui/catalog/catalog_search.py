@@ -40,9 +40,6 @@ class CatalogSearchMixin:
         except Exception:
             return ""
 
-    def apply_filter(self):
-        self.refresh_current_view()
-
     def select_primary_tag(self, tag):
         self.active_primary_tag = tag
         self.active_extra_columns.clear()

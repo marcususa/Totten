@@ -40,12 +40,10 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
         self.db_path = self.root_dir / "personal_catalog.duckdb"
         self._load_preferences()
 
-        self.eco_list_path = self.root_dir / "pgn" / "eco" / "eco_list.json"
-        self.eco_list_fallback = self.root_dir / "eco_list.json"
-
         self.catalog = {}
         self.aggregated_games_data = []
-        self.eco_tree_data = self._load_eco_list_json()
+        self.search_flat_results = None
+        self._is_refreshing = False  # Race-condition lock flag
 
         self.page_size = 12
 
@@ -53,46 +51,23 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
             state.catalog_state["recent_openings"] = []
 
         self.active_opening_filter = state.catalog_state.get("active_opening_filter", None)
-
-        self.active_primary_tag = "Variation"
-        self.active_extra_columns = set()
+        self.active_eco_letter = None
 
         self.expanded_groups = set()
         self.group_display_limits = {}
-        self.expanded_tree_openings = set()
         self.lazy_loaded_instances = {}
 
+        # 1. Build the single-column UI layout once
         self._build_ui()
 
-        # 1. Instantly pull the full opening summary via DuckDB GROUP BY
-        self.load_catalog_summary_from_duckdb()
-
-        # 2. Rebuild the 12-button grid and tree using the loaded summary
-        self._rebuild_opening_grid()
-
-        # 3. Paint the initial view
-        self.refresh_current_view()
-
-        # 4. Run secondary checks in background, then refresh counts on the main thread
-        def _background_load_wrapper():
+        # 2. Single startup load and render (defer background thread to prevent startup race)
+        def _startup_load():
+            self.load_catalog_summary_from_duckdb()
+            self._safe_refresh_view()
             if hasattr(self, "check_and_load_catalog"):
                 self.check_and_load_catalog()
-            self.after(0, self.load_catalog)
 
-        threading.Thread(target=_background_load_wrapper, daemon=True).start()
-
-    def _load_eco_list_json(self):
-        target_path = self.eco_list_path if self.eco_list_path.exists() else self.eco_list_fallback
-        if not target_path.exists():
-            return {}
-        try:
-            with open(target_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception as e:
-            print(f"[ECO List Error] {e}")
-        return {}
+        threading.Thread(target=_startup_load, daemon=True).start()
 
     def _load_preferences(self):
         if self.json_path.exists():
