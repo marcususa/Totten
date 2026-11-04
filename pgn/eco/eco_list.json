@@ -1,0 +1,6154 @@
+{
+  "Unknown Opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Polish (Sokolsky) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Polish": {
+    "Tuebingen variation": [
+      "A00"
+    ],
+    "Outflank variation": [
+      "A00"
+    ]
+  },
+  "Benko's opening": {
+    "Main Line": [
+      "A00"
+    ],
+    "reversed Alekhine": [
+      "A00"
+    ]
+  },
+  "Lasker simul special": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Grob's attack": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Grob": {
+    "spike attack": [
+      "A00"
+    ],
+    "Fritz gambit": [
+      "A00"
+    ],
+    "Romford counter-gambit": [
+      "A00"
+    ]
+  },
+  "Clemenz (Mead's, Basman's or de Klerk's) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Global opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Amar (Paris) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Amar gambit": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Dunst (Sleipner, Heinrichsen) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Battambang opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Novosibirsk opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Anderssen's opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Ware (Meadow Hay) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Crab opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Saragossa opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Mieses opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Valencia opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Venezolana opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Van't Kruijs opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Amsterdam attack": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Gedult's opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Hammerschlag (Fried fox/Pork chop opening)": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Anti-Borg (Desprez) opening": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Durkin's attack": {
+    "Main Line": [
+      "A00"
+    ]
+  },
+  "Nimzovich-Larsen attack": {
+    "Main Line": [
+      "A01"
+    ],
+    "modern variation": [
+      "A01"
+    ],
+    "Indian variation": [
+      "A01"
+    ],
+    "classical variation": [
+      "A01"
+    ],
+    "English variation": [
+      "A01"
+    ],
+    "Dutch variation": [
+      "A01"
+    ],
+    "Polish variation": [
+      "A01"
+    ],
+    "symmetrical variation": [
+      "A01"
+    ]
+  },
+  "Bird's opening": {
+    "Main Line": [
+      "A02",
+      "A03"
+    ],
+    "Williams gambit": [
+      "A03"
+    ],
+    "Lasker variation": [
+      "A03"
+    ]
+  },
+  "Bird": {
+    "From gambit": [
+      "A02"
+    ],
+    "From gambit, Lasker variation": [
+      "A02"
+    ],
+    "From gambit, Lipke variation": [
+      "A02"
+    ],
+    "Hobbs gambit": [
+      "A02"
+    ]
+  },
+  "Bird's opening, Swiss gambit": {
+    "Main Line": [
+      "A02"
+    ]
+  },
+  "Mujannah opening": {
+    "Main Line": [
+      "A03"
+    ]
+  },
+  "Reti opening": {
+    "Main Line": [
+      "A04",
+      "A05",
+      "A06",
+      "A09"
+    ]
+  },
+  "Reti v Dutch": {
+    "Main Line": [
+      "A04"
+    ]
+  },
+  "Reti": {
+    "Pirc-Lisitsin gambit": [
+      "A04"
+    ],
+    "Lisitsin gambit deferred": [
+      "A04"
+    ],
+    "Wade defence": [
+      "A04"
+    ],
+    "Herrstroem gambit": [
+      "A04"
+    ],
+    "King's Indian attack, Spassky's variation": [
+      "A05"
+    ],
+    "King's Indian attack": [
+      "A05",
+      "A07",
+      "A08"
+    ],
+    "King's Indian attack, Reti-Smyslov variation": [
+      "A05"
+    ],
+    "old Indian attack": [
+      "A06"
+    ],
+    "Nimzovich-Larsen attack": [
+      "A06"
+    ],
+    "King's Indian attack (Barcza system)": [
+      "A07"
+    ],
+    "King's Indian attack, Yugoslav variation": [
+      "A07"
+    ],
+    "King's Indian attack, Keres variation": [
+      "A07"
+    ],
+    "King's Indian attack, Pachman system": [
+      "A07"
+    ],
+    "King's Indian attack (with ...c5)": [
+      "A07"
+    ],
+    "King's Indian attack, French variation": [
+      "A08"
+    ],
+    "advance variation": [
+      "A09"
+    ]
+  },
+  "Santasiere's folly": {
+    "Main Line": [
+      "A06"
+    ]
+  },
+  "Tennison (Lemberg, Zukertort) gambit": {
+    "Main Line": [
+      "A06"
+    ]
+  },
+  "Reti accepted": {
+    "Main Line": [
+      "A09"
+    ],
+    "Keres variation": [
+      "A09"
+    ]
+  },
+  "English opening": {
+    "Main Line": [
+      "A10",
+      "A13",
+      "A15",
+      "A16",
+      "A17",
+      "A20",
+      "A21",
+      "A22"
+    ],
+    "Agincourt variation": [
+      "A13"
+    ]
+  },
+  "English": {
+    "Adorjan defence": [
+      "A10"
+    ],
+    "Jaenisch gambit": [
+      "A10"
+    ],
+    "Anglo-Dutch defense": [
+      "A10"
+    ],
+    "Caro-Kann defensive system": [
+      "A11",
+      "A12"
+    ],
+    "Torre defensive system": [
+      "A12"
+    ],
+    "London defensive system": [
+      "A12"
+    ],
+    "Bled variation": [
+      "A12"
+    ],
+    "New York (London) defensive system": [
+      "A12"
+    ],
+    "Capablanca's variation": [
+      "A12"
+    ],
+    "Caro-Kann defensive system, Bogolyubov variation": [
+      "A12"
+    ],
+    "Romanishin gambit": [
+      "A13"
+    ],
+    "Wimpey system": [
+      "A13"
+    ],
+    "Kurajica defence": [
+      "A13"
+    ],
+    "Neo-Catalan": [
+      "A13"
+    ],
+    "Neo-Catalan accepted": [
+      "A13"
+    ],
+    "Neo-Catalan declined": [
+      "A14"
+    ],
+    "Symmetrical, Keres defence": [
+      "A14"
+    ],
+    "Anglo-Gruenfeld defense": [
+      "A16"
+    ],
+    "Anglo-Gruenfeld, Smyslov defense": [
+      "A16"
+    ],
+    "Anglo-Gruenfeld, Czech defense": [
+      "A16"
+    ],
+    "Anglo-Gruenfeld defense, Korchnoi variation": [
+      "A16"
+    ],
+    "Queens Indian formation": [
+      "A17"
+    ],
+    "Queens Indian, Romanishin variation": [
+      "A17"
+    ],
+    "Nimzo-English opening": [
+      "A17"
+    ],
+    "Mikenas-Carls variation": [
+      "A18"
+    ],
+    "Mikenas-Carls, Flohr variation": [
+      "A18"
+    ],
+    "Mikenas-Carls, Kevitz variation": [
+      "A18"
+    ],
+    "Mikenas-Carls, Sicilian variation": [
+      "A19"
+    ],
+    "Bellon gambit": [
+      "A22"
+    ],
+    "Carls' Bremen system": [
+      "A22"
+    ],
+    "Bremen, reverse dragon": [
+      "A22"
+    ],
+    "Bremen, Smyslov system": [
+      "A22"
+    ],
+    "Bremen system, Keres variation": [
+      "A23"
+    ],
+    "Bremen system with ...g6": [
+      "A24"
+    ],
+    "Sicilian reversed": [
+      "A25"
+    ],
+    "closed system": [
+      "A25",
+      "A26"
+    ],
+    "closed, Taimanov variation": [
+      "A25"
+    ],
+    "closed, Hort variation": [
+      "A25"
+    ],
+    "closed, 5.Rb1": [
+      "A25"
+    ],
+    "closed, 5.Rb1 Taimanov variation": [
+      "A25"
+    ],
+    "closed system (without ...d6)": [
+      "A25"
+    ],
+    "Botvinnik system": [
+      "A26"
+    ],
+    "three knights system": [
+      "A27"
+    ],
+    "four knights system": [
+      "A28"
+    ],
+    "Nenarokov variation": [
+      "A28"
+    ],
+    "Bradley Beach variation": [
+      "A28"
+    ],
+    "four knights, Nimzovich variation": [
+      "A28"
+    ],
+    "four knights, Marini variation": [
+      "A28"
+    ],
+    "four knights, Capablanca variation": [
+      "A28"
+    ],
+    "four knights, 4.e3": [
+      "A28"
+    ],
+    "four knights, Stean variation": [
+      "A28"
+    ],
+    "four knights, Romanishin variation": [
+      "A28"
+    ],
+    "four knights, kingside fianchetto": [
+      "A29"
+    ],
+    "symmetrical variation": [
+      "A30",
+      "A32",
+      "A33",
+      "A34",
+      "A35",
+      "A36",
+      "A37",
+      "A38"
+    ],
+    "symmetrical, hedgehog system": [
+      "A30"
+    ],
+    "symmetrical, hedgehog, flexible formation": [
+      "A30"
+    ],
+    "symmetrical, Benoni formation": [
+      "A31"
+    ],
+    "symmetrical, Geller variation": [
+      "A33"
+    ],
+    "symmetrical, three knights system": [
+      "A34"
+    ],
+    "symmetrical, Rubinstein system": [
+      "A34"
+    ],
+    "symmetrical, four knights system": [
+      "A35"
+    ],
+    "ultra-symmetrical variation": [
+      "A36"
+    ],
+    "symmetrical, Botvinnik system reversed": [
+      "A36",
+      "A37"
+    ],
+    "symmetrical, Botvinnik system": [
+      "A36"
+    ],
+    "symmetrical, main line with d3": [
+      "A38"
+    ],
+    "symmetrical, main line with b3": [
+      "A38"
+    ],
+    "symmetrical, main line with d4": [
+      "A39"
+    ]
+  },
+  "English, 1...Nf6 (Anglo-Indian defense)": {
+    "Main Line": [
+      "A15"
+    ]
+  },
+  "English orang-utan": {
+    "Main Line": [
+      "A15"
+    ]
+  },
+  "English, Nimzovich variation": {
+    "Main Line": [
+      "A20"
+    ]
+  },
+  "English, Nimzovich, Flohr variation": {
+    "Main Line": [
+      "A20"
+    ]
+  },
+  "English, Troeger defence": {
+    "Main Line": [
+      "A21"
+    ]
+  },
+  "English, Keres variation": {
+    "Main Line": [
+      "A21"
+    ]
+  },
+  "English, Smyslov defence": {
+    "Main Line": [
+      "A21"
+    ]
+  },
+  "English, Kramnik-Shirov counterattack": {
+    "Main Line": [
+      "A21"
+    ]
+  },
+  "Queen's pawn": {
+    "Main Line": [
+      "A40"
+    ],
+    "Lundin (Kevitz-Mikenas) defence": [
+      "A40"
+    ],
+    "Charlick (Englund) gambit": [
+      "A40"
+    ],
+    "Englund gambit": [
+      "A40"
+    ],
+    "English defence": [
+      "A40"
+    ],
+    "Keres defence": [
+      "A40"
+    ],
+    "Franco-Indian (Keres) defence": [
+      "A40"
+    ],
+    "Bronstein gambit": [
+      "A45"
+    ],
+    "Torre attack": [
+      "A46"
+    ],
+    "Torre attack, Wagner gambit": [
+      "A46"
+    ],
+    "Yusupov-Rubinstein system": [
+      "A46"
+    ],
+    "stonewall attack": [
+      "D00"
+    ],
+    "Chigorin variation": [
+      "D00"
+    ],
+    "Anti-Veresov": [
+      "D00"
+    ],
+    "Mengarini attack": [
+      "E60"
+    ]
+  },
+  "Polish defence": {
+    "Main Line": [
+      "A40"
+    ]
+  },
+  "Modern defence": {
+    "Main Line": [
+      "A40",
+      "A41"
+    ],
+    "Averbakh system": [
+      "A42"
+    ],
+    "Averbakh system, Randspringer variation": [
+      "A42"
+    ],
+    "Averbakh system, Kotov variation": [
+      "A42"
+    ]
+  },
+  "Beefeater defence": {
+    "Main Line": [
+      "A40"
+    ]
+  },
+  "Queen's Pawn": {
+    "Main Line": [
+      "A41"
+    ]
+  },
+  "Old Indian": {
+    "Tartakower (Wade) variation": [
+      "A41"
+    ],
+    "Janowski variation": [
+      "A53"
+    ],
+    "Ukrainian variation": [
+      "A54"
+    ],
+    "Dus-Khotimirsky variation": [
+      "A54"
+    ],
+    "Ukrainian variation, 4.Nf3": [
+      "A54"
+    ],
+    "main line": [
+      "A55"
+    ]
+  },
+  "Old Indian defence": {
+    "Main Line": [
+      "A41",
+      "A53"
+    ]
+  },
+  "Robatsch defence": {
+    "Rossolimo variation": [
+      "A41"
+    ],
+    "three pawns attack": [
+      "B06"
+    ],
+    "Main Line": [
+      "B06"
+    ],
+    "Gurgenidze variation": [
+      "B06"
+    ],
+    "two knights variation": [
+      "B06"
+    ],
+    "two knights, Suttles variation": [
+      "B06"
+    ],
+    "Pseudo-Austrian attack": [
+      "B06"
+    ],
+    "Geller's system": [
+      "B07"
+    ]
+  },
+  "Pterodactyl defence": {
+    "Main Line": [
+      "A42"
+    ]
+  },
+  "Old Benoni defence": {
+    "Main Line": [
+      "A43",
+      "A44"
+    ]
+  },
+  "Old Benoni": {
+    "Franco-Benoni defence": [
+      "A43"
+    ],
+    "Mujannah formation": [
+      "A43"
+    ],
+    "Schmid's system": [
+      "A43"
+    ]
+  },
+  "Woozle defence": {
+    "Main Line": [
+      "A43"
+    ]
+  },
+  "Hawk (Habichd) defence": {
+    "Main Line": [
+      "A43"
+    ]
+  },
+  "Semi-Benoni (`blockade variation')": {
+    "Main Line": [
+      "A44"
+    ]
+  },
+  "Queen's pawn game": {
+    "Main Line": [
+      "A45",
+      "A46",
+      "A50",
+      "D00",
+      "D02",
+      "D04",
+      "D05",
+      "E00",
+      "E10"
+    ]
+  },
+  "Canard opening": {
+    "Main Line": [
+      "A45"
+    ]
+  },
+  "Paleface attack": {
+    "Main Line": [
+      "A45"
+    ]
+  },
+  "Blackmar-Diemer gambit": {
+    "Main Line": [
+      "A45",
+      "D00"
+    ]
+  },
+  "Gedult attack": {
+    "Main Line": [
+      "A45"
+    ]
+  },
+  "Trompovsky attack (Ruth, Opovcensky opening)": {
+    "Main Line": [
+      "A45"
+    ]
+  },
+  "Doery defence": {
+    "Main Line": [
+      "A46",
+      "E10"
+    ]
+  },
+  "Queen's Indian defence": {
+    "Main Line": [
+      "A47",
+      "E12"
+    ]
+  },
+  "Queen's Indian": {
+    "Marienbad system": [
+      "A47"
+    ],
+    "Marienbad system, Berg variation": [
+      "A47"
+    ],
+    "Miles variation": [
+      "E12"
+    ],
+    "Petrosian system": [
+      "E12"
+    ],
+    "4.Nc3": [
+      "E12"
+    ],
+    "4.Nc3, Botvinnik variation": [
+      "E12"
+    ],
+    "4.Nc3, main line": [
+      "E13"
+    ],
+    "4.e3": [
+      "E14"
+    ],
+    "Averbakh variation": [
+      "E14"
+    ],
+    "4.g3": [
+      "E15"
+    ],
+    "Nimzovich variation (exaggerated fianchetto)": [
+      "E15"
+    ],
+    "4.g3 Bb7": [
+      "E15"
+    ],
+    "Rubinstein variation": [
+      "E15"
+    ],
+    "Buerger variation": [
+      "E15"
+    ],
+    "Capablanca variation": [
+      "E16"
+    ],
+    "Yates variation": [
+      "E16"
+    ],
+    "Riumin variation": [
+      "E16"
+    ],
+    "5.Bg2 Be7": [
+      "E17"
+    ],
+    "anti-Queen's Indian system": [
+      "E17"
+    ],
+    "Opovcensky variation": [
+      "E17"
+    ],
+    "old main line, 6.O-O": [
+      "E17"
+    ],
+    "Euwe variation": [
+      "E17"
+    ],
+    "old main line, 7.Nc3": [
+      "E18"
+    ],
+    "old main line, 9.Qxc3": [
+      "E19"
+    ]
+  },
+  "King's Indian": {
+    "East Indian defence": [
+      "A48"
+    ],
+    "Torre attack": [
+      "A48"
+    ],
+    "London system": [
+      "A48"
+    ],
+    "fianchetto without c4": [
+      "A49"
+    ],
+    "Anti-Gruenfeld": [
+      "E60"
+    ],
+    "Danube gambit": [
+      "E60"
+    ],
+    "3.g3": [
+      "E60"
+    ],
+    "3.g3, counterthrust variation": [
+      "E60"
+    ],
+    "Smyslov system": [
+      "E61"
+    ],
+    "fianchetto variation": [
+      "E62"
+    ],
+    "fianchetto, Larsen system": [
+      "E62"
+    ],
+    "fianchetto, Kavalek (Bronstein) variation": [
+      "E62"
+    ],
+    "fianchetto with ...Nc6": [
+      "E62"
+    ],
+    "fianchetto, Uhlmann (Szabo) variation": [
+      "E62"
+    ],
+    "fianchetto, lesser Simagin (Spassky) variation": [
+      "E62"
+    ],
+    "fianchetto, Simagin variation": [
+      "E62"
+    ],
+    "fianchetto, Panno variation": [
+      "E63"
+    ],
+    "fianchetto, Yugoslav system": [
+      "E64"
+    ],
+    "fianchetto, Yugoslav, 7.O-O": [
+      "E65"
+    ],
+    "fianchetto, Yugoslav Panno": [
+      "E66"
+    ],
+    "fianchetto with ...Nd7": [
+      "E67"
+    ],
+    "fianchetto, classical variation": [
+      "E67"
+    ],
+    "fianchetto, classical variation, 8.e4": [
+      "E68"
+    ],
+    "fianchetto, classical main line": [
+      "E69"
+    ],
+    "4.e4": [
+      "E70"
+    ],
+    "Kramer system": [
+      "E70"
+    ],
+    "accelerated Averbakh system": [
+      "E70"
+    ],
+    "Makagonov system (5.h3)": [
+      "E71"
+    ],
+    "Pomar system": [
+      "E72"
+    ],
+    "5.Be2": [
+      "E73"
+    ],
+    "Semi-Averbakh system": [
+      "E73"
+    ],
+    "Averbakh system": [
+      "E73"
+    ],
+    "Averbakh, 6...c5": [
+      "E74"
+    ],
+    "Averbakh, main line": [
+      "E75"
+    ],
+    "Four pawns attack": [
+      "E76",
+      "E77"
+    ],
+    "Four pawns attack, dynamic line": [
+      "E76"
+    ],
+    "Four pawns attack, 6.Be2": [
+      "E77"
+    ],
+    "Six pawns attack": [
+      "E77"
+    ],
+    "Four pawns attack, Florentine gambit": [
+      "E77"
+    ],
+    "Four pawns attack, with Be2 and Nf3": [
+      "E78"
+    ],
+    "Four pawns attack, main line": [
+      "E79"
+    ],
+    "Saemisch variation": [
+      "E80"
+    ],
+    "Saemisch, 5...O-O": [
+      "E81"
+    ],
+    "Saemisch, Byrne variation": [
+      "E81"
+    ],
+    "Saemisch, double fianchetto variation": [
+      "E82"
+    ],
+    "Saemisch, 6...Nc6": [
+      "E83"
+    ],
+    "Saemisch, Ruban variation": [
+      "E83"
+    ],
+    "Saemisch, Panno formation": [
+      "E83"
+    ],
+    "Saemisch, Panno main line": [
+      "E84"
+    ],
+    "Saemisch, orthodox variation": [
+      "E85"
+    ],
+    "Saemisch, orthodox, 7.Nge2 c6": [
+      "E86"
+    ],
+    "Saemisch, orthodox, 7.d5": [
+      "E87"
+    ],
+    "Saemisch, orthodox, Bronstein variation": [
+      "E87"
+    ],
+    "Saemisch, orthodox, 7.d5 c6": [
+      "E88"
+    ],
+    "Saemisch, orthodox main line": [
+      "E89"
+    ],
+    "5.Nf3": [
+      "E90"
+    ],
+    "Larsen variation": [
+      "E90"
+    ],
+    "Zinnowitz variation": [
+      "E90"
+    ],
+    "6.Be2": [
+      "E91"
+    ],
+    "Kazakh variation": [
+      "E91"
+    ],
+    "classical variation": [
+      "E92"
+    ],
+    "Andersson variation": [
+      "E92"
+    ],
+    "Gligoric-Taimanov system": [
+      "E92"
+    ],
+    "Petrosian system": [
+      "E92"
+    ],
+    "Petrosian system, Stein variation": [
+      "E92"
+    ],
+    "Petrosian system, main line": [
+      "E93"
+    ],
+    "Petrosian system, Keres variation": [
+      "E93"
+    ],
+    "orthodox variation": [
+      "E94"
+    ],
+    "orthodox, Donner variation": [
+      "E94"
+    ],
+    "orthodox, 7...Nbd7": [
+      "E94"
+    ],
+    "orthodox, 7...Nbd7, 8.Re1": [
+      "E95"
+    ],
+    "orthodox, 7...Nbd7, main line": [
+      "E96"
+    ],
+    "orthodox, Aronin-Taimanov variation (Yugoslav attack / Mar del Plata variation)": [
+      "E97"
+    ],
+    "orthodox, Aronin-Taimanov, bayonet attack": [
+      "E97"
+    ],
+    "orthodox, Aronin-Taimanov, 9.Ne1": [
+      "E98"
+    ],
+    "orthodox, Aronin-Taimanov, main line": [
+      "E99"
+    ],
+    "orthodox, Aronin-Taimanov, Benko attack": [
+      "E99"
+    ]
+  },
+  "Kevitz-Trajkovich defence": {
+    "Main Line": [
+      "A50"
+    ]
+  },
+  "Queen's Indian accelerated": {
+    "Main Line": [
+      "A50"
+    ]
+  },
+  "Budapest defence declined": {
+    "Main Line": [
+      "A51"
+    ]
+  },
+  "Budapest": {
+    "Fajarowicz variation": [
+      "A51"
+    ],
+    "Fajarowicz, Steiner variation": [
+      "A51"
+    ],
+    "Adler variation": [
+      "A52"
+    ],
+    "Rubinstein variation": [
+      "A52"
+    ],
+    "Alekhine variation": [
+      "A52"
+    ],
+    "Alekhine, Abonyi variation": [
+      "A52"
+    ],
+    "Alekhine variation, Balogh gambit": [
+      "A52"
+    ]
+  },
+  "Budapest defence": {
+    "Main Line": [
+      "A52"
+    ]
+  },
+  "Benoni defence": {
+    "Main Line": [
+      "A56",
+      "A60",
+      "A61"
+    ]
+  },
+  "Benoni defence, Hromodka system": {
+    "Main Line": [
+      "A56"
+    ]
+  },
+  "Vulture defence": {
+    "Main Line": [
+      "A56"
+    ]
+  },
+  "Czech Benoni defence": {
+    "Main Line": [
+      "A56"
+    ]
+  },
+  "Czech Benoni": {
+    "King's Indian system": [
+      "A56"
+    ]
+  },
+  "Benko gambit": {
+    "Main Line": [
+      "A57",
+      "A59"
+    ],
+    "Zaitsev system": [
+      "A57"
+    ],
+    "Nescafe Frappe attack": [
+      "A57"
+    ],
+    "Nd2 variation": [
+      "A58"
+    ],
+    "fianchetto variation": [
+      "A58"
+    ],
+    "7.e4": [
+      "A59"
+    ],
+    "Ne2 variation": [
+      "A59"
+    ],
+    "main line": [
+      "A59"
+    ]
+  },
+  "Benko gambit half accepted": {
+    "Main Line": [
+      "A57"
+    ]
+  },
+  "Benko gambit accepted": {
+    "Main Line": [
+      "A58"
+    ]
+  },
+  "Benoni": {
+    "Uhlmann variation": [
+      "A61"
+    ],
+    "Nimzovich (knight's tour) variation": [
+      "A61"
+    ],
+    "fianchetto variation": [
+      "A61",
+      "A62"
+    ],
+    "fianchetto, 9...Nbd7": [
+      "A63"
+    ],
+    "fianchetto, 11...Re8": [
+      "A64"
+    ],
+    "6.e4": [
+      "A65"
+    ],
+    "pawn storm variation": [
+      "A66"
+    ],
+    "Mikenas variation": [
+      "A66"
+    ],
+    "Taimanov variation": [
+      "A67"
+    ],
+    "four pawns attack": [
+      "A68"
+    ],
+    "four pawns attack, main line": [
+      "A69"
+    ],
+    "classical with e4 and Nf3": [
+      "A70"
+    ],
+    "classical without 9.O-O": [
+      "A70",
+      "A72"
+    ],
+    "classical, 8.Bg5": [
+      "A71"
+    ],
+    "classical, 9.O-O": [
+      "A73"
+    ],
+    "classical, 9...a6, 10.a4": [
+      "A74"
+    ],
+    "classical with ...a6 and 10...Bg4": [
+      "A75"
+    ],
+    "classical, 9...Re8": [
+      "A76"
+    ],
+    "classical, 9...Re8, 10.Nd2": [
+      "A77"
+    ],
+    "classical with ...Re8 and ...Na6": [
+      "A78"
+    ],
+    "classical, 11.f3": [
+      "A79"
+    ]
+  },
+  "Dutch": {
+    "Main Line": [
+      "A80"
+    ],
+    "Leningrad, Basman system": [
+      "A81"
+    ],
+    "Leningrad, Karlsbad variation": [
+      "A81"
+    ],
+    "Staunton gambit": [
+      "A82"
+    ],
+    "Balogh defence": [
+      "A82"
+    ],
+    "Staunton gambit, Tartakower variation": [
+      "A82"
+    ],
+    "Staunton gambit, Staunton's line": [
+      "A83"
+    ],
+    "Staunton gambit, Alekhine variation": [
+      "A83"
+    ],
+    "Staunton gambit, Lasker variation": [
+      "A83"
+    ],
+    "Staunton gambit, Chigorin variation": [
+      "A83"
+    ],
+    "Staunton gambit, Nimzovich variation": [
+      "A83"
+    ],
+    "Staunton gambit deferred": [
+      "A84"
+    ],
+    "Hort-Antoshin system": [
+      "A86"
+    ],
+    "Leningrad variation": [
+      "A86"
+    ],
+    "Leningrad, main variation": [
+      "A87"
+    ],
+    "Leningrad, main variation with c6": [
+      "A88"
+    ],
+    "Leningrad, main variation with Nc6": [
+      "A89"
+    ],
+    "stonewall variation": [
+      "A92"
+    ],
+    "stonewall with Nc3": [
+      "A92",
+      "A95"
+    ],
+    "stonewall, Botwinnik variation": [
+      "A93"
+    ],
+    "stonewall with Ba3": [
+      "A94"
+    ],
+    "stonewall: Chekhover variation": [
+      "A95"
+    ],
+    "classical variation": [
+      "A96"
+    ],
+    "Ilyin-Genevsky variation": [
+      "A97"
+    ],
+    "Ilyin-Genevsky, Winter variation": [
+      "A97"
+    ],
+    "Ilyin-Genevsky variation with Qc2": [
+      "A98"
+    ],
+    "Ilyin-Genevsky variation with b3": [
+      "A99"
+    ]
+  },
+  "Dutch, Spielmann gambit": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch, Manhattan (Alapin, Ulvestad) variation": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch, Von Pretzel gambit": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch, Korchnoi attack": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch, Krejcik gambit": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch, 2.Bg5 variation": {
+    "Main Line": [
+      "A80"
+    ]
+  },
+  "Dutch defence": {
+    "Main Line": [
+      "A81",
+      "A84",
+      "A90",
+      "A91",
+      "A92"
+    ],
+    "Bladel variation": [
+      "A84"
+    ],
+    "Dutch-Indian (Nimzo-Dutch) variation": [
+      "A90"
+    ]
+  },
+  "Dutch defence, Blackburne variation": {
+    "Main Line": [
+      "A81"
+    ]
+  },
+  "Dutch defence, Rubinstein variation": {
+    "Main Line": [
+      "A84"
+    ]
+  },
+  "Dutch with c4 & Nc3": {
+    "Main Line": [
+      "A85"
+    ]
+  },
+  "Dutch with c4 & g3": {
+    "Main Line": [
+      "A86"
+    ]
+  },
+  "Dutch-Indian, Alekhine variation": {
+    "Main Line": [
+      "A90"
+    ]
+  },
+  "Dutch defence, Alekhine variation": {
+    "Main Line": [
+      "A92"
+    ]
+  },
+  "King's pawn opening": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Hippopotamus defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Corn stalk defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Lemming defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Fred": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Barnes defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Fried fox defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Carr's defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Reversed Grob (Borg/Basman defence/macho Grob)": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "St. George (Baker) defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Owen defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "Guatemala defence": {
+    "Main Line": [
+      "B00"
+    ]
+  },
+  "KP": {
+    "Nimzovich defence": [
+      "B00"
+    ],
+    "Nimzovich defence, Wheeler gambit": [
+      "B00"
+    ],
+    "Colorado counter": [
+      "B00"
+    ],
+    "Nimzovich defence, Marshall gambit": [
+      "B00"
+    ],
+    "Nimzovich defence, Bogolyubov variation": [
+      "B00"
+    ],
+    "Neo-Mongoloid defence": [
+      "B00"
+    ],
+    "Indian opening": [
+      "C20"
+    ],
+    "Mengarini's opening": [
+      "C20"
+    ],
+    "King's head opening": [
+      "C20"
+    ],
+    "Patzer opening": [
+      "C20"
+    ],
+    "Napoleon's opening": [
+      "C20"
+    ],
+    "Lopez opening": [
+      "C20"
+    ]
+  },
+  "Scandinavian (centre counter) defence": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Scandinavian defence, Lasker variation": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Scandinavian defence": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Scandinavian defence, Gruenfeld variation": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Scandinavian": {
+    "Anderssen counter-attack": [
+      "B01"
+    ],
+    "Anderssen counter-attack orthodox attack": [
+      "B01"
+    ],
+    "Anderssen counter-attack, Goteborg system": [
+      "B01"
+    ],
+    "Anderssen counter-attack, Collijn variation": [
+      "B01"
+    ],
+    "Pytel-Wade variation": [
+      "B01"
+    ],
+    "Icelandic gambit": [
+      "B01"
+    ],
+    "Marshall variation": [
+      "B01"
+    ],
+    "Kiel variation": [
+      "B01"
+    ],
+    "Richter variation": [
+      "B01"
+    ]
+  },
+  "Scandinavian, Mieses-Kotrvc gambit": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Scandinavian gambit": {
+    "Main Line": [
+      "B01"
+    ]
+  },
+  "Alekhine's defence": {
+    "Main Line": [
+      "B02",
+      "B03"
+    ],
+    "Scandinavian variation": [
+      "B02"
+    ],
+    "Spielmann variation": [
+      "B02"
+    ],
+    "Maroczy variation": [
+      "B02"
+    ],
+    "Krejcik variation": [
+      "B02"
+    ],
+    "Mokele Mbembe (Buecker) variation": [
+      "B02"
+    ],
+    "Brooklyn defence": [
+      "B02"
+    ],
+    "Kmoch variation": [
+      "B02"
+    ],
+    "Saemisch attack": [
+      "B02"
+    ],
+    "Welling variation": [
+      "B02"
+    ],
+    "Steiner variation": [
+      "B02"
+    ],
+    "two pawns' (Lasker's) attack": [
+      "B02"
+    ],
+    "two pawns' attack, Mikenas variation": [
+      "B02"
+    ],
+    "O'Sullivan gambit": [
+      "B03"
+    ],
+    "Balogh variation": [
+      "B03"
+    ],
+    "exchange variation": [
+      "B03"
+    ],
+    "exchange, Karpov variation": [
+      "B03"
+    ],
+    "four pawns attack": [
+      "B03"
+    ],
+    "four pawns attack, Korchnoi variation": [
+      "B03"
+    ],
+    "four pawns attack, 6...Nc6": [
+      "B03"
+    ],
+    "four pawns attack, Ilyin-Genevsky var.": [
+      "B03"
+    ],
+    "four pawns attack, 7.Be3": [
+      "B03"
+    ],
+    "four pawns attack, Tartakower variation": [
+      "B03"
+    ],
+    "four pawns attack, Planinc variation": [
+      "B03"
+    ],
+    "four pawns attack, fianchetto variation": [
+      "B03"
+    ],
+    "four pawns attack, Trifunovic variation": [
+      "B03"
+    ],
+    "modern variation": [
+      "B04"
+    ],
+    "modern, Larsen variation": [
+      "B04"
+    ],
+    "modern, Schmid variation": [
+      "B04"
+    ],
+    "modern, fianchetto variation": [
+      "B04"
+    ],
+    "modern, Keres variation": [
+      "B04"
+    ],
+    "modern variation, 4...Bg4": [
+      "B05"
+    ],
+    "modern, Flohr variation": [
+      "B05"
+    ],
+    "modern, Panov variation": [
+      "B05"
+    ],
+    "modern, Alekhine variation": [
+      "B05"
+    ],
+    "modern, Vitolins attack": [
+      "B05"
+    ]
+  },
+  "Robatsch (modern) defence": {
+    "Main Line": [
+      "B06"
+    ]
+  },
+  "Norwegian defence": {
+    "Main Line": [
+      "B06"
+    ]
+  },
+  "Pirc defence": {
+    "Main Line": [
+      "B07"
+    ]
+  },
+  "Pirc": {
+    "Ufimtsev-Pytel variation": [
+      "B07"
+    ],
+    "150 attack": [
+      "B07"
+    ],
+    "Sveshnikov system": [
+      "B07"
+    ],
+    "Holmov system": [
+      "B07"
+    ],
+    "Byrne variation": [
+      "B07"
+    ],
+    "Chinese variation": [
+      "B07"
+    ],
+    "bayonet (Mariotti) attack": [
+      "B07"
+    ],
+    "classical (two knights) system": [
+      "B08"
+    ],
+    "classical, h3 system": [
+      "B08"
+    ],
+    "classical system, 5.Be2": [
+      "B08"
+    ],
+    "Austrian attack": [
+      "B09"
+    ],
+    "Austrian attack, 6.e5": [
+      "B09"
+    ],
+    "Austrian attack, 6.Be3": [
+      "B09"
+    ],
+    "Austrian attack, 6.Bd3": [
+      "B09"
+    ],
+    "Austrian attack, dragon formation": [
+      "B09"
+    ],
+    "Austrian attack, Ljubojevic variation": [
+      "B09"
+    ]
+  },
+  "Caro-Kann defence": {
+    "Main Line": [
+      "B10",
+      "B12",
+      "B15"
+    ]
+  },
+  "Caro-Kann": {
+    "Hillbilly attack": [
+      "B10"
+    ],
+    "anti-Caro-Kann defence": [
+      "B10"
+    ],
+    "anti-anti-Caro-Kann defence": [
+      "B10"
+    ],
+    "closed (Breyer) variation": [
+      "B10"
+    ],
+    "Goldman (Spielmann) variation": [
+      "B10"
+    ],
+    "two knights variation": [
+      "B10"
+    ],
+    "two knights, 3...Bg4": [
+      "B11"
+    ],
+    "Tartakower (fantasy) variation": [
+      "B12"
+    ],
+    "3.Nd2": [
+      "B12"
+    ],
+    "Edinburgh variation": [
+      "B12"
+    ],
+    "advance variation": [
+      "B12"
+    ],
+    "advance, Short variation": [
+      "B12"
+    ],
+    "exchange variation": [
+      "B13"
+    ],
+    "exchange, Rubinstein variation": [
+      "B13"
+    ],
+    "Panov-Botvinnik attack": [
+      "B13"
+    ],
+    "Panov-Botvinnik, Gunderam attack": [
+      "B13"
+    ],
+    "Panov-Botvinnik, Herzog defence": [
+      "B13"
+    ],
+    "Panov-Botvinnik, normal variation": [
+      "B13"
+    ],
+    "Panov-Botvinnik, Czerniak variation": [
+      "B13"
+    ],
+    "Panov-Botvinnik, Reifir (Spielmann) variation": [
+      "B13"
+    ],
+    "Panov-Botvinnik attack, 5...e6": [
+      "B14"
+    ],
+    "Panov-Botvinnik attack, 5...g6": [
+      "B14"
+    ],
+    "Gurgenidze counter-attack": [
+      "B15"
+    ],
+    "Gurgenidze system": [
+      "B15"
+    ],
+    "Rasa-Studier gambit": [
+      "B15"
+    ],
+    "Alekhine gambit": [
+      "B15"
+    ],
+    "Tartakower (Nimzovich) variation": [
+      "B15"
+    ],
+    "Forgacs variation": [
+      "B15"
+    ],
+    "Bronstein-Larsen variation": [
+      "B16"
+    ],
+    "Steinitz variation": [
+      "B17"
+    ],
+    "classical variation": [
+      "B18"
+    ],
+    "classical, Flohr variation": [
+      "B18"
+    ],
+    "classical, Maroczy attack": [
+      "B18"
+    ],
+    "classical, 6.h4": [
+      "B18"
+    ],
+    "classical, 7...Nd7": [
+      "B19"
+    ],
+    "classical, Spassky variation": [
+      "B19"
+    ]
+  },
+  "de Bruycker defence": {
+    "Main Line": [
+      "B12"
+    ]
+  },
+  "Caro-Masi defence": {
+    "Main Line": [
+      "B12"
+    ]
+  },
+  "Sicilian defence": {
+    "Main Line": [
+      "B20",
+      "B27",
+      "B30",
+      "B32",
+      "B33",
+      "B40",
+      "B44"
+    ]
+  },
+  "Sicilian": {
+    "Gloria variation": [
+      "B20"
+    ],
+    "Steinitz variation": [
+      "B20"
+    ],
+    "wing gambit": [
+      "B20"
+    ],
+    "wing gambit, Santasiere variation": [
+      "B20"
+    ],
+    "wing gambit, Marshall variation": [
+      "B20"
+    ],
+    "wing gambit, Marienbad variation": [
+      "B20"
+    ],
+    "wing gambit, Carlsbad variation": [
+      "B20"
+    ],
+    "Keres variation (2.Ne2)": [
+      "B20"
+    ],
+    "Grand Prix attack": [
+      "B21",
+      "B23"
+    ],
+    "Smith-Morra gambit": [
+      "B21"
+    ],
+    "Andreaschek gambit": [
+      "B21"
+    ],
+    "Smith-Morra gambit, Chicago defence": [
+      "B21"
+    ],
+    "Alapin's variation (2.c3)": [
+      "B22"
+    ],
+    "2.c3, Heidenfeld variation": [
+      "B22"
+    ],
+    "closed": [
+      "B23",
+      "B24",
+      "B25"
+    ],
+    "closed, Korchnoi variation": [
+      "B23"
+    ],
+    "closed, 2...Nc6": [
+      "B23"
+    ],
+    "chameleon variation": [
+      "B23"
+    ],
+    "Grand Prix attack, Schofman variation": [
+      "B23"
+    ],
+    "closed, Smyslov variation": [
+      "B24"
+    ],
+    "closed, 6.Ne2 e5 (Botvinnik)": [
+      "B25"
+    ],
+    "closed, 6.f4": [
+      "B25"
+    ],
+    "closed, 6.f4 e5 (Botvinnik)": [
+      "B25"
+    ],
+    "closed, 6.Be3": [
+      "B26"
+    ],
+    "Stiletto (Althouse) variation": [
+      "B27"
+    ],
+    "Quinteros variation": [
+      "B27"
+    ],
+    "Katalimov variation": [
+      "B27"
+    ],
+    "Hungarian variation": [
+      "B27"
+    ],
+    "Acton extension": [
+      "B27"
+    ],
+    "O'Kelly variation": [
+      "B28"
+    ],
+    "Nimzovich-Rubinstein variation": [
+      "B29"
+    ],
+    "Nimzovich-Rubinstein; Rubinstein counter-gambit": [
+      "B29"
+    ],
+    "Nimzovich-Rossolimo attack (without ...d6)": [
+      "B30"
+    ],
+    "Nimzovich-Rossolimo attack (with ...g6, without ...d6)": [
+      "B31"
+    ],
+    "Nimzovich-Rossolimo attack, Gurgenidze variation": [
+      "B31"
+    ],
+    "Flohr variation": [
+      "B32"
+    ],
+    "Nimzovich variation": [
+      "B32"
+    ],
+    "Labourdonnais-Loewenthal variation": [
+      "B32"
+    ],
+    "Labourdonnais-Loewenthal (Kalashnikov) variation": [
+      "B32"
+    ],
+    "Pelikan (Lasker/Sveshnikov) variation": [
+      "B33"
+    ],
+    "Pelikan, Bird variation": [
+      "B33"
+    ],
+    "Pelikan, Chelyabinsk variation": [
+      "B33"
+    ],
+    "Sveshnikov variation": [
+      "B33"
+    ],
+    "accelerated fianchetto, exchange variation": [
+      "B34"
+    ],
+    "accelerated fianchetto, modern variation": [
+      "B34"
+    ],
+    "accelerated fianchetto, modern variation with Bc4": [
+      "B35"
+    ],
+    "accelerated fianchetto, Maroczy bind": [
+      "B36"
+    ],
+    "accelerated fianchetto, Gurgenidze variation": [
+      "B36"
+    ],
+    "accelerated fianchetto, Maroczy bind, 5...Bg7": [
+      "B37"
+    ],
+    "accelerated fianchetto, Simagin variation": [
+      "B37"
+    ],
+    "accelerated fianchetto, Maroczy bind, 6.Be3": [
+      "B38"
+    ],
+    "accelerated fianchetto, Breyer variation": [
+      "B39"
+    ],
+    "Marshall variation": [
+      "B40"
+    ],
+    "Anderssen variation": [
+      "B40"
+    ],
+    "Pin variation (Sicilian counter-attack)": [
+      "B40"
+    ],
+    "Pin, Jaffe variation": [
+      "B40"
+    ],
+    "Pin, Koch variation": [
+      "B40"
+    ],
+    "Kan variation": [
+      "B41"
+    ],
+    "Kan, Maroczy bind (Reti variation)": [
+      "B41"
+    ],
+    "Kan, Maroczy bind - Bronstein variation": [
+      "B41"
+    ],
+    "Kan, 5.Bd3": [
+      "B42"
+    ],
+    "Kan, Gipslis variation": [
+      "B42"
+    ],
+    "Kan, Polugaievsky variation": [
+      "B42"
+    ],
+    "Kan, Swiss cheese variation": [
+      "B42"
+    ],
+    "Kan, 5.Nc3": [
+      "B43"
+    ],
+    "Taimanov variation": [
+      "B45",
+      "B46",
+      "B48",
+      "B49"
+    ],
+    "Taimanov, American attack": [
+      "B45"
+    ],
+    "Taimanov (Bastrikov) variation": [
+      "B47"
+    ],
+    "Main Line": [
+      "B50",
+      "B54",
+      "B56"
+    ],
+    "wing gambit deferred": [
+      "B50"
+    ],
+    "Canal-Sokolsky (Nimzovich-Rossolimo, Moscow) attack": [
+      "B51"
+    ],
+    "Canal-Sokolsky attack, 3...Bd7": [
+      "B52"
+    ],
+    "Canal-Sokolsky attack, Bronstein gambit": [
+      "B52"
+    ],
+    "Canal-Sokolsky attack, Sokolsky variation": [
+      "B52"
+    ],
+    "Chekhover, Zaitsev variation": [
+      "B53"
+    ],
+    "Prins (Moscow) variation": [
+      "B54"
+    ],
+    "Prins variation, Venice attack": [
+      "B55"
+    ],
+    "Venice attack": [
+      "B56"
+    ],
+    "Sozin, not Scheveningen": [
+      "B57"
+    ],
+    "Magnus Smith trap": [
+      "B57"
+    ],
+    "Sozin, Benko variation": [
+      "B57"
+    ],
+    "classical": [
+      "B58"
+    ],
+    "Boleslavsky variation": [
+      "B58"
+    ],
+    "Boleslavsky, Louma variation": [
+      "B58"
+    ],
+    "Boleslavsky variation, 7.Nb3": [
+      "B59"
+    ],
+    "Richter-Rauzer": [
+      "B60"
+    ],
+    "Richter-Rauzer, Bondarevsky variation": [
+      "B60"
+    ],
+    "Richter-Rauzer, Larsen variation": [
+      "B60"
+    ],
+    "Richter-Rauzer, Larsen variation, 7.Qd2": [
+      "B61"
+    ],
+    "Richter-Rauzer, 6...e6": [
+      "B62"
+    ],
+    "Richter-Rauzer, Podvebrady variation": [
+      "B62"
+    ],
+    "Richter-Rauzer, Margate (Alekhine) variation": [
+      "B62"
+    ],
+    "Richter-Rauzer, Richter attack": [
+      "B62"
+    ],
+    "Richter-Rauzer, Keres variation": [
+      "B62"
+    ],
+    "Richter-Rauzer, Rauzer attack": [
+      "B63"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...Be7": [
+      "B63"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...Be7 defence, 9.f4": [
+      "B64"
+    ],
+    "Richter-Rauzer, Rauzer attack, Geller variation": [
+      "B64"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...Be7 defence, 9...Nxd4": [
+      "B65"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...a6": [
+      "B66"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...a6 defence, 8...Bd7": [
+      "B67"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...a6 defence, 9...Be7": [
+      "B68"
+    ],
+    "Richter-Rauzer, Rauzer attack, 7...a6 defence, 11.Bxf6": [
+      "B69"
+    ],
+    "dragon variation": [
+      "B70"
+    ],
+    "dragon, Levenfish variation": [
+      "B71"
+    ],
+    "dragon, Levenfish; Flohr variation": [
+      "B71"
+    ],
+    "dragon, 6.Be3": [
+      "B72"
+    ],
+    "dragon, classical attack": [
+      "B72"
+    ],
+    "dragon, classical, Amsterdam variation": [
+      "B72"
+    ],
+    "dragon, classical, Grigoriev variation": [
+      "B72"
+    ],
+    "dragon, classical, Nottingham variation": [
+      "B72"
+    ],
+    "dragon, classical, 8.O-O": [
+      "B73"
+    ],
+    "dragon, classical, Zollner gambit": [
+      "B73"
+    ],
+    "dragon, classical, Richter variation": [
+      "B73"
+    ],
+    "dragon, classical, 9.Nb3": [
+      "B74"
+    ],
+    "dragon, classical, Stockholm attack": [
+      "B74"
+    ],
+    "dragon, classical, Spielmann variation": [
+      "B74"
+    ],
+    "dragon, classical, Bernard defence": [
+      "B74"
+    ],
+    "dragon, classical, Reti-Tartakower variation": [
+      "B74"
+    ],
+    "dragon, classical, Alekhine variation": [
+      "B74"
+    ],
+    "dragon, Yugoslav attack": [
+      "B75"
+    ],
+    "dragon, Yugoslav attack, 7...O-O": [
+      "B76"
+    ],
+    "dragon, Yugoslav attack, Rauser variation": [
+      "B76"
+    ],
+    "dragon, Yugoslav attack, 9.Bc4": [
+      "B77"
+    ],
+    "dragon, Yugoslav attack, Byrne variation": [
+      "B77"
+    ],
+    "dragon, Yugoslav attack, 9...Bd7": [
+      "B77"
+    ],
+    "dragon, Yugoslav attack, 10.O-O-O": [
+      "B78"
+    ],
+    "dragon, Yugoslav attack, 12.h4": [
+      "B79"
+    ],
+    "Scheveningen variation": [
+      "B80"
+    ],
+    "Scheveningen, English variation": [
+      "B80"
+    ],
+    "Scheveningen, Vitolins variation": [
+      "B80"
+    ],
+    "Scheveningen, fianchetto variation": [
+      "B80"
+    ],
+    "Scheveningen, Keres attack": [
+      "B81"
+    ],
+    "Scheveningen, 6.f4": [
+      "B82"
+    ],
+    "Scheveningen, Tal variation": [
+      "B82"
+    ],
+    "Scheveningen, 6.Be2": [
+      "B83"
+    ],
+    "modern Scheveningen": [
+      "B83"
+    ],
+    "modern Scheveningen, main line": [
+      "B83"
+    ],
+    "modern Scheveningen, main line with Nb3": [
+      "B83"
+    ],
+    "Scheveningen (Paulsen), classical variation": [
+      "B84"
+    ],
+    "Scheveningen, classical, Nd7 system": [
+      "B84"
+    ],
+    "Scheveningen, classical variation with ...Qc7 and ...Nc6": [
+      "B85"
+    ],
+    "Scheveningen, classical, Maroczy system": [
+      "B85"
+    ],
+    "Scheveningen, classical": [
+      "B85"
+    ],
+    "Scheveningen, classical main line": [
+      "B85"
+    ],
+    "Sozin attack": [
+      "B86"
+    ],
+    "Sozin with ...a6 and ...b5": [
+      "B87"
+    ],
+    "Sozin, Leonhardt variation": [
+      "B88"
+    ],
+    "Sozin, Fischer variation": [
+      "B88"
+    ],
+    "Sozin, 7.Be3": [
+      "B89"
+    ],
+    "Velimirovic attack": [
+      "B89"
+    ],
+    "Najdorf": [
+      "B90"
+    ],
+    "Najdorf, Adams attack": [
+      "B90"
+    ],
+    "Najdorf, Lipnitzky attack": [
+      "B90"
+    ],
+    "Najdorf, Byrne (English) attack": [
+      "B90"
+    ],
+    "Najdorf, Zagreb (fianchetto) variation": [
+      "B91"
+    ],
+    "Najdorf, Opovcensky variation": [
+      "B92"
+    ],
+    "Najdorf, 6.f4": [
+      "B93"
+    ],
+    "Najdorf, 6.Bg5": [
+      "B94"
+    ],
+    "Najdorf, Ivkov variation": [
+      "B94"
+    ],
+    "Najdorf, 6...e6": [
+      "B95"
+    ],
+    "Najdorf, 7.f4": [
+      "B96"
+    ],
+    "Najdorf, Polugayevsky variation": [
+      "B96"
+    ],
+    "Najdorf, Polugayevsky, Simagin variation": [
+      "B96"
+    ],
+    "Najdorf, 7...Qb6": [
+      "B97"
+    ],
+    "Najdorf, Poisoned pawn variation": [
+      "B97"
+    ],
+    "Najdorf, 7...Be7": [
+      "B98"
+    ],
+    "Najdorf, Browne variation": [
+      "B98"
+    ],
+    "Najdorf, Goteborg (Argentine) variation": [
+      "B98"
+    ],
+    "Najdorf variation": [
+      "B98"
+    ],
+    "Najdorf, 7...Be7 main line": [
+      "B99"
+    ]
+  },
+  "Sicilian, Szen (`anti-Taimanov') variation": {
+    "Main Line": [
+      "B44"
+    ]
+  },
+  "Sicilian, Szen, hedgehog variation": {
+    "Main Line": [
+      "B44"
+    ]
+  },
+  "Sicilian, Szen variation, Dely-Kasparov gambit": {
+    "Main Line": [
+      "B44"
+    ]
+  },
+  "Sicilian, Chekhover variation": {
+    "Main Line": [
+      "B53"
+    ]
+  },
+  "French defence": {
+    "Main Line": [
+      "C00",
+      "C11"
+    ]
+  },
+  "French defence, Steiner variation": {
+    "Main Line": [
+      "C00"
+    ]
+  },
+  "French": {
+    "Reti (Spielmann) variation": [
+      "C00"
+    ],
+    "Steinitz attack": [
+      "C00"
+    ],
+    "Labourdonnais variation": [
+      "C00"
+    ],
+    "Wing gambit": [
+      "C00"
+    ],
+    "Pelikan variation": [
+      "C00"
+    ],
+    "Two knights variation": [
+      "C00"
+    ],
+    "Chigorin variation": [
+      "C00"
+    ],
+    "King's Indian attack": [
+      "C00"
+    ],
+    "Reversed Philidor formation": [
+      "C00"
+    ],
+    "Schlechter variation": [
+      "C00"
+    ],
+    "Alapin variation": [
+      "C00"
+    ],
+    "exchange variation": [
+      "C01"
+    ],
+    "exchange, Svenonius variation": [
+      "C01"
+    ],
+    "exchange, Bogolyubov variation": [
+      "C01"
+    ],
+    "advance variation": [
+      "C02"
+    ],
+    "advance, Steinitz variation": [
+      "C02"
+    ],
+    "advance, Nimzovich variation": [
+      "C02"
+    ],
+    "advance, Nimzovich system": [
+      "C02"
+    ],
+    "advance, Wade variation": [
+      "C02"
+    ],
+    "advance, Paulsen attack": [
+      "C02"
+    ],
+    "advance, Milner-Barry gambit": [
+      "C02"
+    ],
+    "advance, Euwe variation": [
+      "C02"
+    ],
+    "Tarrasch": [
+      "C03"
+    ],
+    "Tarrasch, Haberditz variation": [
+      "C03"
+    ],
+    "Tarrasch, Guimard variation": [
+      "C03"
+    ],
+    "Tarrasch, Guimard main line": [
+      "C04"
+    ],
+    "Tarrasch, closed variation": [
+      "C05"
+    ],
+    "Tarrasch, Botvinnik variation": [
+      "C05"
+    ],
+    "Tarrasch, closed variation, main line": [
+      "C06"
+    ],
+    "Tarrasch, Leningrad variation": [
+      "C06"
+    ],
+    "Tarrasch, open variation": [
+      "C07"
+    ],
+    "Tarrasch, Eliskases variation": [
+      "C07"
+    ],
+    "Tarrasch, open, 4.ed ed": [
+      "C08"
+    ],
+    "Tarrasch, open variation, main line": [
+      "C09"
+    ],
+    "Paulsen variation": [
+      "C10"
+    ],
+    "Marshall variation": [
+      "C10"
+    ],
+    "Rubinstein variation": [
+      "C10"
+    ],
+    "Fort Knox variation": [
+      "C10"
+    ],
+    "Rubinstein, Capablanca line": [
+      "C10"
+    ],
+    "Frere (Becker) variation": [
+      "C10"
+    ],
+    "Swiss variation": [
+      "C11"
+    ],
+    "Henneberger variation": [
+      "C11"
+    ],
+    "Steinitz variation": [
+      "C11"
+    ],
+    "Steinitz, Bradford attack": [
+      "C11"
+    ],
+    "Steinitz, Brodsky-Jones variation": [
+      "C11"
+    ],
+    "Steinitz, Boleslavsky variation": [
+      "C11"
+    ],
+    "Steinitz, Gledhill attack": [
+      "C11"
+    ],
+    "Burn variation": [
+      "C11"
+    ],
+    "MacCutcheon variation": [
+      "C12"
+    ],
+    "MacCutcheon, Bogolyubov variation": [
+      "C12"
+    ],
+    "MacCutcheon, advance variation": [
+      "C12"
+    ],
+    "MacCutcheon, Chigorin variation": [
+      "C12"
+    ],
+    "MacCutcheon, Grigoriev variation": [
+      "C12"
+    ],
+    "MacCutcheon, Bernstein variation": [
+      "C12"
+    ],
+    "MacCutcheon, Janowski variation": [
+      "C12"
+    ],
+    "MacCutcheon, Dr. Olland (Dutch) variation": [
+      "C12"
+    ],
+    "MacCutcheon, Tartakower variation": [
+      "C12"
+    ],
+    "MacCutcheon, Lasker variation": [
+      "C12"
+    ],
+    "MacCutcheon, Duras variation": [
+      "C12"
+    ],
+    "MacCutcheon, Lasker variation, 8...g6": [
+      "C12"
+    ],
+    "classical": [
+      "C13"
+    ],
+    "classical, Anderssen variation": [
+      "C13"
+    ],
+    "classical, Anderssen-Richter variation": [
+      "C13"
+    ],
+    "classical, Vistaneckis (Nimzovich) variation": [
+      "C13"
+    ],
+    "classical, Frankfurt variation": [
+      "C13"
+    ],
+    "classical, Tartakower variation": [
+      "C13"
+    ],
+    "Albin-Alekhine-Chatard attack": [
+      "C13"
+    ],
+    "Albin-Alekhine-Chatard attack, Maroczy variation": [
+      "C13"
+    ],
+    "Albin-Alekhine-Chatard attack, Breyer variation": [
+      "C13"
+    ],
+    "Albin-Alekhine-Chatard attack, Teichmann variation": [
+      "C13"
+    ],
+    "Albin-Alekhine-Chatard attack, Spielmann variation": [
+      "C13"
+    ],
+    "classical variation": [
+      "C14"
+    ],
+    "classical, Tarrasch variation": [
+      "C14"
+    ],
+    "classical, Rubinstein variation": [
+      "C14"
+    ],
+    "classical, Alapin variation": [
+      "C14"
+    ],
+    "classical, Pollock variation": [
+      "C14"
+    ],
+    "classical, Steinitz variation": [
+      "C14"
+    ],
+    "classical, Stahlberg variation": [
+      "C14"
+    ],
+    "Winawer (Nimzovich) variation": [
+      "C15"
+    ],
+    "Winawer, Kondratiyev variation": [
+      "C15"
+    ],
+    "Winawer, fingerslip variation": [
+      "C15"
+    ],
+    "Winawer, Alekhine (Maroczy) gambit": [
+      "C15"
+    ],
+    "Winawer, Alekhine gambit, Alatortsev variation": [
+      "C15"
+    ],
+    "Winawer, Alekhine gambit": [
+      "C15"
+    ],
+    "Winawer, Alekhine gambit, Kan variation": [
+      "C15"
+    ],
+    "Winawer, advance variation": [
+      "C16",
+      "C17",
+      "C18"
+    ],
+    "Winawer, Petrosian variation": [
+      "C16"
+    ],
+    "Winawer, advance, Bogolyubov variation": [
+      "C17"
+    ],
+    "Winawer, advance, Russian variation": [
+      "C17"
+    ],
+    "Winawer, advance, 5.a3": [
+      "C17"
+    ],
+    "Winawer, advance, Rauzer variation": [
+      "C17"
+    ],
+    "Winawer, classical variation": [
+      "C18"
+    ],
+    "Winawer, advance, 6...Ne7": [
+      "C19"
+    ],
+    "Winawer, advance, Smyslov variation": [
+      "C19"
+    ],
+    "Winawer, advance, positional main line": [
+      "C19"
+    ],
+    "Winawer, advance, poisoned pawn variation": [
+      "C19"
+    ],
+    "Winawer, advance, poisoned pawn, Euwe-Gligoric variation": [
+      "C19"
+    ],
+    "Winawer, advance, poisoned pawn, Konstantinopolsky variation": [
+      "C19"
+    ]
+  },
+  "Lengfellner system": {
+    "Main Line": [
+      "C00"
+    ]
+  },
+  "St. George defence": {
+    "Main Line": [
+      "C00"
+    ]
+  },
+  "King's pawn game": {
+    "Main Line": [
+      "C20",
+      "C44",
+      "C50"
+    ]
+  },
+  "Alapin's opening": {
+    "Main Line": [
+      "C20"
+    ]
+  },
+  "Centre game": {
+    "Main Line": [
+      "C21",
+      "C22"
+    ],
+    "Paulsen attack": [
+      "C22"
+    ],
+    "Charousek variation": [
+      "C22"
+    ],
+    "l'Hermet variation": [
+      "C22"
+    ],
+    "Berger variation": [
+      "C22"
+    ],
+    "Kupreichik variation": [
+      "C22"
+    ],
+    "Hall variation": [
+      "C22"
+    ]
+  },
+  "Centre game, Kieseritsky variation": {
+    "Main Line": [
+      "C21"
+    ]
+  },
+  "Halasz gambit": {
+    "Main Line": [
+      "C21"
+    ]
+  },
+  "Danish gambit": {
+    "Main Line": [
+      "C21"
+    ],
+    "Collijn defence": [
+      "C21"
+    ],
+    "Schlechter defence": [
+      "C21"
+    ],
+    "Soerensen defence": [
+      "C21"
+    ]
+  },
+  "Bishop's opening": {
+    "Main Line": [
+      "C23"
+    ],
+    "Philidor counter-attack": [
+      "C23"
+    ],
+    "Lisitsyn variation": [
+      "C23"
+    ],
+    "Calabrese counter-gambit": [
+      "C23"
+    ],
+    "Calabrese counter-gambit, Jaenisch variation": [
+      "C23"
+    ],
+    "Classical variation": [
+      "C23"
+    ],
+    "Lopez gambit": [
+      "C23"
+    ],
+    "Philidor variation": [
+      "C23"
+    ],
+    "Pratt variation": [
+      "C23"
+    ],
+    "Lewis counter-gambit": [
+      "C23"
+    ],
+    "del Rio variation": [
+      "C23"
+    ],
+    "Lewis gambit": [
+      "C23"
+    ],
+    "Wing gambit": [
+      "C23"
+    ],
+    "MacDonnell double gambit": [
+      "C23"
+    ],
+    "Four pawns' gambit": [
+      "C23"
+    ],
+    "Berlin defence": [
+      "C24"
+    ],
+    "Greco gambit": [
+      "C24"
+    ],
+    "Ponziani gambit": [
+      "C24"
+    ],
+    "Urusov gambit": [
+      "C24"
+    ],
+    "Urusov gambit, Panov variation": [
+      "C24"
+    ]
+  },
+  "Vienna game": {
+    "Main Line": [
+      "C25",
+      "C26",
+      "C27",
+      "C28"
+    ]
+  },
+  "Vienna": {
+    "Zhuravlev countergambit": [
+      "C25"
+    ],
+    "Paulsen variation": [
+      "C25"
+    ],
+    "Fyfe gambit": [
+      "C25"
+    ],
+    "Steinitz gambit": [
+      "C25"
+    ],
+    "Steinitz gambit, Zukertort defence": [
+      "C25"
+    ],
+    "Steinitz gambit, Fraser-Minckwitz variation": [
+      "C25"
+    ],
+    "Hamppe-Allgaier gambit": [
+      "C25"
+    ],
+    "Hamppe-Allgaier gambit, Alapin variation": [
+      "C25"
+    ],
+    "Hamppe-Muzio gambit": [
+      "C25"
+    ],
+    "Hamppe-Muzio, Dubois variation": [
+      "C25"
+    ],
+    "Pierce gambit": [
+      "C25"
+    ],
+    "Pierce gambit, Rushmere attack": [
+      "C25"
+    ],
+    "Falkbeer variation": [
+      "C26"
+    ],
+    "Mengarini variation": [
+      "C26"
+    ],
+    "Paulsen-Mieses variation": [
+      "C26"
+    ],
+    "`Frankenstein-Dracula' variation": [
+      "C27"
+    ],
+    "Adams' gambit": [
+      "C27"
+    ],
+    "Alekhine variation": [
+      "C27"
+    ]
+  },
+  "Vienna game, Max Lange defence": {
+    "Main Line": [
+      "C25"
+    ]
+  },
+  "Vienna gambit": {
+    "Main Line": [
+      "C25",
+      "C29"
+    ],
+    "Kaufmann variation": [
+      "C29"
+    ],
+    "Breyer variation": [
+      "C29"
+    ],
+    "Paulsen attack": [
+      "C29"
+    ],
+    "Bardeleben variation": [
+      "C29"
+    ],
+    "Heyde variation": [
+      "C29"
+    ]
+  },
+  "Boden-Kieseritsky gambit": {
+    "Main Line": [
+      "C27"
+    ],
+    "Lichtenhein defence": [
+      "C27"
+    ]
+  },
+  "Vienna gambit, Wurzburger trap": {
+    "Main Line": [
+      "C29"
+    ]
+  },
+  "Vienna gambit, Steinitz variation": {
+    "Main Line": [
+      "C29"
+    ]
+  },
+  "King's gambit": {
+    "Main Line": [
+      "C30"
+    ]
+  },
+  "KGD": {
+    "Keene's defence": [
+      "C30"
+    ],
+    "Mafia defence": [
+      "C30"
+    ],
+    "Norwalde variation": [
+      "C30"
+    ],
+    "Norwalde variation, Buecker gambit": [
+      "C30"
+    ],
+    "classical variation": [
+      "C30"
+    ],
+    "classical, Svenonius variation": [
+      "C30"
+    ],
+    "classical, Hanham variation": [
+      "C30"
+    ],
+    "classical, 4.c3": [
+      "C30"
+    ],
+    "classical, Marshall attack": [
+      "C30"
+    ],
+    "classical counter-gambit": [
+      "C30"
+    ],
+    "classical, Reti variation": [
+      "C30"
+    ],
+    "classical, Soldatenkov variation": [
+      "C30"
+    ],
+    "classical, Heath variation": [
+      "C30"
+    ],
+    "2...Nf6": [
+      "C30"
+    ],
+    "Falkbeer counter-gambit": [
+      "C31"
+    ],
+    "Falkbeer, Tartakower variation": [
+      "C31"
+    ],
+    "Falkbeer, Milner-Barry variation": [
+      "C31"
+    ],
+    "Nimzovich counter-gambit": [
+      "C31"
+    ],
+    "Falkbeer, 3...e4": [
+      "C31"
+    ],
+    "Falkbeer, Rubinstein variation": [
+      "C31"
+    ],
+    "Falkbeer, Nimzovich variation": [
+      "C31"
+    ],
+    "Falkbeer, 4.d3": [
+      "C31"
+    ],
+    "Falkbeer, Morphy gambit": [
+      "C31"
+    ],
+    "Falkbeer, 5.de": [
+      "C32"
+    ],
+    "Falkbeer, Alapin variation": [
+      "C32"
+    ],
+    "Falkbeer, main line, 7...Bf5": [
+      "C32"
+    ],
+    "Falkbeer, Tarrasch variation": [
+      "C32"
+    ],
+    "Falkbeer, Charousek gambit": [
+      "C32"
+    ],
+    "Falkbeer, Charousek variation": [
+      "C32"
+    ],
+    "Falkbeer, Keres variation": [
+      "C32"
+    ],
+    "Falkbeer, Reti variation": [
+      "C32"
+    ]
+  },
+  "King's gambit accepted": {
+    "Main Line": [
+      "C33"
+    ]
+  },
+  "KGA": {
+    "Tumbleweed gambit": [
+      "C33"
+    ],
+    "Orsini gambit": [
+      "C33"
+    ],
+    "Pawn's gambit (Stamma gambit)": [
+      "C33"
+    ],
+    "Schurig gambit": [
+      "C33"
+    ],
+    "Carrera (Basman) gambit": [
+      "C33"
+    ],
+    "Villemson (Steinitz) gambit": [
+      "C33"
+    ],
+    "Keres (Mason-Steinitz) gambit": [
+      "C33"
+    ],
+    "Breyer gambit": [
+      "C33"
+    ],
+    "Lesser bishop's (Petroff-Jaenisch-Tartakower) gambit": [
+      "C33"
+    ],
+    "bishop's gambit": [
+      "C33"
+    ],
+    "bishop's gambit, Chigorin's attack": [
+      "C33"
+    ],
+    "bishop's gambit, Greco variation": [
+      "C33"
+    ],
+    "bishop's gambit, classical defence": [
+      "C33"
+    ],
+    "bishop's gambit, Grimm attack": [
+      "C33"
+    ],
+    "bishop's gambit, McDonnell attack": [
+      "C33"
+    ],
+    "bishop's gambit, Fraser variation": [
+      "C33"
+    ],
+    "bishop's gambit, classical defence, Cozio attack": [
+      "C33"
+    ],
+    "bishop's gambit, Boden defence": [
+      "C33"
+    ],
+    "bishop's gambit, Bryan counter-gambit": [
+      "C33"
+    ],
+    "bishop's gambit, Steinitz defence": [
+      "C33"
+    ],
+    "bishop's gambit, Maurian defence": [
+      "C33"
+    ],
+    "bishop's gambit, Ruy Lopez defence": [
+      "C33"
+    ],
+    "bishop's gambit, Lopez-Gianutio counter-gambit": [
+      "C33"
+    ],
+    "Lopez-Gianutio counter-gambit, Hein variation": [
+      "C33"
+    ],
+    "bishop's gambit, Bledow variation": [
+      "C33"
+    ],
+    "bishop's gambit, Gifford variation": [
+      "C33"
+    ],
+    "bishop's gambit, Boren-Svenonius variation": [
+      "C33"
+    ],
+    "bishop's gambit, Anderssen variation": [
+      "C33"
+    ],
+    "bishop's gambit, Morphy variation": [
+      "C33"
+    ],
+    "bishop's gambit, Cozio (Morphy) defence": [
+      "C33"
+    ],
+    "bishop's gambit, Bogolyubov variation": [
+      "C33"
+    ],
+    "bishop's gambit, Paulsen attack": [
+      "C33"
+    ],
+    "bishop's gambit, Jaenisch variation": [
+      "C33"
+    ],
+    "Bonsch-Osmolovsky variation": [
+      "C34"
+    ],
+    "Gianutio counter-gambit": [
+      "C34"
+    ],
+    "Fischer defence": [
+      "C34"
+    ],
+    "Becker defence": [
+      "C34"
+    ],
+    "Schallop defence": [
+      "C34"
+    ],
+    "Cunningham defence": [
+      "C35"
+    ],
+    "Cunningham, Bertin gambit": [
+      "C35"
+    ],
+    "Cunningham, three pawns gambit": [
+      "C35"
+    ],
+    "Cunningham, Euwe defence": [
+      "C35"
+    ],
+    "Abbazia defence (classical defence, modern defence[!])": [
+      "C36"
+    ],
+    "Abbazia defence, modern variation": [
+      "C36"
+    ],
+    "Abbazia defence, Botvinnik variation": [
+      "C36"
+    ],
+    "Quaade gambit": [
+      "C37"
+    ],
+    "Rosentreter gambit": [
+      "C37"
+    ],
+    "Soerensen gambit": [
+      "C37"
+    ],
+    "King's knight's gambit": [
+      "C37"
+    ],
+    "Blachly gambit": [
+      "C37"
+    ],
+    "Lolli gambit (wild Muzio gambit)": [
+      "C37"
+    ],
+    "Lolli gambit, Young variation": [
+      "C37"
+    ],
+    "Ghulam Kassim gambit": [
+      "C37"
+    ],
+    "MacDonnell gambit": [
+      "C37"
+    ],
+    "Salvio gambit": [
+      "C37"
+    ],
+    "Silberschmidt gambit": [
+      "C37"
+    ],
+    "Salvio gambit, Anderssen counter-attack": [
+      "C37"
+    ],
+    "Cochrane gambit": [
+      "C37"
+    ],
+    "Herzfeld gambit": [
+      "C37"
+    ],
+    "Muzio gambit": [
+      "C37"
+    ],
+    "Muzio gambit, Paulsen variation": [
+      "C37"
+    ],
+    "double Muzio gambit": [
+      "C37"
+    ],
+    "Muzio gambit, From defence": [
+      "C37"
+    ],
+    "Muzio gambit, Holloway defence": [
+      "C37"
+    ],
+    "Muzio gambit, Kling and Horwitz counter-attack": [
+      "C37"
+    ],
+    "Muzio gambit, Brentano defence": [
+      "C37"
+    ],
+    "Hanstein gambit": [
+      "C38"
+    ],
+    "Philidor gambit": [
+      "C38"
+    ],
+    "Greco gambit": [
+      "C38"
+    ],
+    "Philidor gambit, Schultz variation": [
+      "C38"
+    ],
+    "Allgaier gambit": [
+      "C39"
+    ],
+    "Allgaier, Horny defence": [
+      "C39"
+    ],
+    "Allgaier, Thorold variation": [
+      "C39"
+    ],
+    "Allgaier, Cook variation": [
+      "C39"
+    ],
+    "Allgaier, Blackburne gambit": [
+      "C39"
+    ],
+    "Allgaier, Walker attack": [
+      "C39"
+    ],
+    "Allgaier, Urusov attack": [
+      "C39"
+    ],
+    "Allgaier, Schlechter defence": [
+      "C39"
+    ],
+    "Kieseritsky, Paulsen defence": [
+      "C39"
+    ],
+    "Kieseritsky, long whip (Stockwhip, classical) defence": [
+      "C39"
+    ],
+    "Kieseritsky, long whip defence, Jaenisch variation": [
+      "C39"
+    ],
+    "Kieseritsky, Brentano (Campbell) defence": [
+      "C39"
+    ],
+    "Kieseritsky, Brentano defence, Kaplanek variation": [
+      "C39"
+    ],
+    "Kieseritsky, Brentano defence": [
+      "C39"
+    ],
+    "Kieseritsky, Brentano defence, Caro variation": [
+      "C39"
+    ],
+    "Kieseritsky, Salvio (Rosenthal) defence": [
+      "C39"
+    ],
+    "Kieseritsky, Salvio defence, Cozio variation": [
+      "C39"
+    ],
+    "Kieseritsky, Polerio defence": [
+      "C39"
+    ],
+    "Kieseritsky, Neumann defence": [
+      "C39"
+    ],
+    "Kieseritsky, Kolisch defence": [
+      "C39"
+    ],
+    "Kieseritsky, Berlin defence": [
+      "C39"
+    ],
+    "Kieseritsky, Berlin defence, Riviere variation": [
+      "C39"
+    ],
+    "Kieseritsky, Berlin defence, 6.Bc4": [
+      "C39"
+    ],
+    "Kieseritsky, Rice gambit": [
+      "C39"
+    ]
+  },
+  "King's knight's gambit": {
+    "Main Line": [
+      "C34",
+      "C38",
+      "C39"
+    ]
+  },
+  "King's knight opening": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "Gunderam defence": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "Greco defence": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "Damiano's defence": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "QP counter-gambit (elephant gambit)": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "QP counter-gambit": {
+    "Maroczy gambit": [
+      "C40"
+    ]
+  },
+  "Latvian counter-gambit": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "Latvian": {
+    "Nimzovich variation": [
+      "C40"
+    ],
+    "Fraser defence": [
+      "C40"
+    ],
+    "Behting variation": [
+      "C40"
+    ],
+    "Polerio variation": [
+      "C40"
+    ],
+    "corkscrew counter-gambit": [
+      "C40"
+    ]
+  },
+  "Latvian gambit, 3.Bc4": {
+    "Main Line": [
+      "C40"
+    ]
+  },
+  "Philidor's defence": {
+    "Main Line": [
+      "C41"
+    ]
+  },
+  "Philidor": {
+    "Steinitz variation": [
+      "C41"
+    ],
+    "Lopez counter-gambit": [
+      "C41"
+    ],
+    "Lopez counter-gambit, Jaenisch variation": [
+      "C41"
+    ],
+    "Philidor counter-gambit": [
+      "C41"
+    ],
+    "Philidor counter-gambit, del Rio attack": [
+      "C41"
+    ],
+    "Philidor counter-gambit, Berger variation": [
+      "C41"
+    ],
+    "Philidor counter-gambit, Zukertort variation": [
+      "C41"
+    ],
+    "exchange variation": [
+      "C41"
+    ],
+    "Boden variation": [
+      "C41"
+    ],
+    "Paulsen attack": [
+      "C41"
+    ],
+    "Berger variation": [
+      "C41"
+    ],
+    "Larsen variation": [
+      "C41"
+    ],
+    "Nimzovich (Jaenisch) variation": [
+      "C41"
+    ],
+    "Improved Hanham variation": [
+      "C41"
+    ],
+    "Nimzovich, Sozin variation": [
+      "C41"
+    ],
+    "Nimzovich, Larobok variation": [
+      "C41"
+    ],
+    "Nimzovich variation": [
+      "C41"
+    ],
+    "Nimzovich, Sokolsky variation": [
+      "C41"
+    ],
+    "Nimzovich, Rellstab variation": [
+      "C41"
+    ],
+    "Nimzovich, Locock variation": [
+      "C41"
+    ],
+    "Nimzovich, Klein variation": [
+      "C41"
+    ],
+    "Hanham variation": [
+      "C41"
+    ],
+    "Hanham, Krause variation": [
+      "C41"
+    ],
+    "Hanham, Steiner variation": [
+      "C41"
+    ],
+    "Hanham, Kmoch variation": [
+      "C41"
+    ],
+    "Hanham, Berger variation": [
+      "C41"
+    ],
+    "Hanham, Schlechter variation": [
+      "C41"
+    ],
+    "Hanham, Delmar variation": [
+      "C41"
+    ]
+  },
+  "Petrov's defence": {
+    "Main Line": [
+      "C42"
+    ]
+  },
+  "Petrov": {
+    "French attack": [
+      "C42"
+    ],
+    "Kaufmann attack": [
+      "C42"
+    ],
+    "Nimzovich attack": [
+      "C42"
+    ],
+    "Cozio (Lasker) attack": [
+      "C42"
+    ],
+    "classical attack": [
+      "C42"
+    ],
+    "classical attack, Chigorin variation": [
+      "C42"
+    ],
+    "classical attack, Berger variation": [
+      "C42"
+    ],
+    "classical attack, Krause variation": [
+      "C42"
+    ],
+    "classical attack, Maroczy variation": [
+      "C42"
+    ],
+    "classical attack, Jaenisch variation": [
+      "C42"
+    ],
+    "classical attack, Mason variation": [
+      "C42"
+    ],
+    "classical attack, Marshall variation": [
+      "C42"
+    ],
+    "classical attack, Tarrasch variation": [
+      "C42"
+    ],
+    "classical attack, Marshall trap": [
+      "C42"
+    ],
+    "classical attack, close variation": [
+      "C42"
+    ],
+    "Cochrane gambit": [
+      "C42"
+    ],
+    "Paulsen attack": [
+      "C42"
+    ],
+    "Damiano variation": [
+      "C42"
+    ],
+    "Italian variation": [
+      "C42"
+    ],
+    "modern (Steinitz) attack": [
+      "C43"
+    ],
+    "modern attack, main line": [
+      "C43"
+    ],
+    "modern attack, Steinitz variation": [
+      "C43"
+    ],
+    "modern attack, Bardeleben variation": [
+      "C43"
+    ],
+    "Urusov gambit": [
+      "C43"
+    ],
+    "modern attack, Symmetrical variation": [
+      "C43"
+    ],
+    "modern attack, Trifunovic variation": [
+      "C43"
+    ]
+  },
+  "Petrov three knights game": {
+    "Main Line": [
+      "C42"
+    ]
+  },
+  "Irish (Chicago) gambit": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Konstantinopolsky opening": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Dresden opening": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Inverted Hungarian": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Inverted Hanham": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Tayler opening": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Ponziani opening": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Ponziani": {
+    "Caro variation": [
+      "C44"
+    ],
+    "Leonhardt variation": [
+      "C44"
+    ],
+    "Steinitz variation": [
+      "C44"
+    ],
+    "Jaenisch counter-attack": [
+      "C44"
+    ],
+    "Fraser defence": [
+      "C44"
+    ],
+    "Reti variation": [
+      "C44"
+    ],
+    "Romanishin variation": [
+      "C44"
+    ]
+  },
+  "Ponziani counter-gambit": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Ponziani counter-gambit, Schmidt attack": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Ponziani counter-gambit, Cordel variation": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Scotch opening": {
+    "Main Line": [
+      "C44"
+    ]
+  },
+  "Scotch": {
+    "Lolli variation": [
+      "C44"
+    ],
+    "Cochrane variation": [
+      "C44"
+    ],
+    "Relfsson gambit ('MacLopez')": [
+      "C44"
+    ],
+    "Goering gambit": [
+      "C44"
+    ],
+    "Sea-cadet mate": [
+      "C44"
+    ],
+    "Goering gambit, Bardeleben variation": [
+      "C44"
+    ],
+    "Ghulam Kassim variation": [
+      "C45"
+    ],
+    "Pulling counter-attack": [
+      "C45"
+    ],
+    "Horwitz attack": [
+      "C45"
+    ],
+    "Berger variation": [
+      "C45"
+    ],
+    "Rosenthal variation": [
+      "C45"
+    ],
+    "Fraser attack": [
+      "C45"
+    ],
+    "Steinitz variation": [
+      "C45"
+    ],
+    "Schmidt variation": [
+      "C45"
+    ],
+    "Mieses variation": [
+      "C45"
+    ],
+    "Tartakower variation": [
+      "C45"
+    ],
+    "Blackburne attack": [
+      "C45"
+    ],
+    "Gottschall variation": [
+      "C45"
+    ],
+    "Paulsen attack": [
+      "C45"
+    ],
+    "Paulsen, Gunsberg defence": [
+      "C45"
+    ],
+    "Meitner variation": [
+      "C45"
+    ],
+    "Blumenfeld attack": [
+      "C45"
+    ],
+    "Potter variation": [
+      "C45"
+    ],
+    "Romanishin variation": [
+      "C45"
+    ]
+  },
+  "Scotch gambit": {
+    "Main Line": [
+      "C44"
+    ],
+    "Anderssen (Paulsen, Suhle) counter-attack": [
+      "C44"
+    ],
+    "Cochrane-Shumov defence": [
+      "C44"
+    ],
+    "Vitzhum attack": [
+      "C44"
+    ],
+    "Hanneken variation": [
+      "C44"
+    ],
+    "Cochrane variation": [
+      "C44"
+    ],
+    "Benima defence": [
+      "C44"
+    ],
+    "Dubois-Reti defence": [
+      "C44"
+    ]
+  },
+  "Scotch game": {
+    "Main Line": [
+      "C45"
+    ]
+  },
+  "Three knights game": {
+    "Main Line": [
+      "C46"
+    ]
+  },
+  "Three knights": {
+    "Schlechter variation": [
+      "C46"
+    ],
+    "Winawer defence (Gothic defence)": [
+      "C46"
+    ],
+    "Steinitz variation": [
+      "C46"
+    ],
+    "Steinitz, Rosenthal variation": [
+      "C46"
+    ]
+  },
+  "Four knights game": {
+    "Main Line": [
+      "C46"
+    ]
+  },
+  "Four knights": {
+    "Schultze-Mueller gambit": [
+      "C46"
+    ],
+    "Italian variation": [
+      "C46"
+    ],
+    "Gunsberg variation": [
+      "C46"
+    ],
+    "Scotch variation": [
+      "C47"
+    ],
+    "Scotch, Krause variation": [
+      "C47"
+    ],
+    "Scotch, 4...exd4": [
+      "C47"
+    ],
+    "Belgrade gambit": [
+      "C47"
+    ],
+    "Spanish variation": [
+      "C48"
+    ],
+    "Ranken variation": [
+      "C48"
+    ],
+    "Spielmann variation": [
+      "C48"
+    ],
+    "Spanish, classical defence": [
+      "C48"
+    ],
+    "Bardeleben variation": [
+      "C48"
+    ],
+    "Marshall variation": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit, Bogolyubov variation": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit, 5.Be2": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit Maroczy variation": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit, exchange variation": [
+      "C48"
+    ],
+    "Rubinstein counter-gambit, Henneberger variation": [
+      "C48"
+    ],
+    "double Ruy Lopez": [
+      "C49"
+    ],
+    "Gunsberg counter-attack": [
+      "C49"
+    ],
+    "Alatortsev variation": [
+      "C49"
+    ],
+    "Main Line": [
+      "C49"
+    ],
+    "Janowski variation": [
+      "C49"
+    ],
+    "Svenonius variation": [
+      "C49"
+    ],
+    "symmetrical variation": [
+      "C49"
+    ],
+    "symmetrical, Metger unpin": [
+      "C49"
+    ],
+    "symmetrical, Capablanca variation": [
+      "C49"
+    ],
+    "symmetrical, Pillsbury variation": [
+      "C49"
+    ],
+    "symmetrical, Blake variation": [
+      "C49"
+    ],
+    "symmetrical, Tarrasch variation": [
+      "C49"
+    ],
+    "symmetrical, Maroczy system": [
+      "C49"
+    ],
+    "Nimzovich (Paulsen) variation": [
+      "C49"
+    ]
+  },
+  "Blackburne shilling gambit": {
+    "Main Line": [
+      "C50"
+    ]
+  },
+  "Rousseau gambit": {
+    "Main Line": [
+      "C50"
+    ]
+  },
+  "Hungarian defence": {
+    "Main Line": [
+      "C50"
+    ],
+    "Tartakower variation": [
+      "C50"
+    ]
+  },
+  "Giuoco Piano": {
+    "Main Line": [
+      "C50",
+      "C53",
+      "C54"
+    ],
+    "four knights variation": [
+      "C50"
+    ],
+    "Jerome gambit": [
+      "C50"
+    ],
+    "LaBourdonnais variation": [
+      "C53"
+    ],
+    "close variation": [
+      "C53"
+    ],
+    "centre-holding variation": [
+      "C53"
+    ],
+    "Tarrasch variation": [
+      "C53"
+    ],
+    "Mestel variation": [
+      "C53"
+    ],
+    "Eisinger variation": [
+      "C53"
+    ],
+    "Bird's attack": [
+      "C53"
+    ],
+    "Ghulam Kassim variation": [
+      "C53"
+    ],
+    "Anderssen variation": [
+      "C53"
+    ],
+    "Krause variation": [
+      "C54"
+    ],
+    "Cracow variation": [
+      "C54"
+    ],
+    "Greco's attack": [
+      "C54"
+    ],
+    "Greco variation": [
+      "C54"
+    ],
+    "Bernstein variation": [
+      "C54"
+    ],
+    "Aitken variation": [
+      "C54"
+    ],
+    "Steinitz variation": [
+      "C54"
+    ],
+    "Moeller (Therkatz) attack": [
+      "C54"
+    ],
+    "Therkatz-Herzog variation": [
+      "C54"
+    ],
+    "Moeller, bayonet attack": [
+      "C54"
+    ]
+  },
+  "Giuoco Pianissimo": {
+    "Main Line": [
+      "C50"
+    ],
+    "Dubois variation": [
+      "C50"
+    ],
+    "Italian four knights variation": [
+      "C50"
+    ],
+    "Canal variation": [
+      "C50"
+    ]
+  },
+  "Evans gambit declined": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Lange variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Pavlov variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Hirschbach variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Vasquez variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Hicken variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, 5.a4": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Showalter variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit declined, Cordel variation": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans counter-gambit": {
+    "Main Line": [
+      "C51"
+    ]
+  },
+  "Evans gambit": {
+    "Main Line": [
+      "C51",
+      "C52"
+    ],
+    "normal variation": [
+      "C51"
+    ],
+    "Ulvestad variation": [
+      "C51"
+    ],
+    "Paulsen variation": [
+      "C51"
+    ],
+    "Morphy attack": [
+      "C51"
+    ],
+    "Goering attack": [
+      "C51"
+    ],
+    "Steinitz variation": [
+      "C51"
+    ],
+    "Fraser attack": [
+      "C51"
+    ],
+    "Fraser-Mortimer attack": [
+      "C51"
+    ],
+    "Stone-Ware variation": [
+      "C51"
+    ],
+    "Mayet defence": [
+      "C51"
+    ],
+    "5...Be7": [
+      "C51"
+    ],
+    "Cordel variation": [
+      "C51"
+    ],
+    "compromised defence": [
+      "C52"
+    ],
+    "compromised defence, Paulsen variation": [
+      "C52"
+    ],
+    "compromised defence, Potter variation": [
+      "C52"
+    ],
+    "Leonhardt variation": [
+      "C52"
+    ],
+    "Tartakower attack": [
+      "C52"
+    ],
+    "Levenfish variation": [
+      "C52"
+    ],
+    "Sokolsky variation": [
+      "C52"
+    ],
+    "Richardson attack": [
+      "C52"
+    ],
+    "Waller attack": [
+      "C52"
+    ],
+    "Lasker defence": [
+      "C52"
+    ],
+    "Sanders-Alapin variation": [
+      "C52"
+    ],
+    "Alapin-Steinitz variation": [
+      "C52"
+    ]
+  },
+  "Two knights defence": {
+    "Main Line": [
+      "C55",
+      "C56",
+      "C57",
+      "C58",
+      "C59"
+    ]
+  },
+  "Giuoco piano": {
+    "Rosentreter variation": [
+      "C55"
+    ],
+    "Main Line": [
+      "C55"
+    ],
+    "Holzhausen attack": [
+      "C55"
+    ]
+  },
+  "Two knights defence (Modern bishop's opening)": {
+    "Main Line": [
+      "C55"
+    ]
+  },
+  "Two knights defence, Keidanz variation": {
+    "Main Line": [
+      "C55"
+    ]
+  },
+  "Two knights defence, Perreux variation": {
+    "Main Line": [
+      "C55"
+    ]
+  },
+  "two knights": {
+    "Max Lange attack": [
+      "C55"
+    ],
+    "Max Lange attack, Berger variation": [
+      "C55"
+    ],
+    "Max Lange attack, Marshall variation": [
+      "C55"
+    ],
+    "Max Lange attack, Rubinstein variation": [
+      "C55"
+    ],
+    "Max Lange attack, Loman defence": [
+      "C55"
+    ],
+    "Max Lange attack, Schlechter variation": [
+      "C55"
+    ],
+    "Max Lange attack, Steinitz variation": [
+      "C55"
+    ],
+    "Max Lange attack, Krause variation": [
+      "C55"
+    ]
+  },
+  "two knights defence": {
+    "Yurdansky attack": [
+      "C56"
+    ],
+    "Canal variation": [
+      "C56"
+    ],
+    "Wilkes Barre (Traxler) variation": [
+      "C57"
+    ],
+    "Ulvestad variation": [
+      "C57"
+    ],
+    "Fritz variation": [
+      "C57"
+    ],
+    "Fritz, Gruber variation": [
+      "C57"
+    ],
+    "Lolli attack": [
+      "C57"
+    ],
+    "Pincus variation": [
+      "C57"
+    ],
+    "Fegatello attack": [
+      "C57"
+    ],
+    "Fegatello attack, Leonhardt variation": [
+      "C57"
+    ],
+    "Fegatello attack, Polerio defence": [
+      "C57"
+    ],
+    "Main Line": [
+      "C58"
+    ],
+    "Kieseritsky variation": [
+      "C58"
+    ],
+    "Yankovich variation": [
+      "C58"
+    ],
+    "Maroczy variation": [
+      "C58"
+    ],
+    "Bogolyubov variation": [
+      "C58"
+    ],
+    "Paoli variation": [
+      "C58"
+    ],
+    "Colman variation": [
+      "C58"
+    ],
+    "Blackburne variation": [
+      "C58"
+    ],
+    "Knorre variation": [
+      "C59"
+    ],
+    "Goering variation": [
+      "C59"
+    ],
+    "Steinitz variation": [
+      "C59"
+    ]
+  },
+  "Ruy Lopez (Spanish opening)": {
+    "Main Line": [
+      "C60"
+    ]
+  },
+  "Ruy Lopez": {
+    "Nuernberg variation": [
+      "C60"
+    ],
+    "Pollock defence": [
+      "C60"
+    ],
+    "Lucena defence": [
+      "C60"
+    ],
+    "Vinogradov variation": [
+      "C60"
+    ],
+    "Brentano defence": [
+      "C60"
+    ],
+    "fianchetto (Smyslov/Barnes) defence": [
+      "C60"
+    ],
+    "Cozio defence": [
+      "C60"
+    ],
+    "Cozio defence, Paulsen variation": [
+      "C60"
+    ],
+    "Bird's defence": [
+      "C61"
+    ],
+    "Bird's defence, Paulsen variation": [
+      "C61"
+    ],
+    "old Steinitz defence": [
+      "C62"
+    ],
+    "old Steinitz defence, Nimzovich attack": [
+      "C62"
+    ],
+    "old Steinitz defence, semi-Duras variation": [
+      "C62"
+    ],
+    "Schliemann defence": [
+      "C63"
+    ],
+    "Schliemann defence, Berger variation": [
+      "C63"
+    ],
+    "classical (Cordel) defence": [
+      "C64"
+    ],
+    "classical defence, Zaitsev variation": [
+      "C64"
+    ],
+    "classical defence, 4.c3": [
+      "C64"
+    ],
+    "classical defence, Benelux variation": [
+      "C64"
+    ],
+    "classical defence, Charousek variation": [
+      "C64"
+    ],
+    "classical defence, Boden variation": [
+      "C64"
+    ],
+    "Cordel gambit": [
+      "C64"
+    ],
+    "Berlin defence": [
+      "C65"
+    ],
+    "Berlin defence, Nyholm attack": [
+      "C65"
+    ],
+    "Berlin defence, Mortimer variation": [
+      "C65"
+    ],
+    "Berlin defence, Mortimer trap": [
+      "C65"
+    ],
+    "Berlin defence, Anderssen variation": [
+      "C65"
+    ],
+    "Berlin defence, Duras variation": [
+      "C65"
+    ],
+    "Berlin defence, Kaufmann variation": [
+      "C65"
+    ],
+    "Berlin defence, 4.O-O": [
+      "C65"
+    ],
+    "Berlin defence, Beverwijk variation": [
+      "C65"
+    ],
+    "Berlin defence, 4.O-O, d6": [
+      "C66"
+    ],
+    "Berlin defence, hedgehog variation": [
+      "C66"
+    ],
+    "Berlin defence, Tarrasch trap": [
+      "C66"
+    ],
+    "closed Berlin defence, Bernstein variation": [
+      "C66"
+    ],
+    "closed Berlin defence, Showalter variation": [
+      "C66"
+    ],
+    "closed Berlin defence, Wolf variation": [
+      "C66"
+    ],
+    "closed Berlin defence, Chigorin variation": [
+      "C66"
+    ],
+    "Berlin defence, open variation": [
+      "C67"
+    ],
+    "open Berlin defence, l'Hermet variation": [
+      "C67"
+    ],
+    "open Berlin defence, Showalter variation": [
+      "C67"
+    ],
+    "open Berlin defence, 5...Be7": [
+      "C67"
+    ],
+    "Berlin defence, Rio de Janeiro variation": [
+      "C67"
+    ],
+    "Berlin defence, Zukertort variation": [
+      "C67"
+    ],
+    "Berlin defence, Pillsbury variation": [
+      "C67"
+    ],
+    "Berlin defence, Winawer attack": [
+      "C67"
+    ],
+    "Berlin defence, Cordel variation": [
+      "C67"
+    ],
+    "Berlin defence, Trifunovic variation": [
+      "C67"
+    ],
+    "Berlin defence, Minckwitz variation": [
+      "C67"
+    ],
+    "Berlin defence, Rosenthal variation": [
+      "C67"
+    ],
+    "exchange variation": [
+      "C68"
+    ],
+    "exchange, Alekhine variation": [
+      "C68"
+    ],
+    "exchange, Keres variation": [
+      "C68"
+    ],
+    "exchange, Romanovsky variation": [
+      "C68"
+    ],
+    "exchange variation, 5.O-O": [
+      "C69"
+    ],
+    "exchange variation, Alapin gambit": [
+      "C69"
+    ],
+    "exchange, Gligoric variation": [
+      "C69"
+    ],
+    "exchange, Bronstein variation": [
+      "C69"
+    ],
+    "Main Line": [
+      "C70"
+    ],
+    "fianchetto defence deferred": [
+      "C70"
+    ],
+    "Cozio defence deferred": [
+      "C70"
+    ],
+    "Bird's defence deferred": [
+      "C70"
+    ],
+    "Alapin's defence deferred": [
+      "C70"
+    ],
+    "Classical defence deferred": [
+      "C70"
+    ],
+    "Caro variation": [
+      "C70"
+    ],
+    "Graz variation": [
+      "C70"
+    ],
+    "Taimanov (chase/wing/accelerated counterthrust) variation": [
+      "C70"
+    ],
+    "Schliemann defence deferred": [
+      "C70"
+    ],
+    "modern Steinitz defence": [
+      "C71",
+      "C74",
+      "C75"
+    ],
+    "Noah's ark trap": [
+      "C71",
+      "C88"
+    ],
+    "modern Steinitz defence, Three knights variation": [
+      "C71"
+    ],
+    "modern Steinitz defence, Duras (Keres) variation": [
+      "C71"
+    ],
+    "modern Steinitz defence, 5.O-O": [
+      "C72"
+    ],
+    "modern Steinitz defence, Richter variation": [
+      "C73"
+    ],
+    "modern Steinitz defence, Alapin variation": [
+      "C73"
+    ],
+    "modern Steinitz defence, siesta variation": [
+      "C74"
+    ],
+    "Siesta, Kopayev variation": [
+      "C74"
+    ],
+    "modern Steinitz defence, Rubinstein variation": [
+      "C75"
+    ],
+    "modern Steinitz defence, fianchetto (Bronstein) variation": [
+      "C76"
+    ],
+    "Morphy defence": [
+      "C77"
+    ],
+    "four knights (Tarrasch) variation": [
+      "C77"
+    ],
+    "Treybal (Bayreuth) variation (exchange var. deferred)": [
+      "C77"
+    ],
+    "Wormald (Alapin) attack": [
+      "C77"
+    ],
+    "Wormald attack, Gruenfeld variation": [
+      "C77"
+    ],
+    "Anderssen variation": [
+      "C77"
+    ],
+    "Morphy defence, Duras variation": [
+      "C77"
+    ],
+    "5.O-O": [
+      "C78"
+    ],
+    "Wing attack": [
+      "C78"
+    ],
+    "...b5 & ...d6": [
+      "C78"
+    ],
+    "Rabinovich variation": [
+      "C78"
+    ],
+    "Archangelsk (counterthrust) variation": [
+      "C78"
+    ],
+    "Moeller defence": [
+      "C78"
+    ],
+    "Steinitz defence deferred (Russian defence)": [
+      "C79"
+    ],
+    "Steinitz defence deferred, Lipnitsky variation": [
+      "C79"
+    ],
+    "Steinitz defence deferred, Rubinstein variation": [
+      "C79"
+    ],
+    "Steinitz defence deferred, Boleslavsky variation": [
+      "C79"
+    ],
+    "open (Tarrasch) defence": [
+      "C80"
+    ],
+    "open, Tartakower variation": [
+      "C80"
+    ],
+    "open, Knorre variation": [
+      "C80"
+    ],
+    "open, 6.d4": [
+      "C80"
+    ],
+    "open, Riga variation": [
+      "C80"
+    ],
+    "open, 6.d4 b5": [
+      "C80"
+    ],
+    "open, Friess attack": [
+      "C80"
+    ],
+    "open, Richter variation": [
+      "C80"
+    ],
+    "open, 7.Bb3": [
+      "C80"
+    ],
+    "open, Schlechter defence": [
+      "C80"
+    ],
+    "open, Berger variation": [
+      "C80"
+    ],
+    "open, Harksen gambit": [
+      "C80"
+    ],
+    "open, 8.de": [
+      "C80"
+    ],
+    "open, Zukertort variation": [
+      "C80"
+    ],
+    "open, 8...Be6": [
+      "C80"
+    ],
+    "open, Bernstein variation": [
+      "C80"
+    ],
+    "open, Bernstein variation, Karpov gambit": [
+      "C80"
+    ],
+    "open, Howell attack": [
+      "C81"
+    ],
+    "open, Howell attack, Ekstroem variation": [
+      "C81"
+    ],
+    "open, Howell attack, Adam variation": [
+      "C81"
+    ],
+    "open, 9.c3": [
+      "C82"
+    ],
+    "open, Berlin variation": [
+      "C82"
+    ],
+    "open, Italian variation": [
+      "C82"
+    ],
+    "open, St. Petersburg variation": [
+      "C82"
+    ],
+    "open, Dilworth variation": [
+      "C82"
+    ],
+    "open, Motzko attack": [
+      "C82"
+    ],
+    "open, Motzko attack, Nenarokov variation": [
+      "C82"
+    ],
+    "open, classical defence": [
+      "C83"
+    ],
+    "open, Malkin variation": [
+      "C83"
+    ],
+    "open, 9...Be7, 10.Re1": [
+      "C83"
+    ],
+    "open, Tarrasch trap": [
+      "C83"
+    ],
+    "open, Breslau variation": [
+      "C83"
+    ],
+    "closed defence": [
+      "C84"
+    ],
+    "closed, centre attack": [
+      "C84"
+    ],
+    "closed, Basque gambit (North Spanish variation)": [
+      "C84"
+    ],
+    "Exchange variation doubly deferred (DERLD)": [
+      "C85"
+    ],
+    "Worrall attack": [
+      "C86"
+    ],
+    "Worrall attack, sharp line": [
+      "C86"
+    ],
+    "Worrall attack, solid line": [
+      "C86"
+    ],
+    "closed, Averbach variation": [
+      "C87"
+    ],
+    "closed": [
+      "C88"
+    ],
+    "closed, Leonhardt variation": [
+      "C88"
+    ],
+    "closed, Balla variation": [
+      "C88"
+    ],
+    "closed, 7...d6, 8.d4": [
+      "C88"
+    ],
+    "Trajkovic counter-attack": [
+      "C88"
+    ],
+    "closed, 7...O-O": [
+      "C88"
+    ],
+    "closed, anti-Marshall 8.a4": [
+      "C88"
+    ],
+    "closed, 8.c3": [
+      "C88"
+    ],
+    "Marshall counter-attack": [
+      "C89"
+    ],
+    "Marshall counter-attack, 11...c6": [
+      "C89"
+    ],
+    "Marshall, Kevitz variation": [
+      "C89"
+    ],
+    "Marshall, main line, 12.d2d4": [
+      "C89"
+    ],
+    "Marshall, main line, 14...Qh3": [
+      "C89"
+    ],
+    "Marshall, main line, Spassky variation": [
+      "C89"
+    ],
+    "Marshall, Herman Steiner variation": [
+      "C89"
+    ],
+    "closed (with ...d6)": [
+      "C90"
+    ],
+    "closed, Pilnik variation": [
+      "C90"
+    ],
+    "closed, Lutikov variation": [
+      "C90"
+    ],
+    "closed, Suetin variation": [
+      "C90"
+    ],
+    "closed, 9.d4": [
+      "C91"
+    ],
+    "closed, Bogolyubov variation": [
+      "C91"
+    ],
+    "closed, 9.h3": [
+      "C92"
+    ],
+    "closed, Keres (9...a5) variation": [
+      "C92"
+    ],
+    "closed, Kholmov variation": [
+      "C92"
+    ],
+    "closed, Ragozin-Petrosian (`Keres') variation": [
+      "C92"
+    ],
+    "closed, Flohr-Zaitsev system (Lenzerheide variation)": [
+      "C92"
+    ],
+    "closed, Smyslov defence": [
+      "C93"
+    ],
+    "closed, Breyer defence": [
+      "C94"
+    ],
+    "closed, Breyer, 10.d4": [
+      "C95"
+    ],
+    "closed, Breyer, Borisenko variation": [
+      "C95"
+    ],
+    "closed, Breyer, Gligoric variation": [
+      "C95"
+    ],
+    "closed, Breyer, Simagin variation": [
+      "C95"
+    ],
+    "closed (8...Na5)": [
+      "C96"
+    ],
+    "closed, Rossolimo defence": [
+      "C96"
+    ],
+    "closed (10...c5)": [
+      "C96"
+    ],
+    "closed, Borisenko defence": [
+      "C96"
+    ],
+    "closed, Keres (...Nd7) defence": [
+      "C96"
+    ],
+    "closed, Chigorin defence": [
+      "C97"
+    ],
+    "closed, Chigorin, Yugoslav system": [
+      "C97"
+    ],
+    "closed, Chigorin, 12...Nc6": [
+      "C98"
+    ],
+    "closed, Chigorin, Rauzer attack": [
+      "C98"
+    ],
+    "closed, Chigorin, 12...c5d4": [
+      "C99"
+    ]
+  },
+  "Queen's pawn, Mason variation": {
+    "Main Line": [
+      "D00"
+    ]
+  },
+  "Queen's pawn, Mason variation, Steinitz counter-gambit": {
+    "Main Line": [
+      "D00"
+    ]
+  },
+  "Levitsky attack (Queen's bishop attack)": {
+    "Main Line": [
+      "D00"
+    ]
+  },
+  "Blackmar gambit": {
+    "Main Line": [
+      "D00"
+    ]
+  },
+  "Blackmar-Diemer": {
+    "Euwe defence": [
+      "D00"
+    ],
+    "Lemberg counter-gambit": [
+      "D00"
+    ]
+  },
+  "Richter-Veresov attack": {
+    "Main Line": [
+      "D01"
+    ]
+  },
+  "Richter-Veresov attack, Veresov variation": {
+    "Main Line": [
+      "D01"
+    ]
+  },
+  "Richter-Veresov attack, Richter variation": {
+    "Main Line": [
+      "D01"
+    ]
+  },
+  "Queen's pawn game, Chigorin variation": {
+    "Main Line": [
+      "D02"
+    ]
+  },
+  "Queen's pawn game, Krause variation": {
+    "Main Line": [
+      "D02"
+    ]
+  },
+  "Queen's bishop game": {
+    "Main Line": [
+      "D02"
+    ]
+  },
+  "Torre attack (Tartakower variation)": {
+    "Main Line": [
+      "D03"
+    ]
+  },
+  "Queen's pawn game, Zukertort variation": {
+    "Main Line": [
+      "D05"
+    ]
+  },
+  "Queen's pawn game, Rubinstein (Colle-Zukertort) variation": {
+    "Main Line": [
+      "D05"
+    ]
+  },
+  "Colle system": {
+    "Main Line": [
+      "D05"
+    ]
+  },
+  "Queen's Gambit": {
+    "Main Line": [
+      "D06"
+    ]
+  },
+  "QGD": {
+    "Grau (Sahovic) defence": [
+      "D06"
+    ],
+    "Marshall defence": [
+      "D06"
+    ],
+    "symmetrical (Austrian) defence": [
+      "D06"
+    ],
+    "Chigorin defence": [
+      "D07"
+    ],
+    "Chigorin defence, Janowski variation": [
+      "D07"
+    ],
+    "Albin counter-gambit": [
+      "D08"
+    ],
+    "Albin counter-gambit, Lasker trap": [
+      "D08"
+    ],
+    "Albin counter-gambit, Alapin variation": [
+      "D08"
+    ],
+    "Albin counter-gambit, Krenosz variation": [
+      "D08"
+    ],
+    "Albin counter-gambit, Janowski variation": [
+      "D08"
+    ],
+    "Albin counter-gambit, Balogh variation": [
+      "D08"
+    ],
+    "Albin counter-gambit, 5.g3": [
+      "D09"
+    ],
+    "Stonewall variation": [
+      "D30"
+    ],
+    "Spielmann variation": [
+      "D30"
+    ],
+    "Main Line": [
+      "D30",
+      "D51",
+      "D52"
+    ],
+    "Capablanca variation": [
+      "D30"
+    ],
+    "Vienna variation": [
+      "D30"
+    ],
+    "Capablanca-Duras variation": [
+      "D30"
+    ],
+    "Hastings variation": [
+      "D30"
+    ],
+    "3.Nc3": [
+      "D31"
+    ],
+    "Janowski variation": [
+      "D31"
+    ],
+    "Alapin variation": [
+      "D31"
+    ],
+    "Charousek (Petrosian) variation": [
+      "D31"
+    ],
+    "semi-Slav": [
+      "D31"
+    ],
+    "semi-Slav, Noteboom variation": [
+      "D31"
+    ],
+    "semi-Slav, Koomen variation": [
+      "D31"
+    ],
+    "semi-Slav, Junge variation": [
+      "D31"
+    ],
+    "semi-Slav, Abrahams variation": [
+      "D31"
+    ],
+    "semi-Slav, Marshall gambit": [
+      "D31"
+    ],
+    "Tarrasch defence": [
+      "D32"
+    ],
+    "Tarrasch, von Hennig-Schara gambit": [
+      "D32"
+    ],
+    "Tarrasch defence, 4.cd ed": [
+      "D32"
+    ],
+    "Tarrasch defence, Tarrasch gambit": [
+      "D32"
+    ],
+    "Tarrasch defence, Marshall gambit": [
+      "D32"
+    ],
+    "Tarrasch, Schlechter-Rubinstein system": [
+      "D33"
+    ],
+    "Tarrasch, Folkestone (Swedish) variation": [
+      "D33"
+    ],
+    "Tarrasch, Schlechter-Rubinstein system, Rey Ardid variation": [
+      "D33"
+    ],
+    "Tarrasch, Prague variation": [
+      "D33"
+    ],
+    "Tarrasch, Wagner variation": [
+      "D33"
+    ],
+    "Tarrasch, Prague variation, 7...Be7": [
+      "D34"
+    ],
+    "Tarrasch, Prague variation, Normal position": [
+      "D34"
+    ],
+    "Tarrasch, Reti variation": [
+      "D34"
+    ],
+    "Tarrasch, Prague variation, 9.Bg5": [
+      "D34"
+    ],
+    "Tarrasch, Bogolyubov variation": [
+      "D34"
+    ],
+    "Tarrasch, Stoltz variation": [
+      "D34"
+    ],
+    "3...Nf6": [
+      "D35"
+    ],
+    "Harrwitz attack": [
+      "D35"
+    ],
+    "exchange variation": [
+      "D35"
+    ],
+    "exchange, Saemisch variation": [
+      "D35"
+    ],
+    "exchange, positional line": [
+      "D35"
+    ],
+    "exchange, chameleon variation": [
+      "D35"
+    ],
+    "exchange, positional line, 5...c6": [
+      "D35"
+    ],
+    "exchange, positional line, 6.Qc2": [
+      "D36"
+    ],
+    "4.Nf3": [
+      "D37"
+    ],
+    "classical variation (5.Bf4)": [
+      "D37"
+    ],
+    "Ragozin variation": [
+      "D38"
+    ],
+    "Ragozin, Vienna variation": [
+      "D39"
+    ],
+    "Semi-Tarrasch defence": [
+      "D40"
+    ],
+    "Semi-Tarrasch, symmetrical variation": [
+      "D40"
+    ],
+    "Semi-Tarrasch, Levenfish variation": [
+      "D40"
+    ],
+    "Semi-Tarrasch defence, Pillsbury variation": [
+      "D40"
+    ],
+    "Semi-Tarrasch, 5.cd": [
+      "D41"
+    ],
+    "Semi-Tarrasch, Kmoch variation": [
+      "D41"
+    ],
+    "Semi-Tarrasch, San Sebastian variation": [
+      "D41"
+    ],
+    "Semi-Tarrasch with e3": [
+      "D41"
+    ],
+    "Semi-Tarrasch, 7.Bd3": [
+      "D42"
+    ],
+    "4.Bg5": [
+      "D50"
+    ],
+    "Been-Koomen variation": [
+      "D50"
+    ],
+    "Semi-Tarrasch, Krause variation": [
+      "D50"
+    ],
+    "Semi-Tarrasch, Primitive Pillsbury variation": [
+      "D50"
+    ],
+    "Semi-Tarrasch": [
+      "D50"
+    ],
+    "Canal (Venice) variation": [
+      "D50"
+    ],
+    "4.Bg5 Nbd7": [
+      "D51"
+    ],
+    "Rochlin variation": [
+      "D51"
+    ],
+    "Alekhine variation": [
+      "D51"
+    ],
+    "Manhattan variation": [
+      "D51"
+    ],
+    "5...c6": [
+      "D51"
+    ],
+    "Capablanca anti-Cambridge Springs variation": [
+      "D51"
+    ],
+    "Cambridge Springs defence": [
+      "D52"
+    ],
+    "Cambridge Springs defence, Bogoljubow variation": [
+      "D52"
+    ],
+    "Cambridge Springs defence, Argentine variation": [
+      "D52"
+    ],
+    "Cambridge Springs defence, Rubinstein variation": [
+      "D52"
+    ],
+    "Cambridge Springs defence, Capablanca variation": [
+      "D52"
+    ],
+    "Cambridge Springs defence, 7.cd": [
+      "D52"
+    ],
+    "Cambridge Springs defence, Yugoslav variation": [
+      "D52"
+    ],
+    "4.Bg5 Be7": [
+      "D53"
+    ],
+    "Lasker variation": [
+      "D53"
+    ],
+    "4.Bg5 Be7, 5.e3 O-O": [
+      "D53"
+    ],
+    "Anti-neo-orthodox variation": [
+      "D54"
+    ],
+    "6.Nf3": [
+      "D55"
+    ],
+    "Pillsbury attack": [
+      "D55"
+    ],
+    "Neo-orthodox variation": [
+      "D55"
+    ],
+    "Neo-orthodox variation, 7.Bxf6": [
+      "D55"
+    ],
+    "Petrosian variation": [
+      "D55"
+    ],
+    "Neo-orthodox variation, 7.Bh4": [
+      "D55"
+    ],
+    "Lasker defence": [
+      "D56"
+    ],
+    "Lasker defence, Teichmann variation": [
+      "D56"
+    ],
+    "Lasker defence, Russian variation": [
+      "D56"
+    ],
+    "Lasker defence, main line": [
+      "D57"
+    ],
+    "Lasker defence, Bernstein variation": [
+      "D57"
+    ],
+    "Tartakower (Makagonov-Bondarevsky) system": [
+      "D58"
+    ],
+    "Tartakower (Makagonov-Bondarevsky) system, 8.cd Nxd5": [
+      "D59"
+    ],
+    "Tartakower variation": [
+      "D59"
+    ],
+    "Orthodox defence": [
+      "D60",
+      "D63"
+    ],
+    "Orthodox defence, Botvinnik variation": [
+      "D60"
+    ],
+    "Orthodox defence, Rauzer variation": [
+      "D60"
+    ],
+    "Orthodox defence, Rubinstein variation": [
+      "D61"
+    ],
+    "Orthodox defence, 7.Qc2 c5, 8.cd (Rubinstein)": [
+      "D62"
+    ],
+    "Orthodox defence, 7.Rc1": [
+      "D63"
+    ],
+    "Orthodox defence, Pillsbury attack": [
+      "D63"
+    ],
+    "Orthodox defence, Capablanca variation": [
+      "D63"
+    ],
+    "Orthodox defence, Swiss (Henneberger) variation": [
+      "D63"
+    ],
+    "Orthodox defence, Swiss, Karlsbad variation": [
+      "D63"
+    ],
+    "Orthodox defence, Rubinstein attack (with Rc1)": [
+      "D64"
+    ],
+    "Orthodox defence, Rubinstein attack, Wolf variation": [
+      "D64"
+    ],
+    "Orthodox defence, Rubinstein attack, Karlsbad variation": [
+      "D64"
+    ],
+    "Orthodox defence, Rubinstein attack, Gruenfeld variation": [
+      "D64"
+    ],
+    "Orthodox defence, Rubinstein attack, main line": [
+      "D65"
+    ],
+    "Orthodox defence, Bd3 line": [
+      "D66",
+      "D67"
+    ],
+    "Orthodox defence, Bd3 line, fianchetto variation": [
+      "D66"
+    ],
+    "Orthodox defence, Bd3 line, Capablanca freeing manoevre": [
+      "D67"
+    ],
+    "Orthodox defence, Bd3 line, Janowski variation": [
+      "D67"
+    ],
+    "Orthodox defence, Bd3 line, Alekhine variation": [
+      "D67"
+    ],
+    "Orthodox defence, Bd3 line, 11.O-O": [
+      "D67"
+    ],
+    "Orthodox defence, classical variation": [
+      "D68"
+    ],
+    "Orthodox defence, classical, 13.d1b1 (Maroczy)": [
+      "D68"
+    ],
+    "Orthodox defence, classical, 13.d1c2 (Vidmar)": [
+      "D68"
+    ],
+    "Orthodox defence, classical, 13.de": [
+      "D69"
+    ]
+  },
+  "QGD Slav defence": {
+    "Main Line": [
+      "D10"
+    ],
+    "exchange variation": [
+      "D10"
+    ]
+  },
+  "QGD Slav defence, Alekhine variation": {
+    "Main Line": [
+      "D10"
+    ]
+  },
+  "QGD Slav": {
+    "Winawer counter-gambit": [
+      "D10"
+    ],
+    "3.Nf3": [
+      "D11"
+    ],
+    "Breyer variation": [
+      "D11"
+    ],
+    "4.e3": [
+      "D11"
+    ],
+    "4.e3 Bf5": [
+      "D12"
+    ],
+    "Landau variation": [
+      "D12"
+    ],
+    "exchange variation": [
+      "D12",
+      "D13"
+    ],
+    "Amsterdam variation": [
+      "D12"
+    ],
+    "exchange variation, 6.Bf4 Bf5": [
+      "D14"
+    ],
+    "exchange, Trifunovic variation": [
+      "D14"
+    ],
+    "4.Nc3": [
+      "D15"
+    ],
+    "Suechting variation": [
+      "D15"
+    ],
+    "Schlechter variation": [
+      "D15"
+    ],
+    "5.e3 (Alekhine variation)": [
+      "D15"
+    ],
+    "Slav gambit": [
+      "D15"
+    ],
+    "Tolush-Geller gambit": [
+      "D15"
+    ],
+    "Smyslov variation": [
+      "D16"
+    ],
+    "Soultanbeieff variation": [
+      "D16"
+    ],
+    "Steiner variation": [
+      "D16"
+    ],
+    "Czech defence": [
+      "D17"
+    ],
+    "Krause attack": [
+      "D17"
+    ],
+    "Carlsbad variation": [
+      "D17"
+    ],
+    "Wiesbaden variation": [
+      "D17"
+    ],
+    "Dutch variation": [
+      "D18",
+      "D19"
+    ],
+    "Dutch, Lasker variation": [
+      "D18"
+    ],
+    "Dutch variation, main line": [
+      "D19"
+    ],
+    "Dutch, Saemisch variation": [
+      "D19"
+    ],
+    "Main Line": [
+      "D30"
+    ],
+    "Semmering variation": [
+      "D30"
+    ]
+  },
+  "QGD Slav accepted": {
+    "Main Line": [
+      "D15"
+    ],
+    "Alapin variation": [
+      "D16"
+    ]
+  },
+  "Queen's gambit accepted": {
+    "Main Line": [
+      "D20",
+      "D23"
+    ]
+  },
+  "QGA": {
+    "3.e4": [
+      "D20"
+    ],
+    "Linares variation": [
+      "D20"
+    ],
+    "Schwartz defence": [
+      "D20"
+    ],
+    "3.Nf3": [
+      "D21"
+    ],
+    "Ericson variation": [
+      "D21"
+    ],
+    "Alekhine defense, Borisenko-Furman variation": [
+      "D21"
+    ],
+    "Alekhine defence": [
+      "D22"
+    ],
+    "Alekhine defence, Alatortsev variation": [
+      "D22"
+    ],
+    "Haberditz variation": [
+      "D22"
+    ],
+    "Mannheim variation": [
+      "D23"
+    ],
+    "4...e6": [
+      "D26"
+    ],
+    "classical variation": [
+      "D26"
+    ],
+    "classical, Furman variation": [
+      "D26"
+    ],
+    "classical variation, 6.O-O": [
+      "D26"
+    ],
+    "classical, Steinitz variation": [
+      "D26"
+    ],
+    "classical, 6...a6": [
+      "D27"
+    ],
+    "classical, Rubinstein variation": [
+      "D27"
+    ],
+    "classical, Geller variation": [
+      "D27"
+    ],
+    "classical, 7.Qe2": [
+      "D28"
+    ],
+    "classical, 7...b5": [
+      "D28"
+    ],
+    "classical, Flohr variation": [
+      "D28"
+    ],
+    "classical, 8...Bb7": [
+      "D29"
+    ],
+    "classical, Smyslov variation": [
+      "D29"
+    ]
+  },
+  "QGA, 4.Nc3": {
+    "Main Line": [
+      "D24"
+    ]
+  },
+  "QGA, Bogolyubov variation": {
+    "Main Line": [
+      "D24"
+    ]
+  },
+  "QGA, 4.e3": {
+    "Main Line": [
+      "D25"
+    ]
+  },
+  "QGA, Smyslov variation": {
+    "Main Line": [
+      "D25"
+    ]
+  },
+  "QGA, Janowsky-Larsen variation": {
+    "Main Line": [
+      "D25"
+    ]
+  },
+  "QGA, Flohr variation": {
+    "Main Line": [
+      "D25"
+    ]
+  },
+  "Queen's gambit declined": {
+    "Main Line": [
+      "D30"
+    ]
+  },
+  "QGD semi-Slav": {
+    "Main Line": [
+      "D43"
+    ],
+    "Hastings variation": [
+      "D43"
+    ],
+    "5.Bg5 dc": [
+      "D44"
+    ],
+    "Botvinnik system (anti-Meran)": [
+      "D44"
+    ],
+    "Ekstrom variation": [
+      "D44"
+    ],
+    "anti-Meran gambit": [
+      "D44"
+    ],
+    "anti-Meran, Lilienthal variation": [
+      "D44"
+    ],
+    "anti-Meran, Szabo variation": [
+      "D44"
+    ],
+    "anti-Meran, Alatortsev system": [
+      "D44"
+    ],
+    "5.e3": [
+      "D45"
+    ],
+    "stonewall defence": [
+      "D45"
+    ],
+    "accelerated Meran (Alekhine variation)": [
+      "D45"
+    ],
+    "5...Nd7": [
+      "D45"
+    ],
+    "Stoltz variation": [
+      "D45"
+    ],
+    "Rubinstein (anti-Meran) system": [
+      "D45"
+    ],
+    "6.Bd3": [
+      "D46"
+    ],
+    "Bogolyubov variation": [
+      "D46"
+    ],
+    "Romih variation": [
+      "D46"
+    ],
+    "Chigorin defence": [
+      "D46"
+    ],
+    "7.Bc4": [
+      "D47"
+    ],
+    "Meran variation": [
+      "D47"
+    ],
+    "neo-Meran (Lundin variation)": [
+      "D47"
+    ],
+    "Meran, Wade variation": [
+      "D47"
+    ],
+    "Meran, 8...a6": [
+      "D48"
+    ],
+    "Meran, Pirc variation": [
+      "D48"
+    ],
+    "Meran": [
+      "D48"
+    ],
+    "Meran, Reynolds' variation": [
+      "D48"
+    ],
+    "Meran, old main line": [
+      "D48"
+    ],
+    "Meran, Blumenfeld variation": [
+      "D49"
+    ],
+    "Meran, Rabinovich variation": [
+      "D49"
+    ],
+    "Meran, Sozin variation": [
+      "D49"
+    ],
+    "Meran, Stahlberg variation": [
+      "D49"
+    ],
+    "Meran, Rellstab attack": [
+      "D49"
+    ]
+  },
+  "Neo-Gruenfeld defence": {
+    "Main Line": [
+      "D70"
+    ]
+  },
+  "Neo-Gruenfeld (Kemeri) defence": {
+    "Main Line": [
+      "D70"
+    ]
+  },
+  "Neo-Gruenfeld, 5.cd": {
+    "Main Line": [
+      "D71"
+    ]
+  },
+  "Neo-Gruenfeld, 5.cd, main line": {
+    "Main Line": [
+      "D72"
+    ]
+  },
+  "Neo-Gruenfeld, 5.Nf3": {
+    "Main Line": [
+      "D73"
+    ]
+  },
+  "Neo-Gruenfeld, 6.cd Nxd5, 7.O-O": {
+    "Main Line": [
+      "D74"
+    ]
+  },
+  "Neo-Gruenfeld, 6.cd Nxd5, 7.O-O c5, 8.Nc3": {
+    "Main Line": [
+      "D75"
+    ]
+  },
+  "Neo-Gruenfeld, 6.cd Nxd5, 7.O-O c5, 8.dc": {
+    "Main Line": [
+      "D75"
+    ]
+  },
+  "Neo-Gruenfeld, 6.cd Nxd5, 7.O-O Nb6": {
+    "Main Line": [
+      "D76"
+    ]
+  },
+  "Neo-Gruenfeld, 6.O-O": {
+    "Main Line": [
+      "D77"
+    ]
+  },
+  "Neo-Gruenfeld, 6.O-O c6": {
+    "Main Line": [
+      "D78"
+    ]
+  },
+  "Neo-Gruenfeld, 6.O-O, main line": {
+    "Main Line": [
+      "D79"
+    ]
+  },
+  "Gruenfeld defence": {
+    "Main Line": [
+      "D80"
+    ],
+    "Smyslov, main line": [
+      "D99"
+    ],
+    "Smyslov, Yugoslav variation": [
+      "D99"
+    ]
+  },
+  "Gruenfeld": {
+    "Spike gambit": [
+      "D80"
+    ],
+    "Stockholm variation": [
+      "D80"
+    ],
+    "Lundin variation": [
+      "D80"
+    ],
+    "Russian variation": [
+      "D81",
+      "D96"
+    ],
+    "4.Bf4": [
+      "D82"
+    ],
+    "Gruenfeld gambit": [
+      "D83"
+    ],
+    "Gruenfeld gambit, Capablanca variation": [
+      "D83"
+    ],
+    "Gruenfeld gambit, Botvinnik variation": [
+      "D83"
+    ],
+    "Gruenfeld gambit accepted": [
+      "D84"
+    ],
+    "exchange variation": [
+      "D85"
+    ],
+    "modern exchange variation": [
+      "D85"
+    ],
+    "exchange, classical variation": [
+      "D86"
+    ],
+    "exchange, Larsen variation": [
+      "D86"
+    ],
+    "exchange, Simagin's lesser variation": [
+      "D86"
+    ],
+    "exchange, Simagin's improved variation": [
+      "D86"
+    ],
+    "exchange, Spassky variation": [
+      "D87"
+    ],
+    "exchange, Seville variation": [
+      "D87"
+    ],
+    "Spassky variation, main line, 10...cd, 11.cd": [
+      "D88"
+    ],
+    "Spassky variation, main line, 13.Bd3": [
+      "D89"
+    ],
+    "exchange, Sokolsky variation": [
+      "D89"
+    ],
+    "Three knights variation": [
+      "D90"
+    ],
+    "Schlechter variation": [
+      "D90"
+    ],
+    "Flohr variation": [
+      "D90"
+    ],
+    "5.Bg5": [
+      "D91"
+    ],
+    "5.Bf4": [
+      "D92"
+    ],
+    "5.e3": [
+      "D94"
+    ],
+    "Makogonov variation": [
+      "D94"
+    ],
+    "Opovcensky variation": [
+      "D94"
+    ],
+    "Smyslov defence": [
+      "D94"
+    ],
+    "Flohr defence": [
+      "D94"
+    ],
+    "Botvinnik variation": [
+      "D95"
+    ],
+    "Pachman variation": [
+      "D95"
+    ],
+    "Russian variation with e4": [
+      "D97"
+    ],
+    "Russian, Alekhine (Hungarian) variation": [
+      "D97"
+    ],
+    "Russian, Szabo (Boleslavsky) variation": [
+      "D97"
+    ],
+    "Russian, Levenfish variation": [
+      "D97"
+    ],
+    "Russian, Byrne (Simagin) variation": [
+      "D97"
+    ],
+    "Russian, Prins variation": [
+      "D97"
+    ],
+    "Russian, Smyslov variation": [
+      "D98"
+    ],
+    "Russian, Keres variation": [
+      "D98"
+    ]
+  },
+  "Gruenfeld with Bf4    e3": {
+    "Main Line": [
+      "D93"
+    ]
+  },
+  "Gruenfeld with e3    Bd3": {
+    "Main Line": [
+      "D94"
+    ]
+  },
+  "Gruenfeld with e3 & Qb3": {
+    "Main Line": [
+      "D95"
+    ]
+  },
+  "Neo-Indian (Seirawan) attack": {
+    "Main Line": [
+      "E00"
+    ]
+  },
+  "Catalan opening": {
+    "Main Line": [
+      "E00"
+    ]
+  },
+  "Catalan": {
+    "closed": [
+      "E01"
+    ],
+    "open, 5.Qa4": [
+      "E02"
+    ],
+    "open, Alekhine variation": [
+      "E03"
+    ],
+    "open, 5.Qa4 Nbd7, 6.Qxc4": [
+      "E03"
+    ],
+    "open, 5.Nf3": [
+      "E04"
+    ],
+    "open, classical line": [
+      "E05"
+    ],
+    "closed, 5.Nf3": [
+      "E06"
+    ],
+    "closed, 6...Nbd7": [
+      "E07"
+    ],
+    "closed, Botvinnik variation": [
+      "E07"
+    ],
+    "closed, 7.Qc2": [
+      "E08"
+    ],
+    "closed, Zagoryansky variation": [
+      "E08"
+    ],
+    "closed, Qc2 & b3": [
+      "E08"
+    ],
+    "closed, Spassky gambit": [
+      "E08"
+    ],
+    "closed, main line": [
+      "E09"
+    ],
+    "closed, Sokolsky variation": [
+      "E09"
+    ]
+  },
+  "Blumenfeld counter-gambit": {
+    "Main Line": [
+      "E10"
+    ]
+  },
+  "Blumenfeld counter-gambit accepted": {
+    "Main Line": [
+      "E10"
+    ]
+  },
+  "Blumenfeld counter-gambit, Dus-Chotimursky variation": {
+    "Main Line": [
+      "E10"
+    ]
+  },
+  "Blumenfeld counter-gambit, Spielmann variation": {
+    "Main Line": [
+      "E10"
+    ]
+  },
+  "Dzindzikhashvili defence": {
+    "Main Line": [
+      "E10"
+    ]
+  },
+  "Bogo-Indian defence": {
+    "Main Line": [
+      "E11"
+    ]
+  },
+  "Bogo-Indian defence, Gruenfeld variation": {
+    "Main Line": [
+      "E11"
+    ]
+  },
+  "Bogo-Indian defence, Nimzovich variation": {
+    "Main Line": [
+      "E11"
+    ]
+  },
+  "Bogo-Indian defence, Monticelli trap": {
+    "Main Line": [
+      "E11"
+    ]
+  },
+  "Nimzo-Indian defence": {
+    "Main Line": [
+      "E20"
+    ]
+  },
+  "Nimzo-Indian": {
+    "Kmoch variation": [
+      "E20"
+    ],
+    "Mikenas attack": [
+      "E20"
+    ],
+    "Romanishin-Kasparov (Steiner) system": [
+      "E20"
+    ],
+    "three knights variation": [
+      "E21"
+    ],
+    "three knights, Korchnoi variation": [
+      "E21"
+    ],
+    "three knights, Euwe variation": [
+      "E21"
+    ],
+    "Spielmann variation": [
+      "E22"
+    ],
+    "Spielmann, 4...c5, 5.dc Nc6": [
+      "E23"
+    ],
+    "Spielmann, Karlsbad variation": [
+      "E23"
+    ],
+    "Spielmann, San Remo variation": [
+      "E23"
+    ],
+    "Spielmann, Staahlberg variation": [
+      "E23"
+    ],
+    "Saemisch variation": [
+      "E24",
+      "E25",
+      "E26",
+      "E27",
+      "E28"
+    ],
+    "Saemisch, Botvinnik variation": [
+      "E24"
+    ],
+    "Saemisch, Keres variation": [
+      "E25"
+    ],
+    "Saemisch, Romanovsky variation": [
+      "E25"
+    ],
+    "Saemisch, O'Kelly variation": [
+      "E26"
+    ],
+    "Saemisch, main line": [
+      "E29"
+    ],
+    "Saemisch, Capablanca variation": [
+      "E29"
+    ],
+    "Leningrad variation": [
+      "E30"
+    ],
+    "Leningrad, ...b5 gambit": [
+      "E30"
+    ],
+    "Leningrad, main line": [
+      "E31"
+    ],
+    "classical variation": [
+      "E32"
+    ],
+    "classical, Adorjan gambit": [
+      "E32"
+    ],
+    "classical, 4...Nc6": [
+      "E33"
+    ],
+    "classical, Milner-Barry (Zurich) variation": [
+      "E33"
+    ],
+    "classical, Noa variation": [
+      "E34"
+    ],
+    "classical, Noa variation, 5.cd ed": [
+      "E35"
+    ],
+    "classical, Noa variation, 5.a3": [
+      "E36"
+    ],
+    "classical, Botvinnik variation": [
+      "E36"
+    ],
+    "classical, Noa variation, main line": [
+      "E36"
+    ],
+    "classical, Noa variation, main line, 7.Qc2": [
+      "E37"
+    ],
+    "classical, San Remo variation": [
+      "E37"
+    ],
+    "classical, 4...c5": [
+      "E38"
+    ],
+    "classical, Pirc variation": [
+      "E39"
+    ],
+    "4.e3": [
+      "E40"
+    ],
+    "4.e3, Taimanov variation": [
+      "E40"
+    ],
+    "4.e3 c5": [
+      "E41"
+    ],
+    "e3, Huebner variation": [
+      "E41"
+    ],
+    "4.e3 c5, 5.Ne2 (Rubinstein)": [
+      "E42"
+    ],
+    "Fischer variation": [
+      "E43"
+    ],
+    "Fischer variation, 5.Ne2": [
+      "E44"
+    ],
+    "4.e3, Bronstein (Byrne) variation": [
+      "E45"
+    ],
+    "4.e3 O-O": [
+      "E46"
+    ],
+    "Reshevsky variation": [
+      "E46"
+    ],
+    "Simagin variation": [
+      "E46"
+    ],
+    "4.e3 O-O, 5.Bd3": [
+      "E47"
+    ],
+    "4.e3 O-O, 5.Bd3 d5": [
+      "E48"
+    ],
+    "4.e3, Botvinnik system": [
+      "E49"
+    ],
+    "4.e3 e8g8, 5.Nf3, without ...d5": [
+      "E50"
+    ],
+    "4.e3 e8g8, 5.Nf3 d7d5": [
+      "E51"
+    ],
+    "4.e3, Ragozin variation": [
+      "E51"
+    ],
+    "4.e3, main line with ...b6": [
+      "E52"
+    ],
+    "4.e3, main line with ...c5": [
+      "E53"
+    ],
+    "4.e3, Keres variation": [
+      "E53"
+    ],
+    "4.e3, Gligoric system with 7...Nbd7": [
+      "E53"
+    ],
+    "4.e3, Gligoric system with 7...dc": [
+      "E54"
+    ],
+    "4.e3, Gligoric system, Smyslov variation": [
+      "E54"
+    ],
+    "4.e3, Gligoric system, Bronstein variation": [
+      "E55"
+    ],
+    "4.e3, main line with 7...Nc6": [
+      "E56"
+    ],
+    "4.e3, main line with 8...dc and 9...cd": [
+      "E57"
+    ],
+    "4.e3, main line with 8...Bxc3": [
+      "E58"
+    ],
+    "4.e3, main line": [
+      "E59"
+    ]
+  },
+  "King's Indian defence": {
+    "Main Line": [
+      "E60"
+    ]
+  },
+  "King's Indian, 3.Nf3": {
+    "Main Line": [
+      "E60"
+    ]
+  },
+  "King's Indian defence, 3.Nc3": {
+    "Main Line": [
+      "E61"
+    ]
+  },
+  "King's Indian with e4 & g3": {
+    "Main Line": [
+      "E72"
+    ]
+  }
+}
