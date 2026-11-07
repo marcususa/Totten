@@ -1,3 +1,4 @@
+# theme_chooser.py
 import json
 import sys
 import os
@@ -16,13 +17,30 @@ while ROOT_DIR != ROOT_DIR.parent:
 DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
 USER_THEMES_FILE = ROOT_DIR / "user_themes.json"
 
-# Load static defaults directly from JSON
+# 1. Load static defaults first as the fallback foundation
 try:
     with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
         THEME_DEFAULTS = json.load(f)
 except Exception as e:
     print(f"[THEME] Error loading {DEFAULTS_FILE}: {e}")
     THEME_DEFAULTS = {}
+
+# 2. Establish AVAILABLE_THEMES starting with defaults
+AVAILABLE_THEMES = json.loads(json.dumps(THEME_DEFAULTS))
+
+# 3. OVERRIDE with user_themes.json (User custom themes take absolute priority)
+if USER_THEMES_FILE.exists():
+    try:
+        with open(USER_THEMES_FILE, "r", encoding="utf-8") as f:
+            u_data = json.load(f)
+            if isinstance(u_data, dict):
+                custom_dict = u_data.get("custom_themes", {})
+                if isinstance(custom_dict, dict) and custom_dict:
+                    for hue_key, hue_val in custom_dict.items():
+                        AVAILABLE_THEMES[hue_key] = hue_val
+                    print(f"[THEME] Loaded custom user themes from {USER_THEMES_FILE}")
+    except Exception as e:
+        print(f"[THEME] Error loading {USER_THEMES_FILE}: {e}")
 
 
 class ThemeChooserWindow(ctk.CTkToplevel):
@@ -97,7 +115,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         saved_group_locks = latest_theme.get("group_locks") or mixer_state.get("group_locks", {})
         saved_var_cols = latest_theme.get("var_columns") or mixer_state.get("var_columns", {})
 
-        hue_choices = list(THEME_DEFAULTS.keys())
+        hue_choices = list(AVAILABLE_THEMES.keys())
         default_hue = hue_choices[0] if hue_choices else "Red"
 
         # Initialize group columns and lock states
@@ -170,7 +188,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         row_idx = 0
         tier_keys = ["Light", "Medium", "Dark"]
 
-        for hue_name, tiers in THEME_DEFAULTS.items():
+        for hue_name, tiers in AVAILABLE_THEMES.items():
             ctk.CTkLabel(
                 grid_container, text=hue_name,
                 font=("Arial", 12, "bold")
@@ -180,7 +198,11 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                 tier_data = tiers.get(tier_key)
 
                 if tier_data and isinstance(tier_data, dict):
-                    swatch_color = tier_data.get("dark_square", tier_data.get("btn_initial", "#3b82f6"))
+                    swatch_color = (
+                        tier_data.get("dark_square") or
+                        tier_data.get("light_square") or
+                        "#3b82f6"
+                    )
 
                     swatch = ctk.CTkButton(
                         grid_container, text="", width=45, height=24,
@@ -287,7 +309,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             self.ui_tier_btns[t_name] = btn
         self.update_tier_buttons(self.ui_tier_var, self.ui_tier_btns)
 
-        # Variable Headers (4 variables for Column 1, 4 variables for Column 2)
+        # Variable Headers
         var_headers_frame = ctk.CTkFrame(right_column, fg_color="transparent")
         var_headers_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 4))
         var_headers_frame.grid_columnconfigure(0, weight=1)
@@ -303,19 +325,22 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             font=("Arial", 11, "bold")
         ).grid(row=0, column=1, sticky="w", padx=(5, 0))
 
-        # Variable containers holding the 4 variables per column layout
+        # Variable containers holding the layout
         var_containers_frame = ctk.CTkFrame(right_column, fg_color="transparent")
         var_containers_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=0)
         var_containers_frame.grid_columnconfigure(0, weight=1)
         var_containers_frame.grid_columnconfigure(1, weight=1)
+        var_containers_frame.grid_rowconfigure(0, weight=1)
 
         self.vars_container_col2 = ctk.CTkFrame(var_containers_frame, fg_color="transparent")
         self.vars_container_col2.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=0)
+        self.vars_container_col2.grid_columnconfigure(0, weight=1)
 
         self.vars_container_col3 = ctk.CTkFrame(var_containers_frame, fg_color="transparent")
         self.vars_container_col3.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=0)
+        self.vars_container_col3.grid_columnconfigure(0, weight=1)
 
-        # Populate grouped variable lists initially (which will also inject the board background and apply button)
+        # Populate grouped variable lists initially
         self.populate_variable_lists()
 
         # Set optimal initial size while allowing free resizing
@@ -500,10 +525,10 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             target_frame = self.vars_container_col2 if g_col == 2 else self.vars_container_col3
 
             group_frame = ctk.CTkFrame(target_frame, fg_color=("#262626", "#1e1e1e"), corner_radius=6)
-            group_frame.pack(fill="x", pady=(4, 6), padx=1)
+            group_frame.pack(fill="x", pady=(4, 6), padx=2, expand=False)
 
             g_header = ctk.CTkFrame(group_frame, fg_color="transparent")
-            g_header.pack(fill="x", padx=6, pady=4)
+            g_header.pack(fill="x", padx=8, pady=4)
 
             ctk.CTkLabel(
                 g_header, text=group_name,
@@ -515,8 +540,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
 
             lock_text = "+" if is_locked else "X"
             lock_btn = ctk.CTkButton(
-                right_ctrls, text=lock_text, width=26, height=26,
-                font=("Arial", 11, "bold"),
+                right_ctrls, text=lock_text, width=24, height=24,
+                font=("Arial", 10, "bold"),
                 fg_color=("#374151", "#2d3748"),
                 hover_color=("#4b5563", "#4a5568"),
                 text_color=("#9ca3af", "#d1d5db"),
@@ -527,8 +552,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             if is_locked:
                 arrow_text = "▶" if g_col == 2 else "◀"
                 swap_group_btn = ctk.CTkButton(
-                    right_ctrls, text=arrow_text, width=26, height=26,
-                    font=("Arial", 11, "bold"),
+                    right_ctrls, text=arrow_text, width=24, height=24,
+                    font=("Arial", 10, "bold"),
                     fg_color=("#374151", "#2d3748"),
                     hover_color=("#4b5563", "#4a5568"),
                     text_color=("#9ca3af", "#d1d5db"),
@@ -544,13 +569,12 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                     v_row = ctk.CTkFrame(group_frame, fg_color="transparent")
                     v_row.pack(fill="x", padx=6, pady=2)
 
-                    ctk.CTkLabel(v_row, text=var, font=("Arial", 9), text_color=("gray80", "gray70")).pack(side="left",
-                                                                                                           padx=(4, 0))
+                    ctk.CTkLabel(v_row, text=var, font=("Arial", 9), text_color=("gray80", "gray70")).pack(side="left", padx=(4, 0))
 
                     var_arrow = "▶" if v_col == 2 else "◀"
                     var_swap_btn = ctk.CTkButton(
-                        v_row, text=var_arrow, width=26, height=26,
-                        font=("Arial", 11, "bold"),
+                        v_row, text=var_arrow, width=24, height=24,
+                        font=("Arial", 10, "bold"),
                         fg_color=("#374151", "#2d3748"),
                         hover_color=("#4b5563", "#4a5568"),
                         text_color=("#9ca3af", "#d1d5db"),
@@ -561,10 +585,9 @@ class ThemeChooserWindow(ctk.CTkToplevel):
             if not is_locked:
                 for var in variables:
                     if self.var_columns[var] != g_col:
-                        other_frame = self.vars_container_col2 if self.var_columns[
-                                                                      var] == 2 else self.vars_container_col3
+                        other_frame = self.vars_container_col2 if self.var_columns[var] == 2 else self.vars_container_col3
                         ind_row = ctk.CTkFrame(other_frame, fg_color=("#262626", "#1e1e1e"), corner_radius=4)
-                        ind_row.pack(fill="x", pady=(2, 4), padx=1)
+                        ind_row.pack(fill="x", pady=(2, 4), padx=2)
 
                         inner = ctk.CTkFrame(ind_row, fg_color="transparent")
                         inner.pack(fill="x", padx=6, pady=4)
@@ -575,8 +598,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                         v_col = self.var_columns[var]
                         var_arrow = "▶" if v_col == 2 else "◀"
                         var_swap_btn = ctk.CTkButton(
-                            inner, text=var_arrow, width=26, height=26,
-                            font=("Arial", 11, "bold"),
+                            inner, text=var_arrow, width=24, height=24,
+                            font=("Arial", 10, "bold"),
                             fg_color=("#374151", "#2d3748"),
                             hover_color=("#4b5563", "#4a5568"),
                             text_color=("#9ca3af", "#d1d5db"),
@@ -584,9 +607,9 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                         )
                         var_swap_btn.pack(side="right", padx=(2, 0))
 
-        # Inject Board Background controls right under "Status" in Column 1 variable column matching the Apply Changes button size and spacing
+        # Inject Board Background controls right under "Status" in Column 1 variable column
         board_container_frame = ctk.CTkFrame(self.vars_container_col2, fg_color="transparent", corner_radius=0)
-        board_container_frame.pack(fill="x", pady=(4, 6), padx=1)
+        board_container_frame.pack(fill="x", pady=(4, 6), padx=2)
 
         board_row_frame = ctk.CTkFrame(board_container_frame, fg_color="transparent")
         board_row_frame.pack(fill="x", padx=6, pady=4)
@@ -600,8 +623,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         right_bg_ctrls.pack(side="right")
 
         btn_add_bg = ctk.CTkButton(
-            right_bg_ctrls, text="+", width=26, height=26,
-            font=("Arial", 11, "bold"),
+            right_bg_ctrls, text="+", width=24, height=24,
+            font=("Arial", 10, "bold"),
             fg_color=("#374151", "#2d3748"),
             hover_color=("#4b5563", "#4a5568"),
             text_color=("#9ca3af", "#d1d5db"),
@@ -610,8 +633,8 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         btn_add_bg.pack(side="left", padx=(2, 0))
 
         btn_remove_bg = ctk.CTkButton(
-            right_bg_ctrls, text="X", width=26, height=26,
-            font=("Arial", 11, "bold"),
+            right_bg_ctrls, text="X", width=24, height=24,
+            font=("Arial", 10, "bold"),
             fg_color=("#374151", "#2d3748"),
             hover_color=("#4b5563", "#4a5568"),
             text_color=("#9ca3af", "#d1d5db"),
@@ -621,7 +644,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
 
         # Inject Apply Changes button at the bottom of Column 2 variable column
         apply_btn_frame = ctk.CTkFrame(self.vars_container_col3, fg_color="transparent")
-        apply_btn_frame.pack(anchor="w", pady=(8, 0), padx=1)
+        apply_btn_frame.pack(anchor="w", pady=(8, 0), padx=2)
 
         apply_mix_btn = ctk.CTkButton(
             apply_btn_frame, text="Apply Changes",
@@ -660,9 +683,9 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         self.save_mixer_state()
 
     def apply_theme_live(self, hue, tier):
-        """Applies a standard theme."""
+        """Applies a standard theme using AVAILABLE_THEMES."""
         try:
-            tier_data = THEME_DEFAULTS.get(hue, {}).get(tier, {})
+            tier_data = AVAILABLE_THEMES.get(hue, {}).get(tier, {})
 
             theme_entry = {
                 "label": f"{hue} ({tier})",
@@ -697,15 +720,15 @@ class ThemeChooserWindow(ctk.CTkToplevel):
         os.execv(python, [python] + sys.argv)
 
     def apply_mixed_theme(self):
-        """Applies a mixed theme."""
+        """Applies a mixed theme using AVAILABLE_THEMES."""
         color1_hue = self.board_combo_var.get()
         color2_hue = self.ui_combo_var.get()
         c1_tier = self.board_tier_var.get()
         c2_tier = self.ui_tier_var.get()
 
         try:
-            c1_base = THEME_DEFAULTS.get(color1_hue, {})
-            c2_base = THEME_DEFAULTS.get(color2_hue, {})
+            c1_base = AVAILABLE_THEMES.get(color1_hue, {})
+            c2_base = AVAILABLE_THEMES.get(color2_hue, {})
 
             mixed_tier = {}
             for var, col in self.var_columns.items():
@@ -730,7 +753,7 @@ class ThemeChooserWindow(ctk.CTkToplevel):
                 "color2_hue": color2_hue,
                 "color2_tier": c2_tier,
                 "group_columns": self.group_columns,
-                "group_locks": self.group_locks,
+                "group_locks": self.group_locked,
                 "var_columns": self.var_columns
             }
 
