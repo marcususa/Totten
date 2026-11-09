@@ -48,7 +48,6 @@ def apply_preview_to_active(self):
             break
 
     if target_key:
-        # coord_key is (tier_key, prop)
         _, prop = target_key
         self.active_themes[hue][tier][prop] = hex_color
 
@@ -102,7 +101,13 @@ def save_user_themes(self):
     """Saves current theme customizations to user_themes.json and restarts the app to apply changes instantly."""
     self.sync_current_view_to_memory()
 
-    # Load existing user_themes.json first to avoid wiping out mixer_state or current_themes
+    hue = self.selected_hue_var.get() if hasattr(self, "selected_hue_var") else "Red"
+    tier = self.selected_tier_var.get() if hasattr(self, "selected_tier_var") else "Medium"
+
+    # Extract the exact 26-variable dictionary that was just edited
+    edited_tier_dict = self.active_themes.get(hue, {}).get(tier, {})
+
+    # Load existing user_themes.json first to preserve mixer state and other history
     existing_data = {}
     if USER_THEMES_FILE.exists():
         try:
@@ -111,10 +116,16 @@ def save_user_themes(self):
         except Exception:
             pass
 
-    # Update or merge fields safely
+    # Update fields safely: update custom_themes AND make this edited theme active immediately
     existing_data["custom_themes"] = self.active_themes
-    existing_data["last_active_hue"] = self.selected_hue_var.get() if hasattr(self, "selected_hue_var") else "Red"
-    existing_data["last_active_tier"] = self.selected_tier_var.get() if hasattr(self, "selected_tier_var") else "Medium"
+    existing_data["active_theme"] = edited_tier_dict
+
+    # If a custom mixed theme override existed, clear it so the editor's direct palette takes precedence
+    if "custom_mixed_theme" in existing_data:
+        del existing_data["custom_mixed_theme"]
+
+    existing_data["last_active_hue"] = hue
+    existing_data["last_active_tier"] = tier
 
     try:
         with open(USER_THEMES_FILE, "w", encoding="utf-8") as f:

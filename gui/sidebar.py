@@ -100,7 +100,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_catalog = ctk.CTkButton(
             self, text="Catalog", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             command=lambda: state.show_workspace("search_catalog")
         )
         self.btn_catalog.pack(fill="x", padx=4, pady=(15, 4))
@@ -108,7 +108,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_analysis = ctk.CTkButton(
             self, text="Analysis", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             command=lambda: state.show_workspace("analysis")
         )
         self.btn_analysis.pack(fill="x", padx=4, pady=4)
@@ -116,7 +116,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_patterns = ctk.CTkButton(
             self, text="Patterns", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             command=lambda: state.show_workspace("patterns")
         )
         self.btn_patterns.pack(fill="x", padx=4, pady=4)
@@ -124,7 +124,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_mixed = ctk.CTkButton(
             self, text="Mixed", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             command=lambda: state.show_workspace("mixed")
         )
         self.btn_mixed.pack(fill="x", padx=4, pady=4)
@@ -132,7 +132,7 @@ class Sidebar(ctk.CTkFrame):
         self.btn_calendar = ctk.CTkButton(
             self, text="Calendar", anchor="w", fg_color="transparent",
             hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=10),
+            font=ctk.CTkFont(size=11),
             command=lambda: state.show_workspace("calendar")
         )
         self.btn_calendar.pack(fill="x", padx=4, pady=4)
@@ -158,7 +158,7 @@ class Sidebar(ctk.CTkFrame):
         self.txt_qeval_moves.bind("<Button-2>", self._on_qeval_right_click)
 
         self.btn_qeval_analysis = ctk.CTkButton(
-            self, text="Analyze", height=24, font=ctk.CTkFont(size=9),
+            self, text="Analyze", height=24, font=ctk.CTkFont(size=10),
             fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
             text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
             command=self.handle_qeval_send_analysis
@@ -169,26 +169,24 @@ class Sidebar(ctk.CTkFrame):
         self.account_panel = ctk.CTkFrame(self, fg_color="transparent")
         self.account_panel.pack(fill="x", padx=4, pady=(12, 6))
 
-        # Chess.com Centered Button
+        # Chess.com Button
         cc_text = self.cc_saved_username if self.cc_saved_username else "Chess.com"
         self.btn_cc_user = ctk.CTkButton(
             self.account_panel, text=cc_text, height=22, anchor="center", font=ctk.CTkFont(size=9, weight="bold"),
-            fg_color=THEME["btn_initial"] if self.active_platform == "chess_com" else THEME["bg_surface"],
+            fg_color=THEME["btn_initial"],
             hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(
-                THEME.get("btn_initial", "#344268")) if self.active_platform == "chess_com" else THEME["text_primary"],
+            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
             command=lambda: self._trigger_platform_action("chess_com", action="last")
         )
         self.btn_cc_user.pack(fill="x", pady=(0, 4))
 
-        # Lichess.org Centered Button
+        # Lichess.org Button (Consistently Styled)
         lich_text = self.lich_saved_username if self.lich_saved_username else "Lichess.org"
         self.btn_lich_user = ctk.CTkButton(
             self.account_panel, text=lich_text, height=22, anchor="center", font=ctk.CTkFont(size=9, weight="bold"),
-            fg_color=THEME["btn_initial"] if self.active_platform == "lichess" else THEME["bg_surface"],
+            fg_color=THEME["btn_initial"],
             hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(
-                THEME.get("btn_initial", "#344268")) if self.active_platform == "lichess" else THEME["text_primary"],
+            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
             command=lambda: self._trigger_platform_action("lichess", action="last")
         )
         self.btn_lich_user.pack(fill="x", pady=(0, 6))
@@ -199,8 +197,9 @@ class Sidebar(ctk.CTkFrame):
             var = ctk.BooleanVar(value=self.filters.get(mode, False))
             chk = ctk.CTkCheckBox(
                 self.account_panel, text=mode, variable=var,
-                font=("Arial", 9, "bold"), checkbox_width=12, checkbox_height=12,
+                font=("Arial", 10, "bold"), checkbox_width=12, checkbox_height=12,
                 border_width=1, corner_radius=2,
+                text_color=THEME.get("text_secondary", "#aaaaaa"),
                 command=lambda m=mode: self._toggle_sidebar_filter(m)
             )
             chk.pack(anchor="w", padx=2, pady=1)
