@@ -334,14 +334,7 @@ class CatalogUIMixin:
                         self.after_cancel(self._click_timer)
                     self._click_timer = self.after(250, lambda: self.toggle_group_expansion(gk))
 
-                def handle_double_click(e, idata=item_data):
-                    if hasattr(self, "_click_timer") and self._click_timer:
-                        self.after_cancel(self._click_timer)
-                        self._click_timer = None
-                    self.on_group_click(idata)
-
                 row_btn.bind("<Button-1>", handle_single_click)
-                row_btn.bind("<Double-Button-1>", handle_double_click)
 
                 if is_expanded:
                     sub_container = ctk.CTkFrame(
@@ -401,4 +394,4 @@ class CatalogUIMixin:
                         )
                         more_btn.pack(fill="x", padx=10, pady=6)
 
-                self.lbl_tag_count.configure(text=f"Opening: {self.active_opening_filter or 'All'}")
+        self.lbl_tag_count.configure(text=f"Opening: {self.active_opening_filter or 'All'}")

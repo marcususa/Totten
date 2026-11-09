@@ -50,16 +50,7 @@ class CatalogActionsMixin:
         self.is_ae_search = True
         # -----------------------
 
-        # 1. PRINT WHAT PYTHON WANTS IT TO DO
         required, excluded, optional = self._parse_search_query(query_text)
-        print("\n" + "=" * 50)
-        print(f"[PYTHON INTENT] User typed search query: '{query_text}'")
-        print(f"[PYTHON INTENT] Parsed Required Terms: {required}")
-        print(f"[PYTHON INTENT] Parsed Optional Terms: {optional}")
-        print(f"[PYTHON INTENT] Parsed Excluded Terms: {excluded}")
-        print(f"[PYTHON INTENT] Active Flag is_ae_search: {self.is_ae_search}")
-        print(f"[PYTHON INTENT] Target ECO Range allowed: {ALL_ECO_LETTERS}")
-        print("=" * 50 + "\n")
 
         if hasattr(self, "_rebuild_eco_filter_buttons"):
             try:
@@ -151,7 +142,7 @@ class CatalogActionsMixin:
             con = duckdb.connect(str(self.db_path), read_only=True)
             tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
             if "catalog_headers" not in tables:
-                print("[DUCKDB ERROR] 'catalog_headers' table not found in database tables:", tables)
+                print("[DUCKDB ERROR] 'catalog_headers' table not found in base tables:", tables)
                 con.close()
                 return
 
@@ -214,15 +205,8 @@ class CatalogActionsMixin:
             rows = con.execute(sql, params).fetchall()
             con.close()
 
-            print(f"\n[DUCKDB RAW SQL EXECUTED]: {sql}")
-            print(f"[DUCKDB PARAMS]: {params}")
-            print(f"[DUCKDB RAW RESULT COUNT]: Fetched {len(rows)} total rows from database.")
-
             self.search_flat_results = None
             grouped_map = {}
-
-            accepted_count = 0
-            rejected_count = 0
 
             for eco, opening, variation, white, black, game_index, headers_json, pgn_text in rows:
                 eco_val = eco or "A00"
@@ -230,15 +214,7 @@ class CatalogActionsMixin:
 
                 if is_ae_search:
                     if not clean_eco or clean_eco[0] not in ALL_ECO_LETTERS:
-                        rejected_count += 1
-                        if rejected_count <= 5:
-                            print(
-                                f"[DUCKDB REJECTED BY PYTHON] ECO value '{eco_val}' (Opening: {opening}) does not start with A-E.")
                         continue
-
-                accepted_count += 1
-                if accepted_count <= 5:
-                    print(f"[DUCKDB ACCEPTED VALUE] ECO: '{eco_val}' | Opening: '{opening}' | Variation: '{variation}'")
 
                 op_val = opening or "Unknown Opening"
                 var_val = variation or "Main Line"
@@ -272,21 +248,16 @@ class CatalogActionsMixin:
                 })
 
             self.aggregated_games_data = list(grouped_map.values())
-            print(
-                f"[SUMMARY] Total Rows Accepted by Python filter: {accepted_count} | Total Rejected: {rejected_count}")
-            print(f"[SUMMARY] Final Formatted Opening Groups: {len(self.aggregated_games_data)}\n")
 
         except Exception as e:
             print(f"[DuckDB Summary Error] {e}")
 
     def fetch_group_instances_lazily(self, group_key):
+        """Strictly queries DuckDB for ALL games matching this exact ECO, Opening, and Variation subset."""
         if group_key in self.lazy_loaded_instances:
-            return self.lazy_loaded_instances[group_key]
-
-        for item in self.aggregated_games_data:
-            if (item["eco"], item["opening"], item["variation"]) == group_key and item.get("instances"):
-                self.lazy_loaded_instances[group_key] = item["instances"]
-                return item["instances"]
+            cached = self.lazy_loaded_instances[group_key]
+            if cached:
+                return cached
 
         eco, opening, variation = group_key
         instances = []
@@ -297,7 +268,9 @@ class CatalogActionsMixin:
                 rows = con.execute("""
                     SELECT game_index, white, black, headers_json, pgn_text 
                     FROM catalog_headers 
-                    WHERE eco = ? AND opening = ? AND variation = ?
+                    WHERE UPPER(TRIM(eco)) = UPPER(TRIM(?)) 
+                      AND LOWER(TRIM(opening)) = LOWER(TRIM(?)) 
+                      AND LOWER(TRIM(variation)) = LOWER(TRIM(?))
                 """, [eco, opening, variation]).fetchall()
                 con.close()
 
@@ -307,6 +280,11 @@ class CatalogActionsMixin:
                     except Exception:
                         headers = {}
 
+                    if "White" not in headers and white:
+                        headers["White"] = white
+                    if "Black" not in headers and black:
+                        headers["Black"] = black
+
                     instances.append({
                         "game_index": game_index,
                         "headers": headers,
@@ -314,9 +292,10 @@ class CatalogActionsMixin:
                         "pgn_text": pgn_text
                     })
             except Exception as e:
-                print(f"[DuckDB Lazy Load Error] {e}")
+                print(f"[DuckDB Subset Query Error]: {e}")
 
-        self.lazy_loaded_instances[group_key] = instances
+        if instances:
+            self.lazy_loaded_instances[group_key] = instances
         return instances
 
     def select_opening_filter(self, opening_name):
@@ -343,103 +322,74 @@ class CatalogActionsMixin:
         if not item_data or not game_data:
             return
 
-        current_opening = item_data.get("opening", "").strip()
-        if current_opening:
-            history = state.catalog_state.get("recent_openings", [])
-            if current_opening in history:
-                history.remove(current_opening)
-            history.insert(0, current_opening)
-            state.catalog_state["recent_openings"] = history
-            self._save_preferences()
+        # 1. Strictly query DuckDB for all games matching this exact ECO, Opening, and Variation
+        group_key = (item_data.get("eco"), item_data.get("opening"), item_data.get("variation"))
+        instances = self.fetch_group_instances_lazily(group_key)
+        if not instances:
+            instances = item_data.get("instances", [])
 
-        instances = item_data.get("instances", [])
-        if not instances and getattr(self, "search_flat_results", None):
-            instances = self.search_flat_results
-        elif not instances:
-            group_key = (item_data["eco"], item_data["opening"], item_data["variation"])
-            instances = self.fetch_group_instances_lazily(group_key)
-            item_data["instances"] = instances
-
+        # 2. Parse game objects for the exact variation subset
+        subset_games = []
         target_game_obj = game_data.get("game_object")
 
         for inst in instances:
-            if not inst.get("game_object") and inst.get("pgn_text"):
+            g_obj = inst.get("game_object")
+            if not g_obj and inst.get("pgn_text"):
                 try:
-                    inst["game_object"] = chess.pgn.read_game(io.StringIO(inst["pgn_text"]))
+                    g_obj = chess.pgn.read_game(io.StringIO(inst["pgn_text"]))
+                    inst["game_object"] = g_obj
                 except Exception:
                     pass
-
-        missing_indices = {
-            inst.get("game_index") for inst in instances
-            if not inst.get("game_object") and inst.get("game_index") is not None
-        }
-
-        if missing_indices and self.pgn_path.exists():
-            try:
-                max_idx = max(missing_indices)
-                with open(self.pgn_path, "r", encoding="utf-8", errors="replace") as f:
-                    idx = 0
-                    while idx <= max_idx:
-                        parsed = chess.pgn.read_game(f)
-                        if parsed is None:
-                            break
-                        if idx in missing_indices:
-                            for inst in instances:
-                                if inst.get("game_index") == idx:
-                                    inst["game_object"] = parsed
-                                    break
-                        idx += 1
-            except Exception as e:
-                print(f"[Fallback Batch PGN Read Error] {e}")
-
-        game_list = []
-        for inst in instances:
-            g_obj = inst.get("game_object")
             if g_obj:
-                game_list.append(g_obj)
+                subset_games.append(g_obj)
                 if inst == game_data and not target_game_obj:
                     target_game_obj = g_obj
 
-        if not target_game_obj and game_list:
-            target_game_obj = game_list[0]
-        elif not game_list and target_game_obj:
-            game_list = [target_game_obj]
-
-        active_index = 0
-        if target_game_obj in game_list:
-            active_index = game_list.index(target_game_obj)
-
-        state.catalog_state["active_games"] = game_list if game_list else [target_game_obj]
-        state.catalog_state["active_focus"] = target_game_obj
-        state.catalog_state["active_index"] = active_index
-
-        sw_func = None
-        if hasattr(state, "show_workspace") and callable(state.show_workspace):
-            sw_func = state.show_workspace
-        elif hasattr(self.winfo_toplevel(), "show_workspace") and callable(
-                getattr(self.winfo_toplevel(), "show_workspace")):
-            sw_func = self.winfo_toplevel().show_workspace
-        elif hasattr(self.master, "show_workspace") and callable(getattr(self.master, "show_workspace")):
-            sw_func = self.master.show_workspace
-
-        if sw_func:
+        if not target_game_obj and game_data.get("pgn_text"):
             try:
-                sw_func("analysis", initial_games=state.catalog_state["active_games"], target_game=target_game_obj,
-                        active_index=active_index)
-                return
+                target_game_obj = chess.pgn.read_game(io.StringIO(game_data["pgn_text"]))
+                game_data["game_object"] = target_game_obj
+                if target_game_obj not in subset_games:
+                    subset_games.insert(0, target_game_obj)
             except Exception:
                 pass
 
-        self._navigate_to_analysis()
+        if not subset_games and target_game_obj:
+            subset_games = [target_game_obj]
+
+        target_index = 0
+        if target_game_obj in subset_games:
+            target_index = subset_games.index(target_game_obj)
+
+        # 3. Save subset to state
+        state.catalog_state["active_games"] = subset_games
+        state.catalog_state["active_focus"] = target_game_obj
+        state.catalog_state["active_index"] = target_index
+        self._save_preferences()
+
+        # 4. Trigger seamless transition to analysis workspace
+        if hasattr(state, "show_workspace") and callable(state.show_workspace):
+            try:
+                state.show_workspace(
+                    "analysis",
+                    initial_games=subset_games,
+                    target_game=target_game_obj,
+                    active_index=target_index
+                )
+                return
+            except Exception as e:
+                print(f"[Catalog Actions Nav Error]: {e}")
+
+        if hasattr(state, "register_nav_listener"):
+            state.trigger_nav_listener("catalog_analysis")
 
     def on_group_click(self, item_data):
         if not item_data:
             return
-        instances = item_data.get("instances", [])
+        group_key = (item_data.get("eco"), item_data.get("opening"), item_data.get("variation"))
+        instances = self.fetch_group_instances_lazily(group_key)
         if not instances:
-            group_key = (item_data["eco"], item_data["opening"], item_data["variation"])
-            instances = self.fetch_group_instances_lazily(group_key)
-            item_data["instances"] = instances
+            instances = item_data.get("instances", [])
         if not instances:
             return
         self.on_game_click(item_data, instances[0])
