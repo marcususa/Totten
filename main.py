@@ -225,7 +225,28 @@ class Totten(ctk.CTk):
                 state.calendar_workspace.update_date_display()
 
 
+import json
+
+def initialize_dynamic_theme():
+    """Loads custom mixed or active theme dictionaries from user_themes.json into core.constants.THEME."""
+    user_themes_file = ROOT_DIR / "user_themes.json"
+    if user_themes_file.exists():
+        try:
+            with open(user_themes_file, "r", encoding="utf-8") as f:
+                u_data = json.load(f)
+                active_dict = u_data.get("custom_mixed_theme") or u_data.get("active_theme")
+                if isinstance(active_dict, dict) and active_dict:
+                    # Update the imported THEME dictionary in-place with our 26 custom/mixed variables
+                    THEME.update(active_dict)
+                    print(f"[THEME] Loaded dynamic theme containing {len(active_dict)} variables.")
+        except Exception as e:
+            print(f"[THEME] Error loading dynamic theme into constants: {e}")
+
+
 if __name__ == "__main__":
+    # Load any saved custom/mixed theme before creating the root app instance
+    initialize_dynamic_theme()
+
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
 
