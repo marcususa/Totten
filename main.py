@@ -182,9 +182,7 @@ class Totten(ctk.CTk):
         elif target == "analysis":
             initial_games = kwargs.get("initial_games") or state.catalog_state.get("active_games")
             target_game = kwargs.get("target_game") or state.catalog_state.get("active_focus")
-            active_index = kwargs.get("active_index")
-            if active_index is None:
-                active_index = state.catalog_state.get("active_index", 0)
+            active_index = kwargs.get("active_index", state.catalog_state.get("active_index", 0))
 
             if hasattr(state, "catalog_workspace") and state.catalog_workspace:
                 state.catalog_workspace.destroy()
