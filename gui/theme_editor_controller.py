@@ -91,11 +91,34 @@ def sync_current_view_to_memory(self):
         if entry and hasattr(entry, "get"):
             try:
                 val = entry.get().strip()
+
+                # Check if valid hex was entered
                 if val.startswith("#") and len(val) in (4, 7):
                     self.active_themes[hue][tier_key][key] = val
-            except Exception:
-                pass
+                else:
+                    # If the field is blank or invalid, fall back to the master default for this specific variable
+                    default_val = THEME_DEFAULTS.get(hue, {}).get(tier_key, {}).get(key)
+                    if default_val:
+                        self.active_themes[hue][tier_key][key] = default_val
+            except Exception as e:
+                print(f"[THEME EDITOR] Error syncing variable {key}: {e}")
 
+def reset_to_defaults(self):
+    """Resets the current active hue/tier back to the master theme_defaults.json values."""
+    hue = self.selected_hue_var.get()
+    tier = self.selected_tier_var.get()
+
+    # Grab default values from master DEFAULTS_FILE / THEME_DEFAULTS
+    default_tier_dict = THEME_DEFAULTS.get(hue, {}).get(tier, {})
+    if default_tier_dict:
+        if hue not in self.active_themes:
+            self.active_themes[hue] = {}
+        # Reset the active memory dict for this tier to a copy of the defaults
+        self.active_themes[hue][tier] = json.loads(json.dumps(default_tier_dict))
+
+        # Rebuild the grid to reflect the reset values instantly
+        self.build_editor_grid(hue)
+        print(f"[THEME EDITOR] Reset {hue} ({tier}) to default values.")
 
 def save_user_themes(self):
     """Saves current theme customizations to user_themes.json and restarts the app to apply changes instantly."""

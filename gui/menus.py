@@ -7,7 +7,7 @@ import gui.app_state as state
 from pgn.importer import import_pgn, import_fen, reset_importer_state
 from gui.sidebar import toggle_sidebar
 from gui.theme_chooser import ThemeChooserWindow
-from gui.theme_editor import ThemeEditorWindow
+from gui.theme_editor_layout import ThemeEditorWindow
 
 # Import your core constants for centralized theming
 try:
