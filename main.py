@@ -1,3 +1,5 @@
+# main.py
+
 import sys
 import os
 import time
@@ -75,8 +77,8 @@ class Totten(ctk.CTk):
         # Defer registering the navigation listener by 300ms to prevent startup event loops and flashing
         self.after(300, lambda: state.register_nav_listener(self._handle_global_navigation))
 
-    def _handle_global_navigation(self, target_view):
-        """Catches centralized navigation requests broadcasted from app_state hub."""
+    def _handle_global_navigation(self, target_view, *args, **kwargs):
+        """Catches centralized navigation requests broadcasted from app_state hub (Downstream Analysis Handoff)."""
         if target_view == "catalog_analysis":
             self.show_workspace("analysis", initial_games=state.catalog_state.get("active_games"),
                                 target_game=state.catalog_state.get("active_focus"),
@@ -85,34 +87,12 @@ class Totten(ctk.CTk):
             self.show_workspace("mixed_analysis", initial_games=state.mixed_state.get("active_games"),
                                 filename=state.mixed_state.get("current_filename"))
         elif target_view == "patterns_analysis":
-            initial_games = state.patterns_state.get("active_games")
-            target_game = state.patterns_state.get("active_focus")
-            active_index = state.patterns_state.get("active_index", 0)
-
-            if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
-                state.patterns_analysis_workspace.destroy()
-
-            from gui.patterns.patterns_layout import PatternsAnalysis
-            try:
-                state.patterns_analysis_workspace = PatternsAnalysis(
-                    self,
-                    initial_games=initial_games,
-                    target_game=target_game,
-                    active_index=active_index
-                )
-            except TypeError:
-                try:
-                    state.patterns_analysis_workspace = PatternsAnalysis(
-                        self,
-                        initial_games=initial_games,
-                        target_game=target_game
-                    )
-                except TypeError:
-                    state.patterns_analysis_workspace = PatternsAnalysis(self)
-
-            state.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-            state.patterns_analysis_workspace.tkraise()
-            state.workspace = state.patterns_analysis_workspace
+            initial_games = kwargs.get("initial_games") or state.patterns_state.get("active_games")
+            target_game = kwargs.get("target_game") or state.patterns_state.get("active_focus")
+            active_index = kwargs.get("active_index", state.patterns_state.get("active_index", 0))
+            target_piece = kwargs.get("target_piece") or state.patterns_state.get("target_piece", "N")
+            self.show_workspace("patterns_analysis", initial_games=initial_games, target_game=target_game,
+                                active_index=active_index, target_piece=target_piece)
 
     def show_workspace(self, target, *args, **kwargs):
         """Persistent switchboard router that toggles or re-creates core workspaces."""
@@ -142,6 +122,42 @@ class Totten(ctk.CTk):
 
             if hasattr(state.edit_workspace, "refresh_view"):
                 state.edit_workspace.refresh_view()
+
+        elif target == "patterns":
+            # STAGE 1: Always load the selection workspace first (Piece criteria & thresholds)
+            if not getattr(state, "patterns_workspace", None):
+                from gui.patterns.patterns_workspace import PatternsWorkspace
+                state.patterns_workspace = PatternsWorkspace(self)
+
+            state.patterns_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.patterns_workspace.tkraise()
+            state.workspace = state.patterns_workspace
+
+            if hasattr(state.patterns_workspace, "refresh_view"):
+                state.patterns_workspace.refresh_view()
+
+        elif target == "patterns_analysis":
+            # STAGE 2: Downstream analysis workspace triggered after a tier is selected
+            initial_games = kwargs.get("initial_games") or state.patterns_state.get("active_games")
+            target_game = kwargs.get("target_game") or state.patterns_state.get("active_focus")
+            active_index = kwargs.get("active_index", state.patterns_state.get("active_index", 0))
+            target_piece = kwargs.get("target_piece") or state.patterns_state.get("target_piece", "N")
+
+            if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
+                state.patterns_analysis_workspace.destroy()
+
+            from gui.patterns.patterns_layout import create_patterns_analysis_workspace
+            state.patterns_analysis_workspace = create_patterns_analysis_workspace(
+                self,
+                initial_games=initial_games,
+                target_game=target_game,
+                active_index=active_index,
+                target_piece=target_piece
+            )
+
+            state.patterns_analysis_workspace.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+            state.patterns_analysis_workspace.tkraise()
+            state.workspace = state.patterns_analysis_workspace
 
         elif target in ("search_catalog", "catalog"):
             if hasattr(state, "catalog_workspace") and state.catalog_workspace:
@@ -234,12 +250,11 @@ def initialize_dynamic_theme():
                 u_data = json.load(f)
                 active_dict = u_data.get("custom_mixed_theme") or u_data.get("active_theme")
                 if isinstance(active_dict, dict) and active_dict:
-                    # Update the imported THEME dictionary in-place with our 26 custom/mixed variables
+                    # Update the imported THEME dictionary in-place with our custom/mixed variables
                     THEME.update(active_dict)
                     print(f"[THEME] Loaded dynamic theme containing {len(active_dict)} variables.")
         except Exception as e:
             print(f"[THEME] Error loading dynamic theme into constants: {e}")
-
 
 if __name__ == "__main__":
     # Load any saved custom/mixed theme before creating the root app instance
