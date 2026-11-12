@@ -4,7 +4,6 @@ import os
 import io
 import customtkinter as ctk
 from core.constants import THEME
-from .patterns_colors import TIER_THEMES
 
 # Optional import for rendering SVGs in CustomTkinter via PIL and cairosvg
 try:
@@ -16,7 +15,7 @@ except ImportError:
 
 
 class PatternsSliderLogicMixin:
-    """Encapsulates piece tray selection, slider throttling, and tier calculation mechanics."""
+    """Encapsulates piece tray selection, slider throttling, and tier calculation mechanics using active theme colors."""
 
     def _init_slider_state(self):
         self.selected_piece_filter = None
@@ -45,11 +44,15 @@ class PatternsSliderLogicMixin:
             ("br", "Black Rook"), ("bq", "Black Queen"), ("bk", "Black King"),
         ]
 
+        btn_initial = THEME.get("btn_initial", "#1e3a8a")
+        btn_hover = THEME.get("btn_hover", "#2e4a8c")
+        border_col = THEME.get("border_color", "#334155")
+
         for code, tooltip in pieces:
             btn = ctk.CTkButton(
                 tray_inner, text=code.upper(), width=34, height=32,
-                font=("Arial", 10, "bold"), fg_color=THEME.get("border_color", "#334155"),
-                hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                font=("Arial", 10, "bold"), fg_color=border_col,
+                hover_color=btn_hover,
                 command=lambda c=code: self.on_piece_clicked(c)
             )
             btn.pack(side="left", padx=2)
@@ -70,16 +73,19 @@ class PatternsSliderLogicMixin:
                 btn.configure(text=code.upper())
 
     def on_piece_clicked(self, piece_code):
+        border_col = THEME.get("border_color", "#334155")
+        active_btn_col = THEME.get("btn_active", "#2563eb")
+
         if self.selected_piece_filter == piece_code:
             self.selected_piece_filter = None
             self.selected_piece = None
-            self.piece_buttons[piece_code].configure(fg_color=THEME.get("border_color", "#334155"))
+            self.piece_buttons[piece_code].configure(fg_color=border_col)
         else:
             if self.selected_piece_filter and self.selected_piece_filter in self.piece_buttons:
-                self.piece_buttons[self.selected_piece_filter].configure(fg_color=THEME.get("border_color", "#334155"))
+                self.piece_buttons[self.selected_piece_filter].configure(fg_color=border_col)
             self.selected_piece_filter = piece_code
-            self.selected_piece = piece_code # Carries over the exact two-letter piece code (e.g. 'wb', 'wn')
-            self.piece_buttons[piece_code].configure(fg_color="#2563eb")
+            self.selected_piece = piece_code
+            self.piece_buttons[piece_code].configure(fg_color=active_btn_col)
 
         self.recalculate_tiers()
 
@@ -157,21 +163,34 @@ class PatternsSliderLogicMixin:
                 if game not in tier_3:
                     tier_3.append(game)
 
+        # Dynamic theme mapping derived directly from active THEME configuration
+        panel_bg = THEME.get("bg_panel", "#172134")
+        surface_bg = THEME.get("bg_surface", "#1e293b")
+        border_col = THEME.get("border_color", "#334155")
+        text_pri = THEME.get("text_primary", "#ffffff")
+        btn_initial = THEME.get("btn_initial", "#1e3a8a")
+
+        dynamic_tier_themes = {
+            "tier1": {"bg": btn_initial, "border": border_col, "fg": text_pri},
+            "tier2": {"bg": btn_initial, "border": border_col, "fg": text_pri},
+            "tier3": {"bg": btn_initial, "border": border_col, "fg": text_pri},
+        }
+
         self.aggregated_tiers = {
             "tier1": {
                 "label": f"Opening (Moves {s1} – {s2 - 1})",
                 "games": tier_1,
-                "theme": TIER_THEMES["tier1"],
+                "theme": dynamic_tier_themes["tier1"],
             },
             "tier2": {
                 "label": f"Middlegame (Moves {s2} – {s3 - 1})",
                 "games": tier_2,
-                "theme": TIER_THEMES["tier2"],
+                "theme": dynamic_tier_themes["tier2"],
             },
             "tier3": {
                 "label": f"Endgame / Remainder (Moves {s3}+)",
                 "games": tier_3,
-                "theme": TIER_THEMES["tier3"],
+                "theme": dynamic_tier_themes["tier3"],
             },
         }
 
