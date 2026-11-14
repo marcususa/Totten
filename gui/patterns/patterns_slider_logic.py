@@ -5,7 +5,6 @@ import io
 import customtkinter as ctk
 from core.constants import THEME
 
-# Optional import for rendering SVGs in CustomTkinter via PIL and cairosvg
 try:
     from PIL import Image
     from cairosvg import svg2png
@@ -15,11 +14,12 @@ except ImportError:
 
 
 class PatternsSliderLogicMixin:
-    """Encapsulates piece tray selection, slider throttling, and tier calculation mechanics using active theme colors."""
+    """Encapsulates piece tray selection, move filtering, slider throttling, and tier calculation mechanics."""
 
     def _init_slider_state(self):
         self.selected_piece_filter = None
         self.selected_piece = None
+        self.specific_move_filter = ""
         self.svg_image_cache = {}
 
         self._slider_timer = None
@@ -44,9 +44,8 @@ class PatternsSliderLogicMixin:
             ("br", "Black Rook"), ("bq", "Black Queen"), ("bk", "Black King"),
         ]
 
-        btn_initial = THEME.get("btn_initial", "#1e3a8a")
+        border_col = THEME.get("border_color", THEME.get("bg_surface", "#1e293b"))
         btn_hover = THEME.get("btn_hover", "#2e4a8c")
-        border_col = THEME.get("border_color", "#334155")
 
         for code, tooltip in pieces:
             btn = ctk.CTkButton(
@@ -72,8 +71,37 @@ class PatternsSliderLogicMixin:
             else:
                 btn.configure(text=code.upper())
 
+        # Specific Move Filter Entry Box & Submit Button
+        self.move_entry_var = ctk.StringVar(value="")
+
+        self.move_entry = ctk.CTkEntry(
+            tray_inner,
+            textvariable=self.move_entry_var,
+            placeholder_text="Move (e.g. Na5 or a5)",
+            width=140,
+            height=32,
+            font=("Arial", 11),
+            fg_color=THEME.get("bg_surface", "#1e293b"),
+            text_color=THEME.get("text_primary", "#ffffff"),
+            border_color=border_col
+        )
+        self.move_entry.pack(side="left", padx=(10, 4))
+
+        self.submit_btn = ctk.CTkButton(
+            tray_inner,
+            text="Submit Filter",
+            width=100,
+            height=32,
+            font=("Arial", 11, "bold"),
+            fg_color=THEME.get("btn_initial", "#1e3a8a"),
+            hover_color=btn_hover,
+            text_color=THEME.get("text_primary", "#ffffff"),
+            command=self.on_submit_filters
+        )
+        self.submit_btn.pack(side="left", padx=2)
+
     def on_piece_clicked(self, piece_code):
-        border_col = THEME.get("border_color", "#334155")
+        border_col = THEME.get("border_color", THEME.get("bg_surface", "#1e293b"))
         active_btn_col = THEME.get("btn_active", "#2563eb")
 
         if self.selected_piece_filter == piece_code:
@@ -87,6 +115,10 @@ class PatternsSliderLogicMixin:
             self.selected_piece = piece_code
             self.piece_buttons[piece_code].configure(fg_color=active_btn_col)
 
+        self.recalculate_tiers()
+
+    def on_submit_filters(self):
+        self.specific_move_filter = self.move_entry_var.get().strip()
         self.recalculate_tiers()
 
     def on_slider_changed(self, val=None):
@@ -124,9 +156,24 @@ class PatternsSliderLogicMixin:
         s3 = int(self.slider_3_val.get())
 
         tier_1, tier_2, tier_3 = [], [], []
+        raw_target_move = getattr(self, "specific_move_filter", "").strip().lower().replace("+", "").replace("#", "")
 
         for game in self.all_games_cache:
             total_moves = int(game["ply_count"] / 2)
+
+            if raw_target_move:
+                resolved = game.get("game_object")
+                has_move = False
+                if resolved and hasattr(resolved, "mainline_moves"):
+                    board = resolved.board()
+                    for move in resolved.mainline_moves():
+                        san = board.san(move).lower().replace("+", "").replace("#", "")
+                        board.push(move)
+                        if san == raw_target_move or san.endswith(raw_target_move):
+                            has_move = True
+                            break
+                if not has_move:
+                    continue
 
             if not self.selected_piece_filter:
                 in_t1 = s1 <= total_moves < s2
@@ -142,7 +189,7 @@ class PatternsSliderLogicMixin:
 
             assigned_to_t1_or_t2 = False
 
-            if not self.selected_piece_filter:
+            if not self.selected_piece_filter and not raw_target_move:
                 if s1 <= total_moves < s2:
                     tier_1.append(game)
                     assigned_to_t1_or_t2 = True
@@ -159,39 +206,31 @@ class PatternsSliderLogicMixin:
                     tier_2.append(game)
                     assigned_to_t1_or_t2 = True
 
-            if not assigned_to_t1_or_t2 or in_t3_matched:
-                if game not in tier_3:
-                    tier_3.append(game)
+                if not assigned_to_t1_or_t2 or in_t3_matched:
+                    if game not in tier_3:
+                        tier_3.append(game)
 
-        # Dynamic theme mapping derived directly from active THEME configuration
-        panel_bg = THEME.get("bg_panel", "#172134")
-        surface_bg = THEME.get("bg_surface", "#1e293b")
         border_col = THEME.get("border_color", "#334155")
         text_pri = THEME.get("text_primary", "#ffffff")
         btn_initial = THEME.get("btn_initial", "#1e3a8a")
-
-        dynamic_tier_themes = {
-            "tier1": {"bg": btn_initial, "border": border_col, "fg": text_pri},
-            "tier2": {"bg": btn_initial, "border": border_col, "fg": text_pri},
-            "tier3": {"bg": btn_initial, "border": border_col, "fg": text_pri},
-        }
 
         self.aggregated_tiers = {
             "tier1": {
                 "label": f"Opening (Moves {s1} – {s2 - 1})",
                 "games": tier_1,
-                "theme": dynamic_tier_themes["tier1"],
+                "theme": {"bg": btn_initial, "border": border_col, "fg": text_pri},
             },
             "tier2": {
                 "label": f"Middlegame (Moves {s2} – {s3 - 1})",
                 "games": tier_2,
-                "theme": dynamic_tier_themes["tier2"],
+                "theme": {"bg": btn_initial, "border": border_col, "fg": text_pri},
             },
             "tier3": {
                 "label": f"Endgame / Remainder (Moves {s3}+)",
                 "games": tier_3,
-                "theme": dynamic_tier_themes["tier3"],
+                "theme": {"bg": btn_initial, "border": border_col, "fg": text_pri},
             },
         }
 
-        self.refresh_ui()
+        if hasattr(self, "refresh_ui") and callable(self.refresh_ui):
+            self.refresh_ui()

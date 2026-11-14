@@ -24,10 +24,8 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self.pgn_path = Path("personal_catalog.pgn")
         self.eco_dir = Path("catalog_eco")
 
-        # Robust Asset Path Resolver
         self.assets_dir = self._find_assets_dir()
 
-        # Retrieve the cross-platform engine path determined by main.py via global state
         available_engines = getattr(state, "available_engines", {})
         self.stockfish_path = stockfish_path or available_engines.get("stockfish")
 
@@ -35,13 +33,12 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self.aggregated_tiers = {}
         self.tier_collapsed = {"tier1": False, "tier2": False, "tier3": False}
 
-        # Starts unselected until the user clicks a piece
         self.selected_piece = None
 
         self._init_slider_state()
         self._init_db()
         self._build_ui()
-        self.after(200, self.check_and_load_catalog) # Deferred initialization
+        self.after(200, self.check_and_load_catalog)
 
     def _find_assets_dir(self):
         current = Path(__file__).resolve().parent
@@ -82,11 +79,10 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         self.master_container.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         self.master_container.grid_propagate(False)
 
-        self.master_container.grid_rowconfigure(0, weight=0) # Unified Toolbar Area
-        self.master_container.grid_rowconfigure(1, weight=1) # Scrollable Tiers
+        self.master_container.grid_rowconfigure(0, weight=0)
+        self.master_container.grid_rowconfigure(1, weight=1)
         self.master_container.grid_columnconfigure(0, weight=1)
 
-        # Unified Toolbar Ring Housing Sliders + Piece Tray Together
         self.unified_toolbar_ring = ctk.CTkFrame(
             self.master_container,
             fg_color=surface_bg,
@@ -99,13 +95,12 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         )
         self.unified_toolbar_ring.grid_columnconfigure(0, weight=1)
 
-        # Sliders Sub-Container inside unified ring
         self.sliders_frame = ctk.CTkFrame(
             self.unified_toolbar_ring, fg_color="transparent"
         )
         self.sliders_frame.pack(anchor="w", fill="x", padx=6, pady=(6, 2))
 
-        # Slider 1 Container (Opening)
+        # Slider 1
         s1_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
         s1_box.pack(side="left", padx=4, pady=2)
         self.lbl_s1 = ctk.CTkLabel(
@@ -131,7 +126,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         )
         self.slider_1.pack(anchor="w", padx=2, pady=(2, 0))
 
-        # Slider 2 Container (Middlegame)
+        # Slider 2
         s2_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
         s2_box.pack(side="left", padx=4, pady=2)
         self.lbl_s2 = ctk.CTkLabel(
@@ -157,7 +152,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         )
         self.slider_2.pack(anchor="w", padx=2, pady=(2, 0))
 
-        # Slider 3 Container (Endgame)
+        # Slider 3
         s3_box = ctk.CTkFrame(self.sliders_frame, fg_color="transparent")
         s3_box.pack(side="left", padx=4, pady=2)
         self.lbl_s3 = ctk.CTkLabel(
@@ -183,10 +178,8 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         )
         self.slider_3.pack(anchor="w", padx=2, pady=(2, 0))
 
-        # SVG Piece Selection Tray
         self._build_piece_tray()
 
-        # Main Scrollable Tier Results Container
         self.cards_scroll_frame = ctk.CTkScrollableFrame(
             self.master_container, fg_color=panel_bg, corner_radius=0, border_width=0
         )
@@ -206,9 +199,25 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         panel_bg = THEME.get("bg_panel", "#172134")
         surface_bg = THEME.get("bg_surface", "#1e293b")
         text_sec = THEME.get("text_secondary", "#cbd5e1")
-        text_muted = THEME.get("text_muted", "#94a3b8")
-        btn_hover_col = THEME.get("btn_hover", "#2e4a8c")
+        text_pri = THEME.get("text_primary", "#ffffff")
+        btn_initial = THEME.get("btn_initial", "#1e3a8a")
 
+        # Show instructions only until the user selects a piece or submits a move filter
+        has_filtered = bool(getattr(self, "selected_piece_filter", None) or getattr(self, "specific_move_filter", ""))
+
+        if not has_filtered:
+            inst_lbl = ctk.CTkLabel(
+                self.cards_scroll_frame,
+                text="1. Select piece,  2. Give exact move, or click \"Submit Filter\"",
+                font=("Arial", 11, "bold"),  # Bold text as requested
+                text_color=text_sec,
+                anchor="w",
+                height=22,
+                fg_color="transparent"
+            )
+            inst_lbl.pack(fill="x", padx=4, pady=(0, 4))
+
+        # Render categorized game tiers below
         for t_key, t_data in self.aggregated_tiers.items():
             games = t_data["games"]
             theme = t_data["theme"]
@@ -229,9 +238,9 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                 tier_frame,
                 text=f"{arrow} {t_data['label']} ({len(games)} games)",
                 anchor="w",
-                fg_color=theme.get("bg", THEME.get("btn_initial", "#1e3a8a")),
-                hover_color=theme.get("border", btn_hover_col),
-                text_color=theme.get("fg", THEME.get("text_primary", "#ffffff")),
+                fg_color=theme.get("bg", btn_initial),
+                hover_color=theme.get("border", THEME.get("btn_hover", "#2e4a8c")),
+                text_color=theme.get("fg", text_pri),
                 font=("Arial", 12, "bold"),
                 height=36,
                 corner_radius=4,
@@ -255,13 +264,11 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                         text=f" {eco} | {white} vs {black}",
                         anchor="w",
                         fg_color=surface_bg,
-                        hover_color=btn_hover_col,
+                        hover_color=THEME.get("btn_hover", "#2e4a8c"),
                         text_color=text_sec,
                         font=("Arial", 11),
                         height=28,
-                        command=lambda game_item=g: self.send_tier_games_to_analysis(
-                            game_item
-                        ),
+                        command=lambda game_item=g: self.send_tier_games_to_analysis(game_item),
                     )
                     game_btn.pack(fill="x", padx=2, pady=1)
 
@@ -271,8 +278,8 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                         text=f" ... and {len(games) - 5} more games. Click to open all.",
                         anchor="w",
                         fg_color="transparent",
-                        hover_color=btn_hover_col,
-                        text_color=text_muted,
+                        hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                        text_color=THEME.get("text_muted", "#94a3b8"),
                         font=("Arial", 10),
                         height=24,
                         command=lambda tk=t_key: self.send_tier_to_analysis(tk),
@@ -301,7 +308,6 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
         selected_piece = getattr(self, "selected_piece", None)
 
-        # Force global state to index 0 and clear focus
         state.patterns_state["active_games"] = full_tier_games
         state.patterns_state["active_focus"] = None
         state.patterns_state["active_index"] = 0
@@ -334,7 +340,6 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
         selected_piece = getattr(self, "selected_piece", None)
 
-        # Force global state to index 0 here as well to prevent stale state carryover
         state.patterns_state["active_games"] = games
         state.patterns_state["active_focus"] = None
         state.patterns_state["active_index"] = 0
@@ -358,10 +363,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             self.app_state.set_active_patterns_collection(games)
 
 
-# --- WORKSPACE FACTORY FUNCTION ---
-
 def create_patterns_workspace(master, *args, **kwargs):
-    """Factory function to instantiate and grid the PatternsWorkspace."""
     instance = PatternsWorkspace(master, *args, **kwargs)
     instance.grid(row=0, column=0, sticky="nsew")
     return instance
