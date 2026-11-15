@@ -44,14 +44,18 @@ class PatternsSliderLogicMixin:
             ("br", "Black Rook"), ("bq", "Black Queen"), ("bk", "Black King"),
         ]
 
-        border_col = THEME.get("border_color", THEME.get("bg_surface", "#1e293b"))
+        btn_initial = THEME.get("btn_initial", "#1e3a8a")
         btn_hover = THEME.get("btn_hover", "#2e4a8c")
+        border_col = THEME.get("border_color", "#334155")
+        text_pri = THEME.get("text_primary", "#ffffff")
 
         for code, tooltip in pieces:
             btn = ctk.CTkButton(
                 tray_inner, text=code.upper(), width=34, height=32,
-                font=("Arial", 10, "bold"), fg_color=border_col,
+                font=("Arial", 10, "bold"),
+                fg_color=border_col,
                 hover_color=btn_hover,
+                text_color=text_pri,
                 command=lambda c=code: self.on_piece_clicked(c)
             )
             btn.pack(side="left", padx=2)
@@ -64,12 +68,12 @@ class PatternsSliderLogicMixin:
                     img = Image.open(io.BytesIO(png_data))
                     ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(24, 24))
                     self.svg_image_cache[code] = ctk_img
-                    btn.configure(image=ctk_img, text="")
+                    btn.configure(image=ctk_img, text="", fg_color=border_col, hover_color=btn_hover)
                 except Exception as e:
                     print(f"[ERROR] Failed rendering SVG {code}: {e}")
-                    btn.configure(text=code.upper())
+                    btn.configure(text=code.upper(), fg_color=border_col, hover_color=btn_hover)
             else:
-                btn.configure(text=code.upper())
+                btn.configure(text=code.upper(), fg_color=border_col, hover_color=btn_hover)
 
         # Specific Move Filter Entry Box & Submit Button
         self.move_entry_var = ctk.StringVar(value="")
@@ -82,7 +86,7 @@ class PatternsSliderLogicMixin:
             height=32,
             font=("Arial", 11),
             fg_color=THEME.get("bg_surface", "#1e293b"),
-            text_color=THEME.get("text_primary", "#ffffff"),
+            text_color=text_pri,
             border_color=border_col
         )
         self.move_entry.pack(side="left", padx=(10, 4))
@@ -93,27 +97,28 @@ class PatternsSliderLogicMixin:
             width=100,
             height=32,
             font=("Arial", 11, "bold"),
-            fg_color=THEME.get("btn_initial", "#1e3a8a"),
+            fg_color=btn_initial,
             hover_color=btn_hover,
-            text_color=THEME.get("text_primary", "#ffffff"),
+            text_color=text_pri,
             command=self.on_submit_filters
         )
         self.submit_btn.pack(side="left", padx=2)
 
     def on_piece_clicked(self, piece_code):
-        border_col = THEME.get("border_color", THEME.get("bg_surface", "#1e293b"))
+        border_col = THEME.get("border_color", "#334155")
+        btn_hover = THEME.get("btn_hover", "#2e4a8c")
         active_btn_col = THEME.get("btn_active", "#2563eb")
 
         if self.selected_piece_filter == piece_code:
             self.selected_piece_filter = None
             self.selected_piece = None
-            self.piece_buttons[piece_code].configure(fg_color=border_col)
+            self.piece_buttons[piece_code].configure(fg_color=border_col, hover_color=btn_hover)
         else:
             if self.selected_piece_filter and self.selected_piece_filter in self.piece_buttons:
-                self.piece_buttons[self.selected_piece_filter].configure(fg_color=border_col)
+                self.piece_buttons[self.selected_piece_filter].configure(fg_color=border_col, hover_color=btn_hover)
             self.selected_piece_filter = piece_code
             self.selected_piece = piece_code
-            self.piece_buttons[piece_code].configure(fg_color=active_btn_col)
+            self.piece_buttons[piece_code].configure(fg_color=active_btn_col, hover_color=btn_hover)
 
         self.recalculate_tiers()
 
