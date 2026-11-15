@@ -1,8 +1,32 @@
+# ==========================================
+# FILE: gui/patterns/patterns_search.py
+# ==========================================
+
+from collections import Counter
 import chess
+import chess.pgn
+from pathlib import Path
+import gui.app_state as state
 from core.patterns_db import get_patterns
+
 
 class PatternsSearchMixin:
     """Mixin class to handle database pattern searching, piece convergence analysis, and text rendering."""
+
+    def display_pattern_results(self, text_content):
+        """Injects pattern analysis text into the middle-right analysis panel and caches it."""
+        self._last_analysis_content = text_content
+        box = getattr(self, "analysis_textbox", None) or getattr(self, "pv_textbox", None) or getattr(self,
+                                                                                                      "_cached_analysis_box",
+                                                                                                      None)
+        if box:
+            try:
+                box.configure(state="normal")
+                box.delete("1.0", "end")
+                box.insert("end", text_content)
+                box.configure(state="disabled")
+            except Exception:
+                pass
 
     def _extract_player_first_word(self, header_val: str) -> str:
         """Extracts the first clean word/token from a PGN White/Black player header."""
@@ -51,14 +75,12 @@ class PatternsSearchMixin:
             is_castling = board.is_castling(move)
             is_ep = board.is_en_passant(move)
 
-            # Update piece-move tracking before pushing
             square_last_move.pop(move.from_square, None)
             if is_ep:
                 ep_cap_sq = move.to_square - 8 if mover_color == chess.WHITE else move.to_square + 8
                 square_last_move.pop(ep_cap_sq, None)
 
             if is_castling:
-                # Track both King and Rook landing squares during castling
                 if move.to_square == chess.G1:
                     square_last_move.pop(chess.H1, None)
                     square_last_move[chess.F1] = move_label
@@ -73,7 +95,6 @@ class PatternsSearchMixin:
                     square_last_move[chess.D8] = move_label
 
             square_last_move[move.to_square] = move_label
-
             board.push(move)
 
             if mover_color != target_color:
@@ -139,13 +160,16 @@ class PatternsSearchMixin:
 
     def trigger_engine_mode(self, mode):
         """
-        Renders continuous PGN stream on the left with `{Move}` brackets,
-        followed by cross-game 2-piece attack matches in `{ECO Player: Move1, Move2 attacking the sq square}` format.
+        Renders continuous PGN stream in the middle-right Analysis panel with clickable move tokens,
+        followed by cross-game 2-piece attack matches. Caches the output content into _active_custom_analysis_content
+        so that navigation (jump_to_node) permanently preserves it and prevents any resetting or green highlights.
         """
-        if not hasattr(self, "pv_textbox"):
+        target_textbox = getattr(self, "analysis_textbox", None) or getattr(self, "pv_textbox", None)
+        if not target_textbox:
             return
 
-        self.pv_textbox.delete("1.0", "end")
+        target_textbox.configure(state="normal")
+        target_textbox.delete("1.0", "end")
 
         try:
             color_filter = None
@@ -168,11 +192,14 @@ class PatternsSearchMixin:
 
             if target_game:
                 all_moves = []
-                for idx, node in enumerate(target_game.mainline(), start=1):
-                    is_white = (idx % 2 != 0)
-                    san = node.san()
+                curr_node = target_game
+                idx = 1
+                while curr_node.variations:
+                    next_node = curr_node.variation(0)
+                    is_white = (curr_node.board().turn == chess.WHITE)
+                    san = curr_node.board().san(next_node.move)
                     clean_san = san.replace("+", "").replace("#", "").lower()
-                    move_num = (idx + 1) // 2
+                    move_num = curr_node.board().fullmove_number
 
                     is_target_side = (color_filter == "W" and is_white) or (color_filter == "B" and not is_white)
                     match_found = is_target_side and clean_san in stored_singles
@@ -181,8 +208,11 @@ class PatternsSearchMixin:
                         "move_num": move_num,
                         "is_white": is_white,
                         "san": san,
-                        "matched": match_found
+                        "matched": match_found,
+                        "node": next_node
                     })
+                    curr_node = next_node
+                    idx += 1
 
                 paired_moves = {}
                 for m in all_moves:
@@ -203,20 +233,37 @@ class PatternsSearchMixin:
                     first_item = False
 
                     if w_move:
-                        self.pv_textbox.insert("end", f"{prefix}{m_num}. ")
+                        target_textbox.insert("end", f"{prefix}{m_num}. ")
                         is_w_match = (color_filter == "W" and w_move["matched"])
-                        w_text = f"{{{w_move['san']}}}" if is_w_match else w_move['san']
-                        self.pv_textbox.insert("end", f"{w_text} ")
+                        # NO MORE GREEN: Pattern matches are rendered normally without green brackets
+                        w_text = w_move['san']
+
+                        tag_name = f"move_{id(w_move['node'])}"
+                        target_textbox.insert("end", w_text, ("clickable_move", tag_name))
+                        target_textbox.tag_bind(
+                            tag_name,
+                            "<Button-1>",
+                            lambda event, n=w_move['node']: (self.jump_to_node(n), "break")
+                        )
+                        target_textbox.insert("end", " ")
                         prefix = ""
 
                     if b_move:
                         if not w_move:
-                            self.pv_textbox.insert("end", f"{prefix}{m_num}... ")
+                            target_textbox.insert("end", f"{prefix}{m_num}... ")
                         else:
-                            self.pv_textbox.insert("end", " ")
+                            target_textbox.insert("end", " ")
                         is_b_match = (color_filter == "B" and b_move["matched"])
-                        b_text = f"{{{b_move['san']}}}" if is_b_match else b_move['san']
-                        self.pv_textbox.insert("end", f"{b_text}")
+                        # NO MORE GREEN: Pattern matches are rendered normally without green brackets
+                        b_text = b_move['san']
+
+                        tag_name = f"move_{id(b_move['node'])}"
+                        target_textbox.insert("end", b_text, ("clickable_move", tag_name))
+                        target_textbox.tag_bind(
+                            tag_name,
+                            "<Button-1>",
+                            lambda event, n=b_move['node']: (self.jump_to_node(n), "break")
+                        )
 
                 # --- Cross-Reference Active Game List for 2-Piece Attacks ---
                 active_games = getattr(self, "game_list", []) or []
@@ -241,9 +288,20 @@ class PatternsSearchMixin:
                         cross_game_comments.append(f"{{{eco_code} {player_first}: {conv_desc}}}")
 
                 if cross_game_comments:
-                    self.pv_textbox.insert("end", " " + " ".join(cross_game_comments))
+                    target_textbox.insert("end", " " + " ".join(cross_game_comments))
 
-                self.pv_textbox.insert("end", "\n")
+            target_textbox.insert("end", "\n")
+            target_textbox.tag_config("clickable_move", foreground="#3b82f6", underline=True)
+
+            # Cache the rendered custom analysis content so that navigation clicks lock and preserve it permanently
+            try:
+                self._active_custom_analysis_content = target_textbox.get("1.0", "end-1c")
+            except Exception:
+                pass
+
+            target_textbox.configure(state="disabled")
 
         except Exception as e:
             print(f"[ERROR in trigger_engine_mode]: {e}")
+            if target_textbox:
+                target_textbox.configure(state="disabled")

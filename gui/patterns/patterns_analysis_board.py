@@ -1,3 +1,7 @@
+# ==========================================
+# FILE: gui/patterns/patterns_analysis_board.py
+# ==========================================
+
 import chess
 import chess.pgn
 from core.constants import THEME
@@ -28,6 +32,7 @@ class PatternsAnalysisBoardMixin:
         self.active_game = resolved
         self.root_game_node = resolved
         self.current_node = resolved
+        self._last_analysis_content = None
 
         # --- BUILD ANALYSIS ROWS FOR THE NEW GAME ---
         self.analysis_rows = {}
@@ -80,9 +85,13 @@ class PatternsAnalysisBoardMixin:
                 surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
                 text_primary = THEME.get("text_primary", "#ffffff")
                 self.moves_textbox.configure(state="normal", fg_color=surface_bg)
+
                 bg_active = THEME.get("active_tracker_bg", "#660000")
                 fg_active = THEME.get("active_tracker_fg", "#ffffff")
-                self.moves_textbox.tag_config("active_move", background=bg_active, foreground=fg_active)
+
+                internal_text = getattr(self.moves_textbox, "_textbox", self.moves_textbox)
+                internal_text.tag_config("active_move", background=bg_active, foreground=fg_active)
+
                 self.moves_textbox.tag_config("default", foreground=text_primary)
                 self.moves_textbox.delete("1.0", "end")
 
@@ -96,7 +105,7 @@ class PatternsAnalysisBoardMixin:
                         move_str = f"{move_num}. {san_move} "
                     else:
                         move_str = f"{san_move} "
-                        move_num += 1
+                    move_num += 1
 
                     tag_name = str(id(next_node))
                     self.moves_textbox.insert("end", move_str, ("default", tag_name))
@@ -115,14 +124,6 @@ class PatternsAnalysisBoardMixin:
             except Exception:
                 pass
 
-        # --- AUTO-TRIGGER ANALYSIS ---
-        if hasattr(self, "trigger_engine_mode"):
-            try:
-                target_mode = getattr(self, "active_engine_mode", None) or "piece_pattern_mode"
-                self.trigger_engine_mode(target_mode)
-            except Exception as e:
-                print(f"[AUTO-ANALYZE ERROR] {e}")
-
         if hasattr(self, "_load_plain_game_moves"):
             try:
                 self._load_plain_game_moves(resolved)
@@ -136,68 +137,81 @@ class PatternsAnalysisBoardMixin:
                 print(f"[OPENINGS RENDER ERROR] {e}")
 
     def jump_to_node(self, target_node):
-        self.board_node = target_node
-        if hasattr(self, "board_widget") and self.board_widget:
+        """Directly updates board position from a click, ensures custom pattern analysis data is fully preserved, and applies active_move background highlight with forced tag prioritization."""
+        self._navigating_moves = True
+
+        current_box = getattr(self, "analysis_textbox", None) or getattr(self, "pv_textbox", None) or getattr(
+            self,
+            "_cached_analysis_box",
+            None
+        )
+        if current_box and not getattr(self, "_last_analysis_content", None):
             try:
-                self.board_widget.set_position_fen(self.board_node.board().fen())
+                self._last_analysis_content = current_box.get("1.0", "end-1c")
             except Exception:
                 pass
-        self.update_active_move_highlight()
-
-    def update_active_move_highlight(self):
-        if not hasattr(self, "moves_textbox") or not self.moves_textbox:
-            return
 
         try:
-            surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
-            self.moves_textbox.configure(state="normal", fg_color=surface_bg)
-            bg_active = THEME.get("active_tracker_bg", "#660000")
-            fg_active = THEME.get("active_tracker_fg", "#ffffff")
-            self.moves_textbox.tag_config("active_move", background=bg_active, foreground=fg_active)
-            self.moves_textbox.tag_remove("active_move", "1.0", "end")
+            self.board_node = target_node
+            self.current_node = target_node
+            if hasattr(self, "board_widget") and self.board_widget:
+                self.board_widget.set_position_fen(self.board_node.board().fen())
 
-            if self.board_node and self.board_node != self.current_game:
-                current_tag = str(id(self.board_node))
-                ranges = self.moves_textbox.tag_ranges(current_tag)
-                if ranges:
-                    self.moves_textbox.tag_add("active_move", ranges[0], ranges[1])
-                    self.moves_textbox.see(ranges[0])
+            if hasattr(self, "moves_textbox") and self.moves_textbox:
+                try:
+                    surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
+                    self.moves_textbox.configure(state="normal", fg_color=surface_bg)
 
-            self.moves_textbox.configure(state="disabled")
-        except Exception:
-            pass
+                    bg_active = THEME.get("active_tracker_bg", "#660000")
+                    fg_active = THEME.get("active_tracker_fg", "#ffffff")
+
+                    internal_text = getattr(self.moves_textbox, "_textbox", self.moves_textbox)
+                    internal_text.tag_config("active_move", background=bg_active, foreground=fg_active)
+                    internal_text.tag_remove("active_move", "1.0", "end")
+
+                    if self.board_node and self.board_node != self.current_game:
+                        current_tag = str(id(self.board_node))
+                        ranges = internal_text.tag_ranges(current_tag)
+                        if ranges:
+                            internal_text.tag_add("active_move", ranges[0], ranges[1])
+                            internal_text.tag_raise("active_move")
+                            self.moves_textbox.see(ranges[0])
+
+                    self.moves_textbox.configure(state="disabled")
+                except Exception as e:
+                    print(f"[MOVES TRACKER HIGHLIGHT ERROR]: {e}")
+
+            content_to_restore = getattr(self, "_active_custom_analysis_content", None) or getattr(self,
+                                                                                                   "_last_analysis_content",
+                                                                                                   None)
+            if current_box and content_to_restore:
+                try:
+                    current_box.configure(state="normal")
+                    current_box.delete("1.0", "end")
+                    current_box.insert("end", content_to_restore)
+                    current_box.configure(state="disabled")
+                except Exception:
+                    pass
+        finally:
+            self._navigating_moves = False
+
+    def update_active_move_highlight(self):
+        if hasattr(self, "board_node") and self.board_node:
+            self.jump_to_node(self.board_node)
 
     def on_prev_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.parent:
-            self.board_node = self.board_node.parent
-            if hasattr(self, "board_widget") and self.board_widget:
-                try:
-                    self.board_widget.set_position_fen(self.board_node.board().fen())
-                except Exception:
-                    pass
-            self.update_active_move_highlight()
+            self.jump_to_node(self.board_node.parent)
         return "break"
 
     def on_next_move(self, event=None):
         if hasattr(self, "board_node") and self.board_node and self.board_node.variations:
-            self.board_node = self.board_node.variation(0)
-            if hasattr(self, "board_widget") and self.board_widget:
-                try:
-                    self.board_widget.set_position_fen(self.board_node.board().fen())
-                except Exception:
-                    pass
-            self.update_active_move_highlight()
+            self.jump_to_node(self.board_node.variation(0))
         return "break"
 
     def on_first_move(self, event=None):
         if hasattr(self, "current_game") and self.current_game:
-            self.board_node = self.current_game
-            if hasattr(self, "board_widget") and self.board_widget:
-                try:
-                    self.board_widget.set_position_fen(self.current_game.board().fen())
-                except Exception:
-                    pass
-            self.update_active_move_highlight()
+            self.jump_to_node(self.current_game)
         return "break"
 
     def on_last_move(self, event=None):
@@ -205,13 +219,7 @@ class PatternsAnalysisBoardMixin:
             node = self.current_game
             while node.variations:
                 node = node.variation(0)
-            self.board_node = node
-            if hasattr(self, "board_widget") and self.board_widget:
-                try:
-                    self.board_widget.set_position_fen(node.board().fen())
-                except Exception:
-                    pass
-            self.update_active_move_highlight()
+            self.jump_to_node(node)
         return "break"
 
     def on_flip_board(self, event=None):
@@ -232,8 +240,6 @@ class PatternsAnalysisBoardMixin:
         if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
             game = self.preview_lookup[item_id]
 
-            if hasattr(self, "analysis_textbox"):
-                self.analysis_textbox.delete("1.0", "end")
             if hasattr(self, "pgn_data_text"):
                 self.pgn_data_text.delete("1.0", "end")
 

@@ -91,21 +91,13 @@ class PatternsEvaluation(PatternsDatabase):
         return sequence
 
     def _sync_analysis_selection(self):
-        """Renders the analysis panel completely, dynamically pulling live game moves and highlighting pattern piece moves."""
+        """Renders the analysis panel completely, strictly preserving custom pattern/engine results across move navigation."""
         if hasattr(state, "patterns_state") and isinstance(state.patterns_state, dict):
             p_state_val = state.patterns_state.get("target_piece")
             if p_state_val:
                 self.target_piece = p_state_val
         if hasattr(state, "selected_piece") and state.selected_piece:
             self.target_piece = state.selected_piece
-
-        highlighted_moves = set()
-        if self.current_game and hasattr(self, "analyze_piece_sequence"):
-            try:
-                seq = self.analyze_piece_sequence(self.current_game, self.target_piece)
-                highlighted_moves = set(seq)
-            except Exception as e:
-                print(f"[HIGHLIGHT ERROR] {e}")
 
         target_boxes = []
         for name in ("analysis_textbox", "analysis_box", "patterns_textbox"):
@@ -120,7 +112,28 @@ class PatternsEvaluation(PatternsDatabase):
             print("[SYNC ERROR] No analysis text boxes found to render into.")
             return
 
+        # If custom pattern or engine results were sent to the panel, restore them on navigation clicks
+        if getattr(self, "_active_custom_analysis_content", None):
+            try:
+                for target_box in target_boxes:
+                    target_box.configure(state="normal", fg_color=THEME["bg_surface"])
+                    inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
+                    inner_box.delete("1.0", "end")
+                    inner_box.insert("end", self._active_custom_analysis_content)
+                    target_box.configure(state="disabled")
+                return
+            except Exception:
+                pass
+
         try:
+            highlighted_moves = set()
+            if self.current_game and hasattr(self, "analyze_piece_sequence"):
+                try:
+                    seq = self.analyze_piece_sequence(self.current_game, self.target_piece)
+                    highlighted_moves = set(seq)
+                except Exception as e:
+                    print(f"[HIGHLIGHT ERROR] {e}")
+
             for target_box in target_boxes:
                 target_box.configure(state="normal", fg_color=THEME["bg_surface"])
                 inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
@@ -187,9 +200,9 @@ class PatternsEvaluation(PatternsDatabase):
                         if b_node:
                             inner_box.tag_bind(b_tag_name, "<Button-1>", lambda *args, n=b_node: self.jump_to_node(n))
 
-                    inner_box.insert("end", "    ")
+                    inner_box.insert("end", " ")
 
-                inner_box.configure(state="disabled")
+                target_box.configure(state="disabled")
         except Exception as e:
             print(f"[SYNC ANALYSIS ERROR] {e}")
 
@@ -202,9 +215,9 @@ class PatternsEvaluation(PatternsDatabase):
             clean_san = san.replace("+", "").replace("#", "").lower()
             mark_move_good(clean_san)
 
-            active_mode = getattr(self, "active_engine_mode", None)
-            if active_mode:
-                self.trigger_engine_mode(active_mode)
+        active_mode = getattr(self, "active_engine_mode", None)
+        if active_mode:
+            self.trigger_engine_mode(active_mode)
 
     def on_eval_bad(self):
         """Marks current selected move as Bad (strips yellow back to white)."""
@@ -215,9 +228,9 @@ class PatternsEvaluation(PatternsDatabase):
             clean_san = san.replace("+", "").replace("#", "").lower()
             mark_move_bad(clean_san)
 
-            active_mode = getattr(self, "active_engine_mode", None)
-            if active_mode:
-                self.trigger_engine_mode(active_mode)
+        active_mode = getattr(self, "active_engine_mode", None)
+        if active_mode:
+            self.trigger_engine_mode(active_mode)
 
     def on_eval_idk(self):
         """Standby mode."""
@@ -249,6 +262,8 @@ class PatternsEvaluation(PatternsDatabase):
         self.board_node = resolved
 
         self.analysis_rows = {}
+        # Clear previous custom analysis cache when switching games
+        self._active_custom_analysis_content = None
 
         if resolved:
             try:
@@ -315,8 +330,8 @@ class PatternsEvaluation(PatternsDatabase):
             self._engine_pausing_to_depth_30 = True
             if worker:
                 worker.pausing_to_depth_30 = True
-        else:
-            self.stop_raw_engine_analysis()
+            else:
+                self.stop_raw_engine_analysis()
             self.update_engine_display("[No active position to evaluate.]\n")
 
     def start_raw_engine_analysis(self):
@@ -338,171 +353,3 @@ class PatternsEvaluation(PatternsDatabase):
 
         for btn_name in ("btn_engine_action", "btn_engines", "btn_pv"):
             btn = getattr(self, btn_name, None)
-            if btn is not None:
-                try:
-                    btn.configure(fg_color=THEME["btn_hover"], text="Stop")
-                except Exception:
-                    pass
-
-        outer_self = self
-
-        class RawEngineWorker(threading.Thread):
-            def __init__(self, board_state, outer):
-                super().__init__()
-                self.board_state = board_state
-                self.outer = outer
-                self.cancel = False
-                self.pausing_to_depth_30 = False
-                self.daemon = True
-
-            def run(self):
-                engine = None
-                try:
-                    engine_path = "stockfish"
-                    exe_filename = "stockfish.exe" if platform.system() == "Windows" else "stockfish"
-
-                    for folder_name in ("engine", "engines"):
-                        folder_path = Path(folder_name)
-                        if folder_path.exists() and folder_path.is_dir():
-                            candidate = folder_path / exe_filename
-                            if candidate.exists():
-                                engine_path = str(candidate.resolve())
-                                break
-                            for file_path in folder_path.iterdir():
-                                if file_path.is_file():
-                                    if platform.system() == "Windows" and file_path.suffix.lower() == ".exe":
-                                        engine_path = str(file_path.resolve())
-                                        break
-                                    elif platform.system() != "Windows":
-                                        engine_path = str(file_path.resolve())
-                                        break
-
-                    engine = chess.engine.SimpleEngine.popen_uci(engine_path)
-                    limit = chess.engine.Limit(depth=30)
-
-                    with engine.analysis(self.board_state, limit, multipv=5) as analysis:
-                        latest_lines = {}
-                        for info in analysis:
-                            if self.cancel:
-                                break
-
-                            current_depth = info.get("depth", 0)
-                            multipv_idx = info.get("multipv", 1)
-                            score = info.get("score")
-                            pv = info.get("pv", [])
-
-                            if score and pv:
-                                score_cp = score.white().score(mate_score=10000)
-                                if score.is_mate():
-                                    mate_val = score.white().mate()
-                                    eval_str = f"M{abs(mate_val)}" if mate_val != 0 else "M0"
-                                    eval_str = f"+{eval_str}" if mate_val >= 0 else f"-{eval_str}"
-                                else:
-                                    eval_str = f"{score_cp / 100.0:+.2f}"
-
-                                latest_lines[multipv_idx] = {
-                                    "depth": current_depth,
-                                    "eval": eval_str,
-                                    "pv": pv
-                                }
-
-                                formatted_lines = []
-                                for idx in sorted(latest_lines.keys()):
-                                    line_data = latest_lines[idx]
-                                    d = line_data["depth"]
-                                    e = line_data["eval"]
-                                    moves = line_data["pv"]
-
-                                    temp_board = self.board_state.copy()
-                                    numbered_pv = []
-                                    for move in moves:
-                                        san_move = temp_board.san(move)
-                                        if temp_board.turn == chess.WHITE:
-                                            numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
-                                        else:
-                                            if len(numbered_pv) == 0:
-                                                numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
-                                            else:
-                                                numbered_pv.append(san_move)
-                                        temp_board.push(move)
-
-                                    moves_str = " ".join(numbered_pv)
-                                    formatted_lines.append(f"{idx}. Depth {d}  Eval: {e}  {moves_str}")
-
-                                display_text = "\n\n".join(formatted_lines) + "\n"
-                                self.outer.after(0, lambda dt=display_text: self.outer.update_engine_display(dt))
-
-                            if current_depth >= 30 and self.pausing_to_depth_30:
-                                break
-
-                except Exception as e:
-                    print(f"[RAW ENGINE WORKER CRASH] {e}")
-                finally:
-                    if engine:
-                        try:
-                            engine.quit()
-                        except Exception:
-                            pass
-                    self.outer.after(0, self.outer.stop_raw_engine_analysis)
-
-        self._current_raw_engine_worker = RawEngineWorker(board_obj, self)
-        self._current_raw_engine_worker.start()
-
-    def stop_raw_engine_analysis(self):
-        try:
-            if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
-                self._current_raw_engine_worker.cancel = True
-                self._current_raw_engine_worker = None
-        except Exception as e:
-            print(f"[STOP ENGINE ERROR] {e}")
-
-        self._engine_running = False
-
-        for btn_name in ("btn_engine_action", "btn_engines", "btn_pv"):
-            btn = getattr(self, btn_name, None)
-            if btn is not None:
-                try:
-                    btn.configure(fg_color=THEME["btn_initial"], text="Engine")
-                except Exception:
-                    pass
-
-    def update_engine_display(self, text):
-        if getattr(self, "active_engine_mode", None) is not None:
-            return
-
-        target_box = getattr(self, "pv_textbox", None)
-        if target_box:
-            try:
-                target_box.configure(fg_color=THEME["bg_surface"])
-                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-                inner_box.configure(state="normal")
-                inner_box.delete("1.0", "end")
-                inner_box.insert("end", text)
-                inner_box.configure(state="disabled")
-            except Exception as e:
-                print(f"[ENGINE DISPLAY ERROR] {e}")
-
-    def write_analysis(self, text):
-        self.update_engine_display(text)
-
-    def write(self, text):
-        self.update_engine_display(text)
-
-    def append(self, text):
-        self.update_engine_display(text)
-
-    def start_game_review(self, target_game):
-        if hasattr(self, "run_patterns_1_analysis"):
-            self.run_patterns_1_analysis(target_game)
-
-    def run_piece_pattern_analysis(self, target_game):
-        target_box = getattr(self, "analysis_textbox", None) or getattr(self, "_cached_analysis_box", None)
-        if target_box:
-            try:
-                target_box.configure(state="normal", fg_color=THEME["bg_surface"])
-                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-                inner_box.delete("1.0", "end")
-                inner_box.insert("end", f"[{self.target_piece} Patterns: Ready to evaluate active game...]\n")
-                inner_box.configure(state="disabled")
-            except Exception as e:
-                print(f"[PATTERNS DISPLAY ERROR] {e}")
