@@ -146,7 +146,7 @@ class Totten(ctk.CTk):
             if hasattr(state, "patterns_analysis_workspace") and state.patterns_analysis_workspace:
                 state.patterns_analysis_workspace.destroy()
 
-            from gui.patterns.patterns_layout import create_patterns_analysis_workspace
+            from gui.patterns import create_patterns_analysis_workspace
             state.patterns_analysis_workspace = create_patterns_analysis_workspace(
                 self,
                 initial_games=initial_games,
