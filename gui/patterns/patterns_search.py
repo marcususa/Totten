@@ -62,6 +62,9 @@ class PatternsSearchMixin:
         seen_constellations = set()
         matches = []
 
+        # Static piece values for Level 2 cascading evaluations
+        piece_vals = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
+
         for move in resolved.mainline_moves():
             mover_color = board.turn
             move_num = board.fullmove_number
@@ -150,7 +153,29 @@ class PatternsSearchMixin:
                         if constellation_sig not in seen_constellations:
                             seen_constellations.add(constellation_sig)
                             sq_label = chess.square_name(target_sq)
-                            matches.append(f"{partner_move_label}, {move_label} attacking the {sq_label} square")
+                            base_desc = f"{partner_move_label}, {move_label} attacking the {sq_label} square"
+
+                            # --- LEVEL 2 STATIC CASCADING THREAT CHECK ---
+                            cascading_notes = []
+                            for atk_sq in [active_sq, partner_sq]:
+                                p_obj = board.piece_at(atk_sq)
+                                if p_obj and p_obj.piece_type in (chess.QUEEN, chess.ROOK, chess.BISHOP):
+                                    for secondary_target in board.attacks(atk_sq):
+                                        if secondary_target == target_sq:
+                                            continue
+                                        sec_piece = board.piece_at(secondary_target)
+                                        if sec_piece and sec_piece.color == opponent_color:
+                                            sec_val = piece_vals.get(sec_piece.piece_type, 1)
+                                            atk_val = piece_vals.get(p_obj.piece_type, 1)
+                                            if sec_val >= 3 or sec_val >= atk_val:
+                                                sec_sq_name = chess.square_name(secondary_target)
+                                                cascading_notes.append(f"Unlocks secondary pressure on {sec_sq_name}")
+                                                break
+
+                            if cascading_notes:
+                                base_desc += f" (Cascade: {'; '.join(cascading_notes)})"
+
+                            matches.append(base_desc)
 
         return matches
 
@@ -164,7 +189,16 @@ class PatternsSearchMixin:
             title_str = "White Patterns - PGN Export" if color_filter == "W" else "Black Patterns - PGN Export"
 
             target_game = getattr(self, "current_game", None)
-            active_games = getattr(self, "game_list", []) or []
+            raw_active_games = getattr(self, "game_list", []) or []
+
+            # Strict Filtering: Only keep games with valid two-piece convergences
+            active_games = []
+            for g_item in raw_active_games:
+                resolved_g = self._resolve_game_obj(g_item)
+                if resolved_g and resolved_g != target_game:
+                    convs = self._find_two_piece_convergences(resolved_g, color_filter)
+                    if convs:
+                        active_games.append(resolved_g)
 
             pgn_io = io.StringIO()
             resolved_target_game = self._resolve_game_obj(target_game) if (
@@ -187,12 +221,7 @@ class PatternsSearchMixin:
                 header_key = "White" if color_filter == "W" else "Black"
                 cross_game_comments = []
 
-                for game_item in active_games:
-                    resolved_item = self._resolve_game_obj(game_item) if hasattr(
-                        self, "_resolve_game_obj") else game_item
-                    if not resolved_item or resolved_item == resolved_target_game:
-                        continue
-
+                for resolved_item in active_games:
                     convergences = self._find_two_piece_convergences(resolved_item, color_filter)
                     if not convergences:
                         continue
@@ -209,7 +238,6 @@ class PatternsSearchMixin:
 
                 result_str = headers.get("Result", "*")
 
-                # Strip out any pre-existing trailing result token to prevent duplication
                 for token in [" 1-0", " 0-1", " 1/2-1/2", " *"]:
                     if moves_str.endswith(token.strip()):
                         moves_str = moves_str[:-len(token.strip())].strip()
@@ -220,11 +248,7 @@ class PatternsSearchMixin:
                 else:
                     pgn_io.write(f"{moves_str} {result_str}\n\n")
 
-            for game_item in active_games:
-                resolved_item = self._resolve_game_obj(game_item) if hasattr(self, "_resolve_game_obj") else game_item
-                if not resolved_item or resolved_item == resolved_target_game:
-                    continue
-
+            for resolved_item in active_games:
                 item_headers = getattr(resolved_item, "headers", {})
                 item_tag_keys = list(item_headers.keys()) if hasattr(item_headers, "keys") else []
                 standard_tags = ["Event", "Site", "Date", "Round", "White", "Black", "Result", "ECO"]
