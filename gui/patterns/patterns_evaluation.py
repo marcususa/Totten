@@ -92,6 +92,8 @@ class PatternsEvaluation(PatternsDatabase):
 
     def _sync_analysis_selection(self):
         """Renders the analysis panel completely, strictly preserving custom pattern/engine results across move navigation."""
+        if getattr(self, "_has_tagged_pattern_view", False):
+            return
         if hasattr(state, "patterns_state") and isinstance(state.patterns_state, dict):
             p_state_val = state.patterns_state.get("target_piece")
             if p_state_val:

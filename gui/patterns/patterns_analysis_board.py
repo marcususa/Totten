@@ -72,7 +72,7 @@ class PatternsAnalysisBoardMixin:
                 exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
                 pgn_text_export = resolved.accept(exporter)
 
-                surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
+                surface_bg = THEME.get("bg_surface")
                 self.pgn_data_text.configure(state="normal", fg_color=surface_bg)
                 self.pgn_data_text.delete("1.0", "end")
                 self.pgn_data_text.insert("end", pgn_text_export)
@@ -82,12 +82,12 @@ class PatternsAnalysisBoardMixin:
 
         if hasattr(self, "moves_textbox") and self.moves_textbox:
             try:
-                surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
-                text_primary = THEME.get("text_primary", "#ffffff")
+                surface_bg = THEME.get("bg_surface")
+                text_primary = THEME.get("text_primary")
                 self.moves_textbox.configure(state="normal", fg_color=surface_bg)
 
-                bg_active = THEME.get("active_tracker_bg", "#660000")
-                fg_active = THEME.get("active_tracker_fg", "#ffffff")
+                bg_active = "#ff0000"
+                fg_active = "#ffffff"
 
                 internal_text = getattr(self.moves_textbox, "_textbox", self.moves_textbox)
                 internal_text.tag_config("active_move", background=bg_active, foreground=fg_active)
@@ -137,7 +137,6 @@ class PatternsAnalysisBoardMixin:
                 print(f"[OPENINGS RENDER ERROR] {e}")
 
     def jump_to_node(self, target_node):
-        """Directly updates board position from a click, ensures custom pattern analysis data is fully preserved, and applies active_move background highlight with forced tag prioritization."""
         self._navigating_moves = True
 
         current_box = getattr(self, "analysis_textbox", None) or getattr(self, "pv_textbox", None) or getattr(
@@ -145,33 +144,54 @@ class PatternsAnalysisBoardMixin:
             "_cached_analysis_box",
             None
         )
-        if current_box and not getattr(self, "_last_analysis_content", None):
-            try:
-                self._last_analysis_content = current_box.get("1.0", "end-1c")
-            except Exception:
-                pass
 
         try:
             self.board_node = target_node
             self.current_node = target_node
             if hasattr(self, "board_widget") and self.board_widget:
-                self.board_widget.set_position_fen(self.board_node.board().fen())
+                try:
+                    self.board_widget.set_position_fen(self.board_node.board().fen())
+                except Exception:
+                    pass
+
+            bg_active = "#ff0000"
+            fg_active = "#ffffff"
+
+            if current_box:
+                try:
+                    current_box.configure(state="normal")
+                    inner_analysis = getattr(current_box, "_textbox", current_box)
+
+                    inner_analysis.tag_config("active_move", background=bg_active, foreground=fg_active,
+                                              underline=False)
+                    inner_analysis.tag_remove("active_move", "1.0", "end")
+
+                    active_node = getattr(self, "board_node", None) or getattr(self, "current_node", None)
+                    if active_node:
+                        target_tag = f"move_{id(active_node)}"
+                        ranges = inner_analysis.tag_ranges(target_tag)
+                        if ranges:
+                            inner_analysis.tag_add("active_move", ranges[0], ranges[1])
+                            inner_analysis.tag_raise("active_move")
+                            current_box.see(ranges[0])
+
+                    current_box.configure(state="disabled")
+                except Exception as e:
+                    print(f"[ANALYSIS TRACKER HIGHLIGHT ERROR]: {e}")
 
             if hasattr(self, "moves_textbox") and self.moves_textbox:
                 try:
-                    surface_bg = THEME.get("bg_surface", THEME.get("bg_main", "#172134"))
+                    surface_bg = THEME.get("bg_surface")
                     self.moves_textbox.configure(state="normal", fg_color=surface_bg)
 
-                    bg_active = THEME.get("active_tracker_bg", "#660000")
-                    fg_active = THEME.get("active_tracker_fg", "#ffffff")
-
                     internal_text = getattr(self.moves_textbox, "_textbox", self.moves_textbox)
-                    internal_text.tag_config("active_move", background=bg_active, foreground=fg_active)
+                    internal_text.tag_config("active_move", background=bg_active, foreground=fg_active, underline=False)
                     internal_text.tag_remove("active_move", "1.0", "end")
 
-                    if self.board_node and self.board_node != self.current_game:
-                        current_tag = str(id(self.board_node))
-                        ranges = internal_text.tag_ranges(current_tag)
+                    active_node = getattr(self, "board_node", None) or getattr(self, "current_node", None)
+                    if active_node:
+                        target_tag = str(id(active_node))
+                        ranges = internal_text.tag_ranges(target_tag)
                         if ranges:
                             internal_text.tag_add("active_move", ranges[0], ranges[1])
                             internal_text.tag_raise("active_move")
@@ -181,17 +201,8 @@ class PatternsAnalysisBoardMixin:
                 except Exception as e:
                     print(f"[MOVES TRACKER HIGHLIGHT ERROR]: {e}")
 
-            content_to_restore = getattr(self, "_active_custom_analysis_content", None) or getattr(self,
-                                                                                                   "_last_analysis_content",
-                                                                                                   None)
-            if current_box and content_to_restore:
-                try:
-                    current_box.configure(state="normal")
-                    current_box.delete("1.0", "end")
-                    current_box.insert("end", content_to_restore)
-                    current_box.configure(state="disabled")
-                except Exception:
-                    pass
+        except Exception as e:
+            print(f"[JUMP TO NODE ERROR]: {e}")
         finally:
             self._navigating_moves = False
 
@@ -253,7 +264,7 @@ class PatternsAnalysisBoardMixin:
             self.btn_pv.configure(
                 text="Engine",
                 command=self.toggle_engine_action,
-                hover_color=THEME.get("btn_hover", "#3b82f6")
+                hover_color=THEME.get("btn_hover")
             )
 
         for btn_name in ("btn_white", "btn_white_patterns"):
@@ -261,9 +272,8 @@ class PatternsAnalysisBoardMixin:
             if btn:
                 btn.configure(
                     text="White Patterns",
-                    command=lambda: (print("[DEBUG CLICK] White Patterns clicked!"),
-                                     self.trigger_engine_mode("white_patterns_mode")),
-                    hover_color=THEME.get("btn_hover", "#3b82f6")
+                    command=lambda: self.trigger_engine_mode("white_patterns_mode"),
+                    hover_color=THEME.get("btn_hover")
                 )
                 break
 
@@ -272,26 +282,23 @@ class PatternsAnalysisBoardMixin:
             if btn:
                 btn.configure(
                     text="Black Patterns",
-                    command=lambda: (print("[DEBUG CLICK] Black Patterns clicked!"),
-                                     self.trigger_engine_mode("black_patterns_mode")),
-                    hover_color=THEME.get("btn_hover", "#3b82f6")
+                    command=lambda: self.trigger_engine_mode("black_patterns_mode"),
+                    hover_color=THEME.get("btn_hover")
                 )
                 break
 
         if hasattr(self, "btn_opening") and self.btn_opening:
             self.btn_opening.configure(
                 text="Opening",
-                command=lambda: (print("[DEBUG CLICK] Opening clicked!"),
-                                 self.trigger_engine_mode("opening_pattern_mode")),
-                hover_color=THEME.get("btn_hover", "#3b82f6")
+                command=lambda: self.trigger_engine_mode("opening_pattern_mode"),
+                hover_color=THEME.get("btn_hover")
             )
 
         if hasattr(self, "btn_calculation") and self.btn_calculation:
             self.btn_calculation.configure(
                 text="Calculation",
-                command=lambda: (print("[DEBUG CLICK] Calculation clicked!"),
-                                 self.trigger_engine_mode("calculation_pattern_mode")),
-                hover_color=THEME.get("btn_hover", "#3b82f6")
+                command=lambda: self.trigger_engine_mode("calculation_pattern_mode"),
+                hover_color=THEME.get("btn_hover")
             )
 
     def _bind_global_shortcuts(self):

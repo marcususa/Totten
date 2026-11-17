@@ -8,6 +8,7 @@ import chess.pgn
 from pathlib import Path
 import gui.app_state as state
 from core.patterns_db import get_patterns
+from core.constants import THEME
 
 
 class PatternsSearchMixin:
@@ -37,11 +38,6 @@ class PatternsSearchMixin:
         return parts[0] if parts else "Unknown"
 
     def _find_two_piece_convergences(self, game_node, color_filter: str):
-        """
-        Scans a game's mainline for true, unobstructed 2-piece attacks on an OPPONENT'S piece
-        by the target side (`W` or `B`) involving the currently selected piece (`self.target_piece`).
-        Excludes empty squares, friendly pieces (self-defense), and squares the opponent can move to in 1 ply.
-        """
         resolved = self._resolve_game_obj(game_node) if hasattr(self, "_resolve_game_obj") else game_node
         if not resolved or not hasattr(resolved, "board"):
             return []
@@ -159,11 +155,171 @@ class PatternsSearchMixin:
         return matches
 
     def trigger_engine_mode(self, mode):
-        """
-        Renders continuous PGN stream in the middle-right Analysis panel with clickable move tokens,
-        followed by cross-game 2-piece attack matches. Caches the output content into _active_custom_analysis_content
-        so that navigation (jump_to_node) permanently preserves it and prevents any resetting or green highlights.
-        """
+        if mode in ("white_patterns_mode", "black_patterns_mode"):
+            import io
+            import chess.pgn
+            import customtkinter as ctk
+
+            color_filter = "W" if mode == "white_patterns_mode" else "B"
+            title_str = "White Patterns - PGN Export" if color_filter == "W" else "Black Patterns - PGN Export"
+
+            target_game = getattr(self, "current_game", None)
+            active_games = getattr(self, "game_list", []) or []
+
+            pgn_io = io.StringIO()
+            resolved_target_game = self._resolve_game_obj(target_game) if (
+                        target_game and hasattr(self, "_resolve_game_obj")) else target_game
+
+            if resolved_target_game:
+                headers = getattr(resolved_target_game, "headers", {})
+                tag_keys = list(headers.keys()) if hasattr(headers, "keys") else []
+                standard_tags = ["Event", "Site", "Date", "Round", "White", "Black", "Result", "ECO"]
+                ordered_tags = [t for t in standard_tags if t in tag_keys] + [t for t in tag_keys if
+                                                                              t not in standard_tags]
+
+                for tag in ordered_tags:
+                    pgn_io.write(f"[{tag} \"{headers.get(tag, '?')}\"]\n")
+                if not ordered_tags:
+                    pgn_io.write(
+                        "[Event \"Unknown\"]\n[Site \"Unknown\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n")
+                pgn_io.write("\n")
+
+                header_key = "White" if color_filter == "W" else "Black"
+                cross_game_comments = []
+
+                for game_item in active_games:
+                    resolved_item = self._resolve_game_obj(game_item) if hasattr(
+                        self, "_resolve_game_obj") else game_item
+                    if not resolved_item or resolved_item == resolved_target_game:
+                        continue
+
+                    convergences = self._find_two_piece_convergences(resolved_item, color_filter)
+                    if not convergences:
+                        continue
+
+                    item_headers = getattr(resolved_item, "headers", {})
+                    eco_code = item_headers.get("ECO", "???")
+                    player_first = self._extract_player_first_word(item_headers.get(header_key, ""))
+
+                    for conv_desc in convergences:
+                        cross_game_comments.append(f"{eco_code} {player_first}: {conv_desc}")
+
+                exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=False)
+                moves_str = resolved_target_game.accept(exporter).strip()
+
+                result_str = headers.get("Result", "*")
+
+                # Strip out any pre-existing trailing result token to prevent duplication
+                for token in [" 1-0", " 0-1", " 1/2-1/2", " *"]:
+                    if moves_str.endswith(token.strip()):
+                        moves_str = moves_str[:-len(token.strip())].strip()
+
+                if cross_game_comments:
+                    combined_comment_str = " ".join(cross_game_comments)
+                    pgn_io.write(f"{moves_str} {{{combined_comment_str}}} {result_str}\n\n")
+                else:
+                    pgn_io.write(f"{moves_str} {result_str}\n\n")
+
+            for game_item in active_games:
+                resolved_item = self._resolve_game_obj(game_item) if hasattr(self, "_resolve_game_obj") else game_item
+                if not resolved_item or resolved_item == resolved_target_game:
+                    continue
+
+                item_headers = getattr(resolved_item, "headers", {})
+                item_tag_keys = list(item_headers.keys()) if hasattr(item_headers, "keys") else []
+                standard_tags = ["Event", "Site", "Date", "Round", "White", "Black", "Result", "ECO"]
+                item_ordered_tags = [t for t in standard_tags if t in item_tag_keys] + [t for t in item_tag_keys if
+                                                                                        t not in item_tag_keys]
+
+                for tag in item_ordered_tags:
+                    pgn_io.write(f"[{tag} \"{item_headers.get(tag, '?')}\"]\n")
+                if not item_ordered_tags:
+                    pgn_io.write(
+                        "[Event \"Unknown\"]\n[Site \"Unknown\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result \"*\"]\n")
+                pgn_io.write("\n")
+
+                exporter = chess.pgn.StringExporter(headers=False, variations=True, comments=True)
+                item_moves_str = resolved_item.accept(exporter).strip()
+                item_result = item_headers.get("Result", "*")
+
+                for token in [" 1-0", " 0-1", " 1/2-1/2", " *"]:
+                    if item_moves_str.endswith(token.strip()):
+                        item_moves_str = item_moves_str[:-len(token.strip())].strip()
+
+                pgn_io.write(f"{item_moves_str} {item_result}\n\n")
+
+            final_pgn_content = pgn_io.getvalue()
+
+            popup = ctk.CTkToplevel(self)
+            popup.title(title_str)
+            popup.geometry("750x650")
+            popup.configure(
+                fg_color=THEME.get("bg_panel", "#172134"),
+                bg=THEME.get("bg_panel", "#172134")
+            )
+
+            popup.attributes("-topmost", True)
+            popup.after(100, lambda: popup.attributes("-topmost", False))
+
+            lbl = ctk.CTkLabel(
+                popup,
+                text=title_str,
+                font=("Arial", 16, "bold"),
+                text_color=THEME.get("text_primary", "#ffffff"),
+                fg_color="transparent"
+            )
+            lbl.pack(pady=(15, 5))
+
+            txt_box = ctk.CTkTextbox(
+                popup,
+                wrap="word",
+                fg_color=THEME.get("bg_surface", "#1e293b"),
+                text_color=THEME.get("text_primary", "#ffffff"),
+                border_color=THEME.get("border_color", "#334155"),
+                border_width=1
+            )
+            txt_box.pack(fill="both", expand=True, padx=15, pady=10)
+
+            txt_box.insert("1.0", final_pgn_content)
+            txt_box.configure(state="disabled")
+
+            btn_frame = ctk.CTkFrame(
+                popup,
+                fg_color=THEME.get("bg_panel", "#172134"),
+                border_color=THEME.get("border_color", "#334155"),
+                border_width=0
+            )
+            btn_frame.pack(fill="x", padx=15, pady=(0, 15))
+
+            def copy_pgn():
+                popup.clipboard_clear()
+                popup.clipboard_append(final_pgn_content)
+
+            btn_copy = ctk.CTkButton(
+                btn_frame,
+                text="Copy PGN",
+                command=copy_pgn,
+                fg_color=THEME.get("btn_initial", "#1e3a8a"),
+                hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                text_color=THEME.get("text_primary", "#ffffff"),
+                border_color=THEME.get("border_color", "#334155"),
+                border_width=0
+            )
+            btn_copy.pack(side="right", padx=5)
+
+            btn_close = ctk.CTkButton(
+                btn_frame,
+                text="Close",
+                command=popup.destroy,
+                fg_color=THEME.get("btn_initial", "#1e3a8a"),
+                hover_color=THEME.get("btn_hover", "#2e4a8c"),
+                text_color=THEME.get("text_primary", "#ffffff"),
+                border_color=THEME.get("border_color", "#334155"),
+                border_width=0
+            )
+            btn_close.pack(side="right", padx=5)
+            return
+
         target_textbox = getattr(self, "analysis_textbox", None) or getattr(self, "pv_textbox", None)
         if not target_textbox:
             return
@@ -173,11 +329,7 @@ class PatternsSearchMixin:
 
         try:
             color_filter = None
-            if mode == "white_patterns_mode":
-                color_filter = "W"
-            elif mode == "black_patterns_mode":
-                color_filter = "B"
-            elif mode == "opening_pattern_mode":
+            if mode == "opening_pattern_mode":
                 from gui.openings import OpeningsManager
                 manager = OpeningsManager()
                 manager.attach_to_workspace(self, mode_key=mode)
@@ -187,13 +339,18 @@ class PatternsSearchMixin:
             else:
                 return
 
+            inner_box = getattr(target_textbox, "_textbox", target_textbox)
+            bg_active = THEME.get("active_tracker_bg", "#ff0000")
+            fg_active = THEME.get("active_tracker_fg", "#ffffff")
+
+            inner_box.tag_config("active_move", background=bg_active, foreground=fg_active, underline=False)
+
             stored_singles, _ = get_patterns(color_filter)
             target_game = getattr(self, "current_game", None)
 
             if target_game:
                 all_moves = []
                 curr_node = target_game
-                idx = 1
                 while curr_node.variations:
                     next_node = curr_node.variation(0)
                     is_white = (curr_node.board().turn == chess.WHITE)
@@ -212,7 +369,6 @@ class PatternsSearchMixin:
                         "node": next_node
                     })
                     curr_node = next_node
-                    idx += 1
 
                 paired_moves = {}
                 for m in all_moves:
@@ -234,14 +390,30 @@ class PatternsSearchMixin:
 
                     if w_move:
                         target_textbox.insert("end", f"{prefix}{m_num}. ")
-                        is_w_match = (color_filter == "W" and w_move["matched"])
-                        # NO MORE GREEN: Pattern matches are rendered normally without green brackets
                         w_text = w_move['san']
+                        node_id = id(w_move['node'])
+                        tag_name = str(node_id)
+                        node_tag = f"move_{node_id}"
 
-                        tag_name = f"move_{id(w_move['node'])}"
-                        target_textbox.insert("end", w_text, ("clickable_move", tag_name))
+                        target_textbox.tag_config(
+                            tag_name,
+                            foreground=THEME.get("text_primary", "#ffffff"),
+                            underline=False
+                        )
+                        target_textbox.tag_config(
+                            node_tag,
+                            foreground=THEME.get("text_primary", "#ffffff"),
+                            underline=False
+                        )
+
+                        target_textbox.insert("end", w_text, (tag_name, node_tag))
                         target_textbox.tag_bind(
                             tag_name,
+                            "<Button-1>",
+                            lambda event, n=w_move['node']: (self.jump_to_node(n), "break")
+                        )
+                        target_textbox.tag_bind(
+                            node_tag,
                             "<Button-1>",
                             lambda event, n=w_move['node']: (self.jump_to_node(n), "break")
                         )
@@ -253,19 +425,34 @@ class PatternsSearchMixin:
                             target_textbox.insert("end", f"{prefix}{m_num}... ")
                         else:
                             target_textbox.insert("end", " ")
-                        is_b_match = (color_filter == "B" and b_move["matched"])
-                        # NO MORE GREEN: Pattern matches are rendered normally without green brackets
                         b_text = b_move['san']
+                        node_id = id(b_move['node'])
+                        tag_name = str(node_id)
+                        node_tag = f"move_{node_id}"
 
-                        tag_name = f"move_{id(b_move['node'])}"
-                        target_textbox.insert("end", b_text, ("clickable_move", tag_name))
+                        target_textbox.tag_config(
+                            tag_name,
+                            foreground=THEME.get("text_primary", "#ffffff"),
+                            underline=False
+                        )
+                        target_textbox.tag_config(
+                            node_tag,
+                            foreground=THEME.get("text_primary", "#ffffff"),
+                            underline=False
+                        )
+
+                        target_textbox.insert("end", b_text, (tag_name, node_tag))
                         target_textbox.tag_bind(
                             tag_name,
                             "<Button-1>",
                             lambda event, n=b_move['node']: (self.jump_to_node(n), "break")
                         )
+                        target_textbox.tag_bind(
+                            node_tag,
+                            "<Button-1>",
+                            lambda event, n=b_move['node']: (self.jump_to_node(n), "break")
+                        )
 
-                # --- Cross-Reference Active Game List for 2-Piece Attacks ---
                 active_games = getattr(self, "game_list", []) or []
                 header_key = "White" if color_filter == "W" else "Black"
                 cross_game_comments = []
@@ -290,16 +477,15 @@ class PatternsSearchMixin:
                 if cross_game_comments:
                     target_textbox.insert("end", " " + " ".join(cross_game_comments))
 
-            target_textbox.insert("end", "\n")
-            target_textbox.tag_config("clickable_move", foreground="#3b82f6", underline=True)
+                target_textbox.insert("end", "\n")
 
-            # Cache the rendered custom analysis content so that navigation clicks lock and preserve it permanently
-            try:
-                self._active_custom_analysis_content = target_textbox.get("1.0", "end-1c")
-            except Exception:
-                pass
+            self._has_tagged_pattern_view = True
+            self._active_custom_analysis_content = None
 
             target_textbox.configure(state="disabled")
+
+            if hasattr(self, "update_active_move_highlight"):
+                self.update_active_move_highlight()
 
         except Exception as e:
             print(f"[ERROR in trigger_engine_mode]: {e}")

@@ -2,7 +2,6 @@ import customtkinter as ctk
 import gui.app_state as state
 
 from core.constants import THEME
-from gui.patterns.patterns_init_mixin import PatternsInitMixin
 from gui.engine_mixins.engine_piece_mixin import EnginePieceMixin
 from gui.patterns.patterns_analysis_navigation import PatternsAnalysisNavigationMixin
 from gui.patterns.patterns_analysis_board import PatternsAnalysisBoardMixin
@@ -11,7 +10,6 @@ from gui.patterns.patterns_evaluation import PatternsEvaluation
 
 class PatternsAnalysis(
     ctk.CTkFrame,
-    PatternsInitMixin,
     PatternsAnalysisNavigationMixin,
     PatternsAnalysisBoardMixin,
     EnginePieceMixin,
@@ -199,6 +197,52 @@ class PatternsAnalysis(
             else:
                 self.load_game(game)
 
+    def open_patterns_pgn_window(self, games_to_export, title="Patterns PGN Export"):
+        """Spawns a pop-out Toplevel window displaying the filtered games in PGN format."""
+        import io
+        import chess.pgn
+
+        popup = ctk.CTkToplevel(self)
+        popup.title(title)
+        popup.geometry("650x550")
+
+        # Bring window to front safely
+        popup.attributes("-topmost", True)
+        popup.after(100, lambda: popup.attributes("-topmost", False))
+
+        # Header Label
+        lbl = ctk.CTkLabel(popup, text=title, font=("Arial", 16, "bold"))
+        lbl.pack(pady=(15, 5))
+
+        # Scrollable Textbox for PGN content
+        txt_box = ctk.CTkTextbox(popup, wrap="word")
+        txt_box.pack(fill="both", expand=True, padx=15, pady=10)
+
+        # Export game collection to standard PGN format string
+        pgn_io = io.StringIO()
+        for game in games_to_export:
+            g_obj = self._resolve_game_obj(game) if hasattr(self, "_resolve_game_obj") else game
+            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+            pgn_str = g_obj.accept(exporter)
+            pgn_io.write(pgn_str + "\n\n")
+
+        txt_box.insert("1.0", pgn_io.getvalue())
+        txt_box.configure(state="disabled")
+
+        # Button bar (Copy & Close)
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=(0, 15))
+
+        def copy_pgn():
+            popup.clipboard_clear()
+            popup.clipboard_append(pgn_io.getvalue())
+
+        btn_copy = ctk.CTkButton(btn_frame, text="Copy PGN", command=copy_pgn)
+        btn_copy.pack(side="right", padx=5)
+
+        btn_close = ctk.CTkButton(btn_frame, text="Close", command=popup.destroy)
+        btn_close.pack(side="right", padx=5)
+
     def _bind_engine_buttons(self):
         # --- Standalone Engine Comparison Button ---
         if hasattr(self, "btn_pv") and self.btn_pv:
@@ -214,8 +258,13 @@ class PatternsAnalysis(
             if btn:
                 btn.configure(
                     text="White Patterns",
-                    command=lambda: (print("[DEBUG CLICK] White Patterns clicked!"),
-                                     self.trigger_engine_mode("white_patterns_mode")),
+                    command=lambda: (
+                        print("[DEBUG CLICK] White Patterns clicked!"),
+                        self.open_patterns_pgn_window(
+                            [g for g in self.game_list if getattr(self, "_is_white_pattern", lambda x: True)(g)],
+                            title="White Patterns - PGN Export"
+                        )
+                    ),
                     hover_color=THEME["btn_hover"]
                 )
                 break
@@ -226,8 +275,13 @@ class PatternsAnalysis(
             if btn:
                 btn.configure(
                     text="Black Patterns",
-                    command=lambda: (print("[DEBUG CLICK] Black Patterns clicked!"),
-                                     self.trigger_engine_mode("black_patterns_mode")),
+                    command=lambda: (
+                        print("[DEBUG CLICK] Black Patterns clicked!"),
+                        self.open_patterns_pgn_window(
+                            [g for g in self.game_list if getattr(self, "_is_black_pattern", lambda x: True)(g)],
+                            title="Black Patterns - PGN Export"
+                        )
+                    ),
                     hover_color=THEME["btn_hover"]
                 )
                 break
