@@ -1,250 +1,264 @@
+# ==========================================
+# FILE: gui/patterns/patterns_layout.py
+# ==========================================
+
 import customtkinter as ctk
-import gui.app_state as state
-
-from core.constants import THEME
-from gui.engine_mixins.engine_piece_mixin import EnginePieceMixin
-from gui.patterns.patterns_analysis_navigation import PatternsAnalysisNavigationMixin
-from gui.patterns.patterns_analysis_board import PatternsAnalysisBoardMixin
-from gui.patterns.patterns_evaluation import PatternsEvaluation
+from tkinter import ttk
+from gui.chess_board import ChessBoardWidget
+from core.constants import THEME, LAYOUT
+from gui.statusbar import set_status_message
 
 
-class PatternsAnalysis(
-    ctk.CTkFrame,
-    PatternsAnalysisNavigationMixin,
-    PatternsAnalysisBoardMixin,
-    EnginePieceMixin,
-    PatternsEvaluation,
-):
-    """
-    Dedicated workspace controller for Patterns Analysis UI layout, shortcuts, and bindings.
-    Inherits evaluation and comparison engine logic from PatternsEvaluation.
-    """
+class PatternsAnalysisLayoutMixin:
+    """Mixin class to handle the complete CustomTkinter layout and widget instantiation for analysis views."""
 
-    def __init__(self, parent, filename=None, initial_games=None, target_game=None, active_index=None,
-                 target_piece=None, *args, **kwargs):
-        kwargs.pop('target_game', None)
-        kwargs.pop('active_index', None)
-        kwargs.pop('target_piece', None)
+    def init_layout(self):
+        import gui.app_state as state
 
-        super().__init__(parent, fg_color=THEME["bg_panel"], corner_radius=0, *args, **kwargs)
+        self.main_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.filename = filename or "personal_catalog.pgn"
+        self.main_container.grid_columnconfigure(0, weight=0, minsize=LAYOUT["board_width"])
+        self.main_container.grid_columnconfigure(1, weight=3)
+        self.main_container.grid_rowconfigure(0, weight=1)
 
-        if not initial_games and hasattr(state, "catalog_state"):
-            initial_games = state.catalog_state.get("active_games")
+        self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
 
-        if not initial_games and hasattr(state, "all_games"):
-            initial_games = state.all_games
+        self.left_board_panel = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"], corner_radius=8,
+                                             border_width=1,
+                                             border_color=THEME.get("border_color", THEME["bg_surface"]))
+        self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
-        self.game_list = list(initial_games) if initial_games else []
-        self.current_game = None
-        self.board_node = None
-        self.preview_lookup = {}
+        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color=THEME["bg_surface"],
+                                         width=LAYOUT["board_width"], height=LAYOUT["board_height"],
+                                         corner_radius=0)
+        self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
+        self.board_holder.pack_propagate(False)
 
-        self.active_game = None
-        self.root_game_node = None
-        self.current_node = None
-        self.active_engine_mode = None
-        self.analysis_rows = {}
-        self._cached_analysis_box = None
+        self.board_widget = ChessBoardWidget(self.board_holder, square_size=LAYOUT["square_size"])
+        self.board_widget.pack(fill="both", expand=True)
 
-        resolved_piece = (
-            target_piece or
-            (state.patterns_state.get("target_piece") if hasattr(state, "patterns_state") and isinstance(
-                state.patterns_state, dict) else None) or
-            getattr(state, "selected_piece", None) or
-            "N"
+        self.engine_results_container_frame = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"],
+                                                           corner_radius=8,
+                                                           border_width=1,
+                                                           border_color=THEME.get("border_color", THEME["bg_surface"]))
+        self.engine_results_container_frame.pack(side="top", fill="both", expand=True, padx=0, pady=0)
+
+        self.engine_results_header_frame = ctk.CTkFrame(self.engine_results_container_frame, fg_color="transparent")
+        self.engine_results_header_frame.pack(fill="x", padx=10, pady=(6, 2))
+
+        self.row_analysis_btns = ctk.CTkFrame(self.engine_results_header_frame, fg_color="transparent")
+        self.row_analysis_btns.pack(side="left", padx=0)
+
+        if hasattr(self, "active_engine_mode"):
+            self._active_engine_mode = self.active_engine_mode
+        elif not hasattr(self, "_active_engine_mode"):
+            self._active_engine_mode = None
+
+        if not hasattr(self, "_engine_running"):
+            self._engine_running = False
+
+        if not hasattr(self, "_selected_mode_button"):
+            self._selected_mode_button = None
+
+        def set_analysis_mode(mode):
+            self._selected_mode_button = mode
+            self._active_engine_mode = mode
+            self.active_engine_mode = mode
+            update_analysis_buttons_state()
+            if hasattr(self, "trigger_engine_mode"):
+                self.trigger_engine_mode(mode)
+
+        def update_analysis_buttons_state():
+            buttons_map = {
+                "white_patterns_mode": (self.btn_white, self.frame_white),
+                "black_patterns_mode": (self.btn_black, self.frame_black),
+                "opening_pattern_mode": (self.btn_opening, self.frame_opening),
+                "calculation_pattern_mode": (self.btn_calculation, self.frame_calculation)
+            }
+            for m, (btn, frm) in buttons_map.items():
+                is_selected = (self._selected_mode_button == m)
+                btn.configure(
+                    fg_color=THEME["btn_hover"] if is_selected else THEME["btn_initial"]
+                )
+                frm.configure(border_width=0 if is_selected else 1)
+
+        def on_btn_enter(btn, mode, frm):
+            if self._selected_mode_button != mode:
+                btn.configure(fg_color=THEME["btn_hover"])
+                frm.configure(border_width=0)
+
+        def on_btn_leave(btn, mode, frm):
+            if self._selected_mode_button != mode:
+                btn.configure(fg_color=THEME["btn_initial"])
+                frm.configure(border_width=1)
+
+        def init_buttons_ui():
+            for widget in self.row_analysis_btns.winfo_children():
+                widget.destroy()
+
+            btn_height = 20
+            btn_corner = 6
+            btn_font = ctk.CTkFont(size=11)
+            btn_hover = THEME["btn_hover"]
+            btn_initial = THEME["btn_initial"]
+            text_color = THEME["text_primary"]
+            border_color = THEME.get("border_color", THEME["bg_surface"])
+
+            def create_mode_button(text, width, mode_key):
+                frm = ctk.CTkFrame(
+                    self.row_analysis_btns, fg_color="transparent", corner_radius=btn_corner,
+                    border_width=1, border_color=border_color
+                )
+                frm.pack(side="left", padx=2)
+                btn = ctk.CTkButton(
+                    frm, text=text, width=width, height=btn_height, corner_radius=btn_corner,
+                    border_width=0, fg_color=btn_initial, hover_color=btn_hover,
+                    text_color=text_color, font=btn_font,
+                    command=lambda: set_analysis_mode(mode_key)
+                )
+                btn.bind("<Enter>", lambda e, b=btn, m=mode_key, f=frm: on_btn_enter(b, m, f))
+                btn.bind("<Leave>", lambda e, b=btn, m=mode_key, f=frm: on_btn_leave(b, m, f))
+                btn.pack()
+                return btn, frm
+
+            self.btn_white, self.frame_white = create_mode_button("White Patterns", 95, "white_patterns_mode")
+            self.btn_black, self.frame_black = create_mode_button("Black Patterns", 95, "black_patterns_mode")
+            self.btn_opening, self.frame_opening = create_mode_button("Opening", 75, "opening_pattern_mode")
+            self.btn_calculation, self.frame_calculation = create_mode_button("Calculation", 80,
+                                                                              "calculation_pattern_mode")
+
+        init_buttons_ui()
+
+        # --- Dynamic Engine Button Creation in Header ---
+        self.btn_pv = ctk.CTkButton(
+            self.engine_results_header_frame,
+            text="Engine",
+            width=70,
+            height=20,
+            corner_radius=6,
+            fg_color=THEME["btn_initial"],
+            hover_color=THEME["btn_hover"],
+            text_color=THEME["text_primary"],
+            font=ctk.CTkFont(size=11),
+            command=self.toggle_engine_action
         )
-        self.target_piece = resolved_piece
-        self.active_sequence = []
+        self.btn_pv.pack(side="right", padx=4)
 
-        self.init_layout()
-        self._find_and_cache_analysis_box()
-        self.load_catalog_data()
-        self._bind_engine_buttons()
-        self._bind_global_shortcuts()
+        self.pv_inner_wrapper = ctk.CTkFrame(self.engine_results_container_frame, fg_color="transparent")
+        self.pv_inner_wrapper.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
-        # FORCE ALWAYS STARTING AT THE TOP (Index 0)
-        if self.game_list and hasattr(self, "load_game"):
-            self.load_game(self.game_list[0])
+        self.pv_textbox = ctk.CTkTextbox(
+            self.pv_inner_wrapper,
+            fg_color=THEME["bg_surface"],
+            text_color=THEME["text_primary"],
+            font=ctk.CTkFont(family="Arial", size=11),
+            wrap="word",
+            height=LAYOUT["pv_box_height"]
+        )
 
-        if hasattr(self, "board_widget") and self.board_widget:
-            self.board_widget.on_step_back = self.on_prev_move
-            self.board_widget.on_step_forward = self.on_next_move
-            self.board_widget.on_jump_start = self.on_first_move
-            self.board_widget.on_jump_end = self.on_last_move
+        self.pv_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
+        self.pv_textbox.tag_config("active_move", background=THEME["active_tracker_bg"],
+                                   foreground=THEME["active_tracker_fg"])
+        self.pv_textbox.pack(fill="both", expand=True, padx=0, pady=2)
 
-        self.after(50, self.focus_force)
+        self.right_analysis_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.right_analysis_panel.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
 
-    def _safe_load_game(self, game_node, category_source=None):
-        if category_source and category_source != "patterns":
-            return
-        import gui.app_state as state_ref
-        if hasattr(state_ref, "patterns_state"):
-            state_ref.patterns_state["active_index"] = 0
-            state_ref.patterns_state["active_focus"] = None
+        self.right_analysis_panel.rowconfigure(0, weight=1)
+        self.right_analysis_panel.rowconfigure(1, weight=0, minsize=32)
+        self.right_analysis_panel.rowconfigure(2, weight=3)
+        self.right_analysis_panel.rowconfigure(3, weight=1)
+        self.right_analysis_panel.columnconfigure(0, weight=1)
 
-        self._auto_select_first_game(retries=10)
+        self.top_catalog_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
+                                              border_width=1,
+                                              border_color=THEME.get("border_color", THEME["bg_surface"]))
+        self.top_catalog_panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
-    def _auto_select_first_game(self, retries=10):
-        if hasattr(self, "pgn_tree") and self.pgn_tree:
-            children = self.pgn_tree.get_children()
-            if children:
-                first_item = children[0]
-                self.pgn_tree.selection_set(first_item)
-                self.pgn_tree.focus(first_item)
-                self.pgn_tree.yview_moveto(0.0)
-                self.after_idle(lambda: self.pgn_tree.yview_moveto(0.0))
-                self._on_tree_selection_event(None)
-                return
-
-        if retries > 0:
-            self.after(50, lambda: self._auto_select_first_game(retries - 1))
-
-    def toggle_pgn_data_panel(self):
-        """Toggles the Game Details panel (Row 3), making the player panel longer and extending analysis downwards."""
-        if self.pgn_data_panel.winfo_ismapped():
-            # 1. Hide Game Details panel
-            self.pgn_data_panel.grid_remove()
-
-            # 2. Collapse Row 3 weight completely
-            self.right_analysis_panel.rowconfigure(3, weight=0, minsize=0)
-
-            # 3. Increase Row 0 (Player panel) weight to 2 for extra height
-            self.right_analysis_panel.rowconfigure(0, weight=2)
-
-            # 4. Set Row 2 (Analysis Panel) weight to 6 to absorb the rest and stretch down
-            self.right_analysis_panel.rowconfigure(2, weight=6)
-
-            # 5. Explicitly ensure container frame fills downwards
-            self.analysis_container_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=(0, 0))
-        else:
-            # 1. Restore standard weights when Game Details is open
-            self.right_analysis_panel.rowconfigure(0, weight=1)
-            self.right_analysis_panel.rowconfigure(2, weight=3)
-            self.right_analysis_panel.rowconfigure(3, weight=1, minsize=70)
-
-            # 2. Restore bottom padding and re-grid Game Details on Row 3
-            self.analysis_container_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=(0, 8))
-            self.pgn_data_panel.grid(row=3, column=0, sticky="nsew", padx=0, pady=0)
-
-    def on_flip_board(self, event=None):
-        """Explicitly calls toggle_flip() on the board widget when 'f' or 'F' is pressed."""
+        style = ttk.Style()
         try:
-            if hasattr(self, "board_widget") and self.board_widget:
-                if hasattr(self.board_widget, "toggle_flip") and callable(self.board_widget.toggle_flip):
-                    self.board_widget.toggle_flip()
-                    print("[BOARD DEBUG] Board widget toggle_flip() executed successfully.")
-                elif hasattr(self.board_widget, "flip_board"):
-                    self.board_widget.flip_board()
-                elif hasattr(self.board_widget, "invert"):
-                    self.board_widget.invert()
-        except Exception as e:
-            print(f"[BOARD FLIP ERROR] {e}")
+            style.theme_use("clam")
+        except Exception:
+            pass
 
-    def _handle_keypress(self, event=None):
-        if event and event.keysym in ("f", "F"):
-            self.on_flip_board()
-            return "break"
+        style.layout("Borderless.Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+        style.configure(
+            "Borderless.Treeview",
+            background=THEME["bg_surface"],
+            foreground=THEME["text_primary"],
+            fieldbackground=THEME["bg_surface"],
+            rowheight=18,
+            font=("Arial", 10),
+            borderwidth=0,
+            relief="flat",
+        )
+        style.map(
+            "Borderless.Treeview",
+            background=[("selected", THEME["btn_hover"])],
+            foreground=[("selected", "#ffffff")]
+        )
+        style.configure(
+            "Borderless.Treeview.Heading",
+            background=THEME["bg_panel"],
+            foreground=THEME["text_primary"],
+            font=("Arial", 10, "bold"),
+            relief="flat",
+            borderwidth=0
+        )
+        style.map(
+            "Borderless.Treeview.Heading",
+            background=[('active', THEME["bg_panel"]), ('selected', THEME["bg_panel"])],
+            foreground=[('active', THEME["text_primary"]), ('selected', THEME["text_primary"])]
+        )
 
-    def _handle_left(self, event=None):
-        if hasattr(self, "on_prev_move") and callable(self.on_prev_move):
-            try:
-                self.on_prev_move(event)
-            except TypeError:
-                self.on_prev_move()
-        return "break"
+        self.tree_frame = ctk.CTkFrame(self.top_catalog_panel, fg_color="transparent")
+        self.tree_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
-    def _handle_right(self, event=None):
-        if hasattr(self, "on_next_move") and callable(self.on_next_move):
-            try:
-                self.on_next_move(event)
-            except TypeError:
-                self.on_next_move()
-        return "break"
+        self.pgn_scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical")
+        self.pgn_scrollbar.pack(side="right", fill="y", padx=(2, 0), pady=0)
 
-    def _handle_up(self, event=None):
-        if hasattr(self, "on_first_move") and callable(self.on_first_move):
-            try:
-                self.on_first_move(event)
-            except TypeError:
-                self.on_first_move()
-        return "break"
+        self.pgn_tree = ttk.Treeview(
+            self.tree_frame,
+            columns=("no", "white", "black", "result"),
+            show="headings",
+            selectmode="browse",
+            height=3,
+            takefocus=False,
+            style="Borderless.Treeview"
+        )
+        self.pgn_tree.heading("no", text=" ")
+        self.pgn_tree.heading("white", text="White Player", anchor="w")
+        self.pgn_tree.heading("black", text="Black Player", anchor="w")
+        self.pgn_tree.heading("result", text="Res")
 
-    def _handle_down(self, event=None):
-        if hasattr(self, "on_last_move") and callable(self.on_last_move):
-            try:
-                self.on_last_move(event)
-            except TypeError:
-                self.on_last_move()
-        return "break"
+        self.pgn_tree.column("no", width=30, anchor="center")
+        self.pgn_tree.column("white", width=135, anchor="w")
+        self.pgn_tree.column("black", width=135, anchor="w")
+        self.pgn_tree.column("result", width=45, anchor="center")
 
-    def _on_tree_selection_event(self, event):
-        selected_items = self.pgn_tree.selection()
-        if not selected_items:
-            return
-        item_id = selected_items[0]
-        if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
-            game = self.preview_lookup[item_id]
+        def _on_tree_selection(event):
+            self._on_tree_selection_event(event)
 
-            if hasattr(self, "analysis_textbox"):
-                self.analysis_textbox.delete("1.0", "end")
-            if hasattr(self, "pgn_data_text"):
-                self.pgn_data_text.delete("1.0", "end")
+        self.pgn_tree.bind("<<TreeviewSelect>>", _on_tree_selection)
 
-            if hasattr(self, "on_hardwired_tree_select"):
-                self.on_hardwired_tree_select(game)
-            else:
-                self.load_game(game)
+        self.pgn_scrollbar.configure(command=self.pgn_tree.yview)
+        self.pgn_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
+        self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
-    def open_patterns_pgn_window(self, games_to_export, title="Patterns PGN Export"):
-        """Spawns a pop-out Toplevel window displaying the filtered games in PGN format."""
-        import io
-        import chess.pgn
-
-        popup = ctk.CTkToplevel(self)
-        popup.title(title)
-        popup.geometry("650x550")
-
-        # Bring window to front safely
-        popup.attributes("-topmost", True)
-        popup.after(100, lambda: popup.attributes("-topmost", False))
-
-        # Header Label
-        lbl = ctk.CTkLabel(popup, text=title, font=("Arial", 16, "bold"))
-        lbl.pack(pady=(15, 5))
-
-        # Scrollable Textbox for PGN content
-        txt_box = ctk.CTkTextbox(popup, wrap="word")
-        txt_box.pack(fill="both", expand=True, padx=15, pady=10)
-
-        # Export game collection to standard PGN format string
-        pgn_io = io.StringIO()
-        for game in games_to_export:
-            g_obj = self._resolve_game_obj(game) if hasattr(self, "_resolve_game_obj") else game
-            exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
-            pgn_str = g_obj.accept(exporter)
-            pgn_io.write(pgn_str + "\n\n")
-
-        txt_box.insert("1.0", pgn_io.getvalue())
-        txt_box.configure(state="disabled")
-
-        # Button bar (Copy & Close)
-        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-        def copy_pgn():
-            popup.clipboard_clear()
-            popup.clipboard_append(pgn_io.getvalue())
-
-        btn_copy = ctk.CTkButton(btn_frame, text="Copy PGN", command=copy_pgn)
-        btn_copy.pack(side="right", padx=5)
-
-        btn_close = ctk.CTkButton(btn_frame, text="Close", command=popup.destroy)
-        btn_close.pack(side="right", padx=5)
+        self.eval_bar_frame = ctk.CTkFrame(
+            self.right_analysis_panel,
+            fg_color=THEME["bg_panel"],
+            corner_radius=6,
+            border_width=1,
+            border_color=THEME.get("border_color", THEME["bg_surface"]),
+            height=32
+        )
+        self.eval_bar_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 8))
 
     def _bind_engine_buttons(self):
-        # --- Standalone Engine Comparison Button ---
+        """Binds the standalone engine comparison button and handles mode selection."""
         if hasattr(self, "btn_pv") and self.btn_pv:
             self.btn_pv.configure(
                 text="Engine",
@@ -286,110 +300,28 @@ class PatternsAnalysis(
                 )
                 break
 
-        # --- Opening ---
-        if hasattr(self, "btn_opening") and self.btn_opening:
-            self.btn_opening.configure(
-                text="Opening",
-                command=lambda: (print("[DEBUG CLICK] Opening clicked!"),
-                                 self.trigger_engine_mode("opening_pattern_mode")),
-                hover_color=THEME["btn_hover"]
-            )
+    def toggle_engine_action(self):
+        """Toggles the evaluation engine analysis state securely in the Patterns section."""
+        if not hasattr(self, "_engine_running"):
+            self._engine_running = False
 
-        # --- Calculation ---
-        if hasattr(self, "btn_calculation") and self.btn_calculation:
-            self.btn_calculation.configure(
-                text="Calculation",
-                command=lambda: (print("[DEBUG CLICK] Calculation clicked!"),
-                                 self.trigger_engine_mode("calculation_pattern_mode")),
-                hover_color=THEME["btn_hover"]
-            )
+        self._engine_running = not self._engine_running
 
-    def _bind_global_shortcuts(self):
-        try:
-            top_level = self.winfo_toplevel()
+        if self._engine_running:
+            if hasattr(self, "start_engine") and callable(self.start_engine):
+                self.start_engine()
+            elif hasattr(self, "run_evaluation") and callable(self.run_evaluation):
+                self.run_evaluation()
 
-            for key, callback in [
-                ("<Left>", self.on_prev_move),
-                ("<Right>", self.on_next_move),
-                ("<Up>", self.on_first_move),
-                ("<Down>", self.on_last_move),
-                ("f", self.on_flip_board),
-                ("F", self.on_flip_board)
-            ]:
-                top_level.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
-                self.bind(key, lambda e, cb=callback: self._safe_handle_shortcut(cb, e))
+            if hasattr(self, "btn_pv") and self.btn_pv:
+                self.btn_pv.configure(fg_color=THEME["btn_hover"])
+            set_status_message("Engine analysis started")
+        else:
+            if hasattr(self, "stop_engine") and callable(self.stop_engine):
+                self.stop_engine()
+            elif hasattr(self, "stop_evaluation") and callable(self.stop_evaluation):
+                self.stop_evaluation()
 
-            if hasattr(self, "pgn_tree") and self.pgn_tree:
-                self.pgn_tree.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
-                self.pgn_tree.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
-                self.pgn_tree.bind("<Up>", lambda e: self._safe_handle_shortcut(self.on_first_move, e))
-                self.pgn_tree.bind("<Down>", lambda e: self._safe_handle_shortcut(self.on_last_move, e))
-                self.pgn_tree.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-                self.pgn_tree.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-
-            if hasattr(self, "board_widget") and self.board_widget:
-                self.board_widget.bind("<Left>", lambda e: self._safe_handle_shortcut(self.on_prev_move, e))
-                self.board_widget.bind("<Right>", lambda e: self._safe_handle_shortcut(self.on_next_move, e))
-                self.board_widget.bind("f", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-                self.board_widget.bind("F", lambda e: self._safe_handle_shortcut(self.on_flip_board, e))
-        except Exception as e:
-            print(f"[SHORTCUT BIND ERROR] {e}")
-
-    def _safe_handle_shortcut(self, callback, event):
-        try:
-            focused = self.winfo_toplevel().focus_get()
-            if focused and type(focused).__name__ in ("CTkTextbox", "CTkEntry", "Text", "Entry"):
-                return
-
-            if callable(callback):
-                try:
-                    callback(event)
-                except TypeError:
-                    callback()
-                return "break"
-        except Exception as e:
-            print(f"[SHORTCUT EXECUTION ERROR] {e}")
-
-
-def create_workspace(master, initial_games=None, **kwargs):
-    import gui.app_state as state_mod
-
-    if initial_games is None:
-        initial_games = (
-            getattr(state_mod, "catalog_state", {}).get("active_games") or
-            getattr(state_mod, "active_group_games", None) or
-            getattr(state_mod, "active_search_results", None) or
-            getattr(state_mod, "active_category_source", None) or
-            getattr(state_mod, "all_games", None)
-        )
-
-    active_index = kwargs.get("active_index", getattr(state_mod, "catalog_state", {}).get("active_index", 0))
-
-    defocus = (
-        kwargs.get("target_game") or
-        getattr(state_mod, "catalog_state", {}).get("active_focus") or
-        getattr(state_mod, "active_focus_game", None)
-    )
-
-    target_piece = (
-        kwargs.get("target_piece") or
-        (state_mod.patterns_state.get("target_piece") if hasattr(state_mod, "patterns_state") and isinstance(
-            state_mod.patterns_state, dict) else None) or
-        getattr(state_mod, "selected_piece", None) or
-        "N"
-    )
-
-    instance = PatternsAnalysis(
-        master,
-        filename="personal_catalog.pgn",
-        initial_games=initial_games,
-        target_game=defocus,
-        active_index=active_index,
-        target_piece=target_piece
-    )
-    state_mod.workspace = instance
-    return instance
-
-
-def create_patterns_analysis_workspace(master, initial_games=None, **kwargs):
-    return create_workspace(master, initial_games=initial_games, **kwargs)
+            if hasattr(self, "btn_pv") and self.btn_pv:
+                self.btn_pv.configure(fg_color=THEME["btn_initial"])
+            set_status_message("Engine analysis stopped")
