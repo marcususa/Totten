@@ -109,23 +109,17 @@ class CatalogInitMixin:
         target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
 
         # Dynamic theme colors
-        primary = THEME.get("text_primary", "#ffffff")
-        secondary = THEME.get("text_secondary", "#94a3b8")
-        accent = THEME.get("btn_hover", primary)
+        primary = THEME["text_primary"]
+        secondary = THEME.get("text_secondary", primary)
+        accent = THEME["btn_hover"]
 
-        target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), spacing3=6)
-        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), spacing3=6)
-        target_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"), spacing3=6)
-
-        # Override light_blue tags to use the theme primary or secondary color instead of blue
+        target_box.tag_config("red", foreground=THEME.get("eval_red", primary), spacing3=6)
+        target_box.tag_config("orange", foreground=THEME.get("eval_orange", primary), spacing3=6)
+        target_box.tag_config("green", foreground=THEME.get("eval_green", primary), spacing3=6)
         target_box.tag_config("light_blue", foreground=THEME.get("eval_default", secondary), spacing3=6)
-
-        target_box.tag_config("default", foreground=primary, spacing3=6)
-        target_box.tag_config("comment_tag", foreground=secondary, spacing3=6)
-        target_box.tag_config("header_tag", foreground=secondary, spacing3=6)
-        target_box.tag_config("move_tag", foreground=primary, spacing3=6)
+        ...
         target_box.tag_config("active_tracker", background=THEME.get("active_tracker_bg", accent),
-                              foreground=THEME.get("active_tracker_fg", "#ffffff"))
+                              foreground=THEME.get("active_tracker_fg", primary))
 
     def render_pv_lines(self, pv_data):
         """Renders up to 4 Multi-PV engine lines into self.pv_textbox."""
@@ -430,7 +424,7 @@ class CatalogInitMixin:
         style.map(
             "Borderless.Treeview",
             background=[("selected", THEME["btn_hover"])],
-            foreground=[("selected", THEME.get("active_tracker_fg", "#ffffff"))]
+            foreground=[("selected", THEME.get("active_tracker_fg", THEME["text_primary"]))]
         )
         style.configure(
             "Borderless.Treeview.Heading",
@@ -504,7 +498,7 @@ class CatalogInitMixin:
 
         self.lbl_analysis_title = ctk.CTkLabel(
             self.analysis_header_frame, text="Analysis", font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=THEME.get("text_secondary", "#94a3b8")
+            text_color=THEME.get("text_secondary", THEME["text_primary"])
         )
         self.lbl_analysis_title.pack(side="left", anchor="w")
 

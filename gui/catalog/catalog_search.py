@@ -63,22 +63,23 @@ class CatalogSearchMixin:
         dialog.transient(self)
         dialog.grab_set()
 
-        dialog.configure(fg_color=THEME.get("bg_panel", "#172134"))
+        dialog.configure(fg_color=THEME["bg_panel"])
         dialog.grid_rowconfigure(0, weight=1)
         dialog.grid_columnconfigure(0, weight=1)
 
-        frame = ctk.CTkFrame(dialog, fg_color=THEME.get("bg_panel", "#172134"), corner_radius=0)
+        frame = ctk.CTkFrame(dialog, fg_color=THEME["bg_panel"], corner_radius=0)
         frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
         scrollable_frame = ctk.CTkScrollableFrame(
             frame,
-            fg_color=THEME.get("bg_surface", "#1e293b"),
-            label_fg_color=THEME.get("bg_surface", "#1e293b"),
-            border_color=THEME.get("border_color", "#445577"),
+            fg_color=THEME["bg_surface"],
+            label_fg_color=THEME["bg_surface"],
+            border_color=THEME.get("border_color", THEME["bg_surface"]),
             border_width=1
         )
+
         scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         scrollable_frame.grid_columnconfigure(0, weight=1)
@@ -98,16 +99,16 @@ class CatalogSearchMixin:
                 variable=var,
                 font=("Arial", 12),
                 command=lambda t=tag, v=var: self.toggle_tag_from_dialog(t, v.get()),
-                text_color=THEME.get("text_primary", "#f8fafc"),
-                fg_color=THEME.get("btn_hover", "#2e4a8c"),
-                hover_color=THEME.get("btn_hover", "#2e4a8c"),
-                checkmark_color=THEME.get("active_tracker_fg", "#ffffff"),
-                border_color=THEME.get("btn_hover", "#2e4a8c"),
+                text_color=THEME["text_primary"],
+                fg_color=THEME["btn_hover"],
+                hover_color=THEME["btn_hover"],
+                checkmark_color=THEME.get("active_tracker_fg", THEME["text_primary"]),
+                border_color=THEME["btn_hover"],
                 border_width=2
             )
 
             def on_enter(e, c=chk, v=var):
-                c.configure(hover_color=THEME.get("btn_hover", "#2e4a8c"))
+                c.configure(hover_color=THEME["btn_hover"])
 
             chk.bind("<Enter>", on_enter)
             chk.grid(row=row_idx, column=col_idx, sticky="w", pady=6, padx=12)
@@ -127,9 +128,9 @@ class CatalogSearchMixin:
                 btn_width = 80
 
             is_active = (tag == self.active_primary_tag) or (tag == "All" and len(self.active_extra_columns) > 0)
-            btn_fg = THEME.get("btn_hover", "#2e4a8c") if is_active else "transparent"
-            btn_hover = THEME.get("btn_hover", "#3b5998") if is_active else THEME.get("btn_initial", "#2b3856")
-            text_color = THEME.get("text_primary", "#ffffff") if is_active else THEME.get("text_secondary", "#cbd5e1")
+            btn_fg = THEME["btn_hover"] if is_active else "transparent"
+            btn_hover = THEME["btn_hover"] if is_active else THEME["btn_initial"]
+            text_color = THEME["text_primary"] if is_active else THEME.get("text_secondary", THEME["text_primary"])
 
             if tag == "All":
                 btn = ctk.CTkButton(
