@@ -2,12 +2,13 @@ import threading
 import chess
 import chess.pgn
 from core.chess_engine import ChessEngine
+from core.constants import THEME
 
 
 class EngineReviewMixin:
     def _safe_configure_textbox(self, box, state=None, text_content=None):
         try:
-            bg_color = "#1e293b"
+            bg_color = THEME.get("bg_surface", "")
             if state:
                 try:
                     box.configure(state=state)
@@ -36,7 +37,7 @@ class EngineReviewMixin:
 
         if hasattr(self, "btn_review") and self.btn_review:
             try:
-                self.btn_review.configure(bg="#344268")
+                self.btn_review.configure(bg=THEME.get("btn_hover", ""))
             except Exception:
                 pass
         if hasattr(self, "candidates_container"):
@@ -152,7 +153,7 @@ class EngineReviewMixin:
                         move_num += 1
 
                     moves_box.tag_bind(tag_name, "<Button-1>", lambda e, n=next_node: self.jump_to_node(n))
-                    moves_box.tag_config(tag_name, foreground="#f8fafc")
+                    moves_box.tag_config(tag_name, foreground=THEME.get("text_primary", ""))
                     node = next_node
 
                 moves_box.configure(state="disabled")
@@ -249,17 +250,22 @@ class EngineReviewMixin:
             target_box.delete("1.0", "end")
 
             eval_tag_colors = {
-                "red": "#e5534b",
-                "orange": "#f0883e",
-                "green": "#57ab5a",
-                "light_blue": "#539bf5",
-                "default": "#f8fafc"
+                "red": THEME.get("eval_red", ""),
+                "orange": THEME.get("eval_orange", ""),
+                "green": THEME.get("eval_green", ""),
+                "light_blue": THEME.get("eval_light_blue", ""),
+                "default": THEME.get("text_primary", "")
             }
+
 
             for tag_name, color in eval_tag_colors.items():
                 target_box.tag_config(tag_name, foreground=color)
 
-            target_box.tag_config("active_tracker", background="#11587a", foreground="#ffffff")
+            target_box.tag_config(
+                "active_tracker",
+                background=THEME.get("active_tracker_bg", ""),
+                foreground=THEME.get("active_tracker_fg", "")
+            )
 
             for move_num in sorted(self.analysis_rows.keys()):
                 row = self.analysis_rows[move_num]

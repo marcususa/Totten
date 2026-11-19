@@ -1,14 +1,14 @@
 import threading
 import chess.pgn
 from core.chess_engine import ChessEngine
-
+from core.constants import THEME
 
 class EngineStandardMixin:
     def trigger_engine_mode(self, mode_name):
         self.active_engine_mode = mode_name
 
         if hasattr(self, "btn_standard") and self.btn_standard:
-            self.btn_standard.configure(fg_color="#2e4a8c")
+            self.btn_standard.configure(fg_color=THEME.get("btn_hover", ""))
         if hasattr(self, "candidates_container"):
             self.candidates_container.pack_forget()
         if hasattr(self, "review_container"):

@@ -4,6 +4,7 @@ import threading
 import chess.pgn
 import gui.app_state as state
 from core.chess_engine import ChessEngine
+from core.constants import THEME
 
 
 class EnginePieceMixin:
@@ -12,7 +13,7 @@ class EnginePieceMixin:
 
         if hasattr(self, "btn_standard") and self.btn_standard:
             try:
-                self.btn_standard.configure(fg_color="#2e4a8c")
+                self.btn_standard.configure(fg_color=THEME.get("btn_hover", ""))
             except Exception:
                 pass
 

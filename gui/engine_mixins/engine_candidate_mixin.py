@@ -87,14 +87,14 @@ class EngineCandidateMixin:
         except Exception:
             pass
 
-        text_primary = THEME.get("text_primary", "#ffffff")
-        text_secondary = THEME.get("text_secondary", "#aaaaaa")
-        eval_red = THEME.get("eval_red", "#ff6b6b")
-        eval_orange = THEME.get("eval_orange", "#ffa94d")
-        eval_green = THEME.get("eval_green", "#51cf66")
-        eval_light_blue = THEME.get("eval_light_blue", "#33afdc")
-        tracker_bg = THEME.get("active_tracker_bg", "#2b3a55")
-        tracker_fg = THEME.get("active_tracker_fg", "#ffffff")
+        text_primary = THEME.get("text_primary", "")
+        text_secondary = THEME.get("text_secondary", "")
+        eval_red = THEME.get("eval_red", "")
+        eval_orange = THEME.get("eval_orange", "")
+        eval_green = THEME.get("eval_green", "")
+        eval_light_blue = THEME.get("eval_light_blue", "")
+        tracker_bg = THEME.get("active_tracker_bg", "")
+        tracker_fg = THEME.get("active_tracker_fg", "")
 
         target_box.tag_config("red", foreground=eval_red, spacing3=4)
         target_box.tag_config("orange", foreground=eval_orange, spacing3=4)
@@ -125,7 +125,7 @@ class EngineCandidateMixin:
 
         if hasattr(self, "btn_candidates") and self.btn_candidates:
             try:
-                self.btn_candidates.configure(fg_color="#2e4a8c")
+                self.btn_candidates.configure(fg_color=THEME.get("btn_hover", ""))
             except Exception:
                 pass
 
@@ -188,7 +188,7 @@ class EngineCandidateMixin:
         """Handles chunk buttons (+10, +20, +30) continuing from the last evaluated chunk end."""
         if hasattr(self, "btn_candidates") and self.btn_candidates:
             try:
-                self.btn_candidates.configure(fg_color="#1f538d")
+                self.btn_candidates.configure(fg_color=THEME.get("btn_hover", ""))
             except Exception:
                 pass
 
@@ -484,7 +484,7 @@ class EngineCandidateMixin:
             sys.stdout.flush()
 
         try:
-            box.configure(fg_color=THEME.get("bg_surface", "#1e1e1e"))
+            box.configure(fg_color=THEME.get("bg_surface", ""))
         except Exception:
             pass
 
