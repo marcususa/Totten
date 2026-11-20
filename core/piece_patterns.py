@@ -1,7 +1,7 @@
 # core/piece_patterns.py
 
 import os
-import duckdb
+from core.db_backend import USE_DUCKDB, connect_db
 
 # Raw pattern definitions grouped by color context
 RAW_WHITE_PATTERNS = [
@@ -33,11 +33,12 @@ RAW_BOTH_PATTERNS = [
 
 
 def get_pattern_catalog_connection():
-    """Connects directly to the standalone patterns.duckdb file in the project root."""
+    """Connects directly to the standalone patterns database in the project root."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
-    db_path = os.path.join(project_root, "patterns.duckdb")
-    return duckdb.connect(db_path)
+    ext = "duckdb" if USE_DUCKDB else "sqlite3"
+    db_path = os.path.join(project_root, f"patterns.{ext}")
+    return connect_db(db_path)
 
 
 def seed_patterns_database():
@@ -47,16 +48,11 @@ def seed_patterns_database():
         conn.execute("""
                      CREATE TABLE IF NOT EXISTS pattern_checklist
                      (
-                         id
-                         INTEGER,
-                         color
-                         VARCHAR,
-                         tier
-                         INTEGER,
-                         target_square
-                         VARCHAR,
-                         sequence_order
-                         INTEGER
+                         id INTEGER,
+                         color VARCHAR,
+                         tier INTEGER,
+                         target_square VARCHAR,
+                         sequence_order INTEGER
                      );
                      """)
 
@@ -80,14 +76,15 @@ def seed_patterns_database():
         insert_group(RAW_BLACK_PATTERNS, 'B')
         insert_group(RAW_BOTH_PATTERNS, 'BOTH')
 
-        print("Successfully initialized and seeded patterns.duckdb!")
+        ext = "duckdb" if USE_DUCKDB else "sqlite3"
+        print(f"Successfully initialized and seeded patterns.{ext}!")
     finally:
         conn.close()
 
 
 def fetch_patterns_by_color(color_code: str, target_piece: str = None):
     """
-    Queries the pattern_checklist table from patterns.duckdb.
+    Queries the pattern_checklist table from the patterns database.
     Normalizes color input ('white'/'black' -> 'W'/'B') and fetches records
     matching the specified color as well as any universal 'BOTH' records,
     optionally contextualized by the active target piece.
@@ -105,9 +102,9 @@ def fetch_patterns_by_color(color_code: str, target_piece: str = None):
         query = """
                 SELECT id, color, tier, target_square, sequence_order
                 FROM pattern_checklist
-                WHERE color = ? \
+                WHERE color = ?
                    OR color = 'BOTH'
-                ORDER BY tier ASC, id ASC, sequence_order ASC; \
+                ORDER BY tier ASC, id ASC, sequence_order ASC;
                 """
         results = conn.execute(query, [db_color]).fetchall()
 
