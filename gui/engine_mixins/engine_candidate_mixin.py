@@ -1,21 +1,23 @@
 import sys
 import threading
 import traceback
-import duckdb
 import chess.pgn
 from core.chess_engine import ChessEngine
 from core.constants import THEME
+from core.db_backend import USE_DUCKDB, connect_db
 
 
 class CommentDBManager:
-    """Embedded database manager handling DuckDB storage for candidate comments."""
+    """Embedded database manager handling DuckDB or SQLite3 storage for candidate comments."""
 
-    def __init__(self, db_path="catalog_comments.duckdb"):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = "catalog_comments.duckdb" if USE_DUCKDB else "catalog_comments.sqlite3"
         self.db_path = db_path
         self._init_db()
 
     def _init_db(self):
-        with duckdb.connect(self.db_path) as conn:
+        with connect_db(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS position_records (
                     position_id VARCHAR PRIMARY KEY,
@@ -42,7 +44,7 @@ class CommentDBManager:
 
     def save_comment(self, position_id, fen, move_id, candidate_move, comment_text):
         comment_id = f"{position_id}_{move_id}_{hash(comment_text)}"
-        with duckdb.connect(self.db_path) as conn:
+        with connect_db(self.db_path) as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO position_records (position_id, fen) 
                 VALUES (?, ?)
@@ -59,7 +61,7 @@ class CommentDBManager:
             """, [comment_id, position_id, move_id, comment_text])
 
     def get_comment(self, move_id):
-        with duckdb.connect(self.db_path) as conn:
+        with connect_db(self.db_path) as conn:
             result = conn.execute("""
                 SELECT comment_text FROM candidate_comments WHERE move_id = ?
             """, [move_id]).fetchone()
@@ -120,6 +122,17 @@ class EngineCandidateMixin:
             return "red"
         return "default"
 
+    def _reset_candidates_button_visual(self):
+        """Returns the Candidates button from pressed/active color back to initial state."""
+        self.active_engine_mode = None
+        for btn_name in ("btn_candidates", "btn_candidate_moves"):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(fg_color=THEME.get("btn_initial", ""))
+                except Exception:
+                    pass
+
     def trigger_engine_mode(self, mode_name):
         self.active_engine_mode = mode_name
 
@@ -173,16 +186,19 @@ class EngineCandidateMixin:
                     else:
                         parent.pack(fill="both", expand=True)
                     shown = True
-                    print(f"[UI DEBUG] Displayed analysis_textbox master widget.")
+                    print("[UI DEBUG] Displayed analysis_textbox master widget.")
                     sys.stdout.flush()
             except Exception as e:
                 print(f"[UI DEBUG] Could not display analysis_textbox parent: {e}")
                 sys.stdout.flush()
 
-        if hasattr(self, "active_game") and self.active_game:
+        selected_game = getattr(self, "current_game", None) or getattr(self, "active_game", None)
+        if selected_game:
+            self.active_game = selected_game
             self._active_chunk_start = 1
             self._active_chunk_end = 15
-            self.start_candidates_analysis(self.active_game, start_move=1, max_chunk=15)
+            self.candidate_rows = {}
+            self.start_candidates_analysis(selected_game, start_move=1, max_chunk=15)
 
     def trigger_engine_chunk(self, chunk_size):
         """Handles chunk buttons (+10, +20, +30) continuing from the last evaluated chunk end."""
@@ -221,6 +237,7 @@ class EngineCandidateMixin:
             return
 
         self.active_game = game
+        self.current_game = game
         self.current_node = game
         self.root_game_node = game
 
@@ -235,10 +252,7 @@ class EngineCandidateMixin:
             self.pgn_data_text.insert("end", pgn_text_export)
             self.pgn_data_text.configure(state="disabled")
 
-        self._load_plain_game_moves(game)
-        self._active_chunk_start = 1
-        self._active_chunk_end = 15
-        self.start_candidates_analysis(game, start_move=1, max_chunk=15)
+        self._reset_candidates_panel_on_game_change()
 
     def _load_plain_game_moves(self, game):
         self.candidate_rows = {}
@@ -278,19 +292,23 @@ class EngineCandidateMixin:
 
     def start_candidates_analysis(self, target_game=None, start_move=1, max_chunk=15):
         if not target_game:
-            if hasattr(self, "active_game") and self.active_game:
-                target_game = self.active_game
-            elif hasattr(self, "root_game_node") and self.root_game_node:
-                target_game = self.root_game_node
-            elif hasattr(self, "preview_lookup") and self.preview_lookup:
-                first_item = next(iter(self.preview_lookup.keys()), None)
-                if first_item:
-                    target_game = self.preview_lookup.get(first_item)
+            target_game = (
+                getattr(self, "current_game", None)
+                or getattr(self, "active_game", None)
+                or getattr(self, "root_game_node", None)
+            )
+            if not target_game and hasattr(self, "pgn_tree") and hasattr(self, "preview_lookup"):
+                sel = self.pgn_tree.selection()
+                if sel:
+                    target_game = self.preview_lookup.get(sel[0])
 
         if not target_game:
-            print(f"[CANDIDATE ERROR] No active game available to analyze. Please select a game from the list first.")
+            print("[CANDIDATE ERROR] No active game available to analyze. Please select a game from the list first.")
             sys.stdout.flush()
             return
+
+        self.active_game = target_game
+        self.current_game = target_game
 
         if not hasattr(self, "candidate_rows") or not self.candidate_rows:
             self._load_plain_game_moves(target_game)
@@ -414,7 +432,7 @@ class EngineCandidateMixin:
                         traceback.print_exc()
 
                 try:
-                    print(f"[CANDIDATE WORKER] Instantiating ChessEngine...")
+                    print("[CANDIDATE WORKER] Instantiating ChessEngine...")
                     sys.stdout.flush()
                     engine_worker = ChessEngine()
                     print(f"[CANDIDATE WORKER] Calling analyze_game for range {self.start_m}-{self.end_m}...")
@@ -427,8 +445,10 @@ class EngineCandidateMixin:
                         start_move=self.start_m,
                         end_move=self.end_m
                     )
-                    print(f"[CANDIDATE WORKER] analyze_game execution completed.")
+                    print("[CANDIDATE WORKER] analyze_game execution completed.")
                     sys.stdout.flush()
+                    if not self.cancel:
+                        self.outer.after(0, self.outer._reset_candidates_button_visual)
 
                 except Exception as e:
                     print(f"[CANDIDATE WORKER CRASH]: {e}")
@@ -461,7 +481,7 @@ class EngineCandidateMixin:
     def _sync_candidate_selection(self):
         """Redraws the candidate analysis textbox flowing continuously like a book from left to right."""
         if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
-            print(f"[SYNC WARNING] analysis_textbox attribute missing!")
+            print("[SYNC WARNING] analysis_textbox attribute missing!")
             sys.stdout.flush()
             return
 
@@ -554,3 +574,31 @@ class EngineCandidateMixin:
             print(f"[SYNC CANDIDATE ERROR]: {e}")
             sys.stdout.flush()
             traceback.print_exc()
+
+    def _reset_candidates_panel_on_game_change(self):
+        """Resets Candidates button to initial state and clears stale candidate analysis on game selection."""
+        if hasattr(self, "_candidate_lock"):
+            with self._candidate_lock:
+                worker = getattr(self, "_current_candidate_worker", None)
+                if worker and worker.is_alive():
+                    worker.cancel = True
+
+        if hasattr(self, "btn_candidates") and self.btn_candidates:
+            try:
+                self.btn_candidates.configure(fg_color=THEME.get("btn_initial", ""))
+            except Exception:
+                pass
+
+        self.candidate_rows = {}
+        self._active_chunk_start = 1
+        self._active_chunk_end = 0
+
+        if hasattr(self, "analysis_textbox") and self.analysis_textbox:
+            box = self.analysis_textbox
+            target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
+            try:
+                target_box.configure(state="normal")
+                target_box.delete("1.0", "end")
+                target_box.configure(state="disabled")
+            except Exception:
+                pass
