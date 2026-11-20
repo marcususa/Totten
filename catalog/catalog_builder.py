@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 import threading
 import chess.pgn
-import duckdb
+from core.db_backend import USE_DUCKDB, connect_db, get_db_path
 from gui.statusbar import set_status_message
 
-DB_Path = Path("personal_catalog.duckdb")
+DB_Path = get_db_path()
 PGN_Path = Path("personal_catalog.pgn")
 
 
@@ -23,8 +23,8 @@ def get_header(headers, key, default="Unknown"):
 
 def catalog_pgns(filename, progress_callback=None):
     """
-    Parses a PGN file and appends its games directly into DuckDB and personal_catalog.pgn
-    with live progress updates.
+    Parses a PGN file and appends its games directly into the database (DuckDB or SQLite3)
+    and personal_catalog.pgn with live progress updates.
     """
     path_to_import = Path(filename)
     if not path_to_import.exists():
@@ -34,7 +34,7 @@ def catalog_pgns(filename, progress_callback=None):
     if file_size == 0:
         file_size = 1
 
-    con = duckdb.connect(str(DB_Path))
+    con = connect_db(DB_Path)
     con.execute("""
             CREATE TABLE IF NOT EXISTS catalog_headers
             (
@@ -95,7 +95,7 @@ def catalog_pgns(filename, progress_callback=None):
     if progress_callback:
         progress_callback("phase_1_complete")
 
-    # Batch insert into DuckDB
+    # Batch insert into database
     if games_to_insert:
         set_status_message("Saving to database...")
         con.executemany("""
@@ -108,7 +108,8 @@ def catalog_pgns(filename, progress_callback=None):
     if progress_callback:
         progress_callback("phase_2_complete")
 
-    print(f"[Catalog Builder] Successfully ingested {added_count} games into DuckDB.")
+    backend_name = "DuckDB" if USE_DUCKDB else "SQLite3"
+    print(f"[Catalog Builder] Successfully ingested {added_count} games into {backend_name}.")
     return added_count
 
 
