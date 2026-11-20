@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import urllib.request
 import chess
 import chess.pgn
 import customtkinter as ctk
@@ -9,9 +10,16 @@ import gui.calendar_workspace
 from core.constants import THEME
 
 
+def _theme_color(key, fallback_key="text_primary"):
+    """Looks up a color strictly from THEME without hardcoded hex fallbacks."""
+    if key in THEME:
+        return THEME[key]
+    return THEME[fallback_key]
+
+
 def _get_dynamic_progress_fill():
-    """Computes a high-contrast progress fill color dynamically based on background luminance."""
-    bg = THEME.get("bg_panel", "#172134").lstrip('#')
+    """Computes a high-contrast progress fill color dynamically from background luminance."""
+    bg = _theme_color("bg_panel", "bg_surface").lstrip("#")
     try:
         r, g, b = int(bg[0:2], 16), int(bg[2:4], 16), int(bg[4:6], 16)
         luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
@@ -27,28 +35,30 @@ def _get_dynamic_progress_fill():
 
         return f"#{max(0, min(255, nr)):02x}{max(0, min(255, ng)):02x}{max(0, min(255, nb)):02x}"
     except Exception:
-        return "#ffffff"
+        return _theme_color("text_primary")
 
 
 def _get_dynamic_text_color(hex_str):
-    """Computes high-contrast text color (dark or white) based on button background luminance."""
-    clean_hex = hex_str.lstrip('#')
+    """Computes high-contrast text color based on button background luminance and THEME."""
+    clean_hex = (hex_str or "").lstrip("#")
     try:
         r, g, b = int(clean_hex[0:2], 16), int(clean_hex[2:4], 16), int(clean_hex[4:6], 16)
         luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-        return "#0f172a" if luminance > 0.5 else "#ffffff"
+        if luminance > 0.5:
+            return _theme_color("bg_surface", "bg_panel")
+        return _theme_color("text_primary")
     except Exception:
-        return THEME.get("text_primary", "#ffffff")
+        return _theme_color("text_primary")
 
 
 class Sidebar(ctk.CTkFrame):
     CONFIG_FILE = "chess_accounts.json"
 
     def __init__(self, parent):
-        super().__init__(parent, width=205, corner_radius=0, fg_color=THEME.get("bg_panel"))
+        super().__init__(parent, width=205, corner_radius=0, fg_color=_theme_color("bg_panel", "bg_surface"))
         super().pack_propagate(False)
 
-        # Load saved accounts for both platforms
+        # Load saved accounts and engine preference
         self.saved_accounts = self._load_saved_accounts()
         self.cc_saved_username = self.saved_accounts.get("chess_com", None)
         self.lich_saved_username = self.saved_accounts.get("lichess", None)
@@ -59,6 +69,11 @@ class Sidebar(ctk.CTkFrame):
         # Filter states
         self.filters = {"Blitz": False, "Rapid": False, "Standard": False, "All": True}
 
+        btn_initial = _theme_color("btn_initial", "bg_surface")
+        btn_hover = _theme_color("btn_hover", "btn_initial")
+        text_primary = _theme_color("text_primary")
+        text_secondary = _theme_color("text_secondary", "text_primary")
+
         # --- STATUS DISPLAY ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")
         self.status_container.pack(side="bottom", fill="x", padx=4, pady=(2, 6))
@@ -68,9 +83,9 @@ class Sidebar(ctk.CTkFrame):
             text="Ready",
             anchor="sw",
             justify="left",
-            wraplength=75,
+            wraplength=190,
             font=ctk.CTkFont(size=10),
-            text_color=THEME.get("status_text", "#ddddff")
+            text_color=_theme_color("status_text", "text_secondary"),
         )
         self.lbl_status.pack(side="bottom", fill="x", anchor="sw")
 
@@ -84,9 +99,9 @@ class Sidebar(ctk.CTkFrame):
             self.progress_container,
             height=8,
             corner_radius=2,
-            fg_color=THEME.get("progress_bg", "#1e293b"),
+            fg_color=_theme_color("progress_bg", "bg_surface"),
             progress_color=_get_dynamic_progress_fill(),
-            mode="determinate"
+            mode="determinate",
         )
         self.progress_bar.pack(fill="x", expand=True, pady=4)
         self.progress_bar.set(0.0)
@@ -97,45 +112,26 @@ class Sidebar(ctk.CTkFrame):
         self.progress_container.pack_forget()
 
         # --- NAVIGATION BUTTONS ---
-        self.btn_catalog = ctk.CTkButton(
-            self, text="Catalog", anchor="w", fg_color="transparent",
-            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=11),
-            command=lambda: state.show_workspace("search_catalog")
-        )
-        self.btn_catalog.pack(fill="x", padx=4, pady=(15, 4))
-
-        self.btn_analysis = ctk.CTkButton(
-            self, text="Analysis", anchor="w", fg_color="transparent",
-            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=11),
-            command=lambda: state.show_workspace("analysis")
-        )
-        self.btn_analysis.pack(fill="x", padx=4, pady=4)
-
-        self.btn_patterns = ctk.CTkButton(
-            self, text="Patterns", anchor="w", fg_color="transparent",
-            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=11),
-            command=lambda: state.show_workspace("patterns")
-        )
-        self.btn_patterns.pack(fill="x", padx=4, pady=4)
-
-        self.btn_mixed = ctk.CTkButton(
-            self, text="Mixed", anchor="w", fg_color="transparent",
-            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=11),
-            command=lambda: state.show_workspace("mixed")
-        )
-        self.btn_mixed.pack(fill="x", padx=4, pady=4)
-
-        self.btn_calendar = ctk.CTkButton(
-            self, text="Calendar", anchor="w", fg_color="transparent",
-            hover_color=THEME["btn_hover"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=11),
-            command=lambda: state.show_workspace("calendar")
-        )
-        self.btn_calendar.pack(fill="x", padx=4, pady=4)
+        nav_items = [
+            ("btn_catalog", "Catalog", "search_catalog", (15, 4)),
+            ("btn_analysis", "Analysis", "analysis", 4),
+            ("btn_patterns", "Patterns", "patterns", 4),
+            ("btn_mixed", "Mixed Collections", "mixed", 4),
+            ("btn_calendar", "Calendar", "calendar", 4),
+        ]
+        for attr_name, label_text, workspace_key, pady_val in nav_items:
+            btn = ctk.CTkButton(
+                self,
+                text=label_text,
+                anchor="w",
+                fg_color="transparent",
+                hover_color=btn_hover,
+                text_color=text_primary,
+                font=ctk.CTkFont(size=11),
+                command=lambda wk=workspace_key: state.show_workspace(wk),
+            )
+            btn.pack(fill="x", padx=4, pady=pady_val)
+            setattr(self, attr_name, btn)
 
         # Start with the analysis workspace on startup
         state.show_workspace("analysis")
@@ -144,13 +140,19 @@ class Sidebar(ctk.CTkFrame):
         self.placeholder_text = "Paste PGN for quick analysis. You can also search online users below."
 
         self.txt_qeval_moves = ctk.CTkTextbox(
-            self, height=75, fg_color=THEME["bg_surface"], text_color=THEME["text_primary"],
-            font=ctk.CTkFont(size=9), border_color=THEME["border_color"], border_width=1, wrap="word"
+            self,
+            height=75,
+            fg_color=_theme_color("bg_surface", "bg_panel"),
+            text_color=text_primary,
+            font=ctk.CTkFont(size=9),
+            border_color=_theme_color("border_color", "btn_initial"),
+            border_width=1,
+            wrap="word",
         )
         self.txt_qeval_moves.pack(fill="x", padx=4, pady=(10, 4))
 
         self.txt_qeval_moves.insert("1.0", self.placeholder_text)
-        self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
+        self.txt_qeval_moves.configure(text_color=text_secondary)
 
         self.txt_qeval_moves.bind("<FocusIn>", self._on_qeval_focus_in)
         self.txt_qeval_moves.bind("<FocusOut>", self._on_qeval_focus_out)
@@ -158,10 +160,14 @@ class Sidebar(ctk.CTkFrame):
         self.txt_qeval_moves.bind("<Button-2>", self._on_qeval_right_click)
 
         self.btn_qeval_analysis = ctk.CTkButton(
-            self, text="Analyze", height=24, font=ctk.CTkFont(size=10),
-            fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
-            command=self.handle_qeval_send_analysis
+            self,
+            text="Analyze",
+            height=24,
+            font=ctk.CTkFont(size=10),
+            fg_color=btn_initial,
+            hover_color=btn_hover,
+            text_color=_get_dynamic_text_color(btn_initial),
+            command=self.handle_qeval_send_analysis,
         )
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 4))
 
@@ -172,22 +178,30 @@ class Sidebar(ctk.CTkFrame):
         # Chess.com Button
         cc_text = self.cc_saved_username if self.cc_saved_username else "Chess.com"
         self.btn_cc_user = ctk.CTkButton(
-            self.account_panel, text=cc_text, height=22, anchor="center", font=ctk.CTkFont(size=9, weight="bold"),
-            fg_color=THEME["btn_initial"],
-            hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
-            command=lambda: self._trigger_platform_action("chess_com", action="last")
+            self.account_panel,
+            text=cc_text,
+            height=22,
+            anchor="center",
+            font=ctk.CTkFont(size=9, weight="bold"),
+            fg_color=btn_initial,
+            hover_color=btn_hover,
+            text_color=_get_dynamic_text_color(btn_initial),
+            command=lambda: self._trigger_platform_action("chess_com", action="last"),
         )
         self.btn_cc_user.pack(fill="x", pady=(0, 4))
 
-        # Lichess.org Button (Consistently Styled)
+        # Lichess.org Button
         lich_text = self.lich_saved_username if self.lich_saved_username else "Lichess.org"
         self.btn_lich_user = ctk.CTkButton(
-            self.account_panel, text=lich_text, height=22, anchor="center", font=ctk.CTkFont(size=9, weight="bold"),
-            fg_color=THEME["btn_initial"],
-            hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
-            command=lambda: self._trigger_platform_action("lichess", action="last")
+            self.account_panel,
+            text=lich_text,
+            height=22,
+            anchor="center",
+            font=ctk.CTkFont(size=9, weight="bold"),
+            fg_color=btn_initial,
+            hover_color=btn_hover,
+            text_color=_get_dynamic_text_color(btn_initial),
+            command=lambda: self._trigger_platform_action("lichess", action="last"),
         )
         self.btn_lich_user.pack(fill="x", pady=(0, 6))
 
@@ -196,44 +210,87 @@ class Sidebar(ctk.CTkFrame):
         for mode in ("Blitz", "Rapid", "Standard", "All"):
             var = ctk.BooleanVar(value=self.filters.get(mode, False))
             chk = ctk.CTkCheckBox(
-                self.account_panel, text=mode, variable=var,
-                font=("Arial", 10, "bold"), checkbox_width=12, checkbox_height=12,
-                border_width=1, corner_radius=2,
-                text_color=THEME.get("text_secondary", "#aaaaaa"),
-                command=lambda m=mode: self._toggle_sidebar_filter(m)
+                self.account_panel,
+                text=mode,
+                variable=var,
+                font=ctk.CTkFont(size=10, weight="bold"),
+                checkbox_width=12,
+                checkbox_height=12,
+                border_width=1,
+                corner_radius=2,
+                fg_color=btn_initial,
+                hover_color=btn_hover,
+                border_color=_theme_color("border_color", "btn_initial"),
+                checkmark_color=_theme_color("active_tracker_fg", "text_primary"),
+                text_color=text_secondary,
+                command=lambda m=mode: self._toggle_sidebar_filter(m),
             )
             chk.pack(anchor="w", padx=2, pady=1)
             self.sidebar_box_labels[mode] = chk
 
         # Batch Download Button ("100")
         ctk.CTkButton(
-            self.account_panel, text="100", height=22, anchor="center", font=ctk.CTkFont(size=9, weight="bold"),
-            fg_color=THEME["btn_initial"], hover_color=THEME["btn_hover"],
-            text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")),
-            command=lambda: self._trigger_platform_action(self.active_platform, action="batch")
+            self.account_panel,
+            text="100",
+            height=22,
+            anchor="center",
+            font=ctk.CTkFont(size=9, weight="bold"),
+            fg_color=btn_initial,
+            hover_color=btn_hover,
+            text_color=_get_dynamic_text_color(btn_initial),
+            command=lambda: self._trigger_platform_action(self.active_platform, action="batch"),
         ).pack(fill="x", pady=(4, 0))
 
     def _load_saved_accounts(self):
-        """Loads saved usernames from the local JSON config file."""
+        """Loads saved usernames and settings from the local JSON config file."""
         if os.path.exists(self.CONFIG_FILE):
             try:
-                with open(self.CONFIG_FILE, "r") as f:
-                    return json.load(f)
+                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
             except Exception as e:
                 print(f"[DEBUG] Error loading accounts config: {e}")
         return {"chess_com": None, "lichess": None}
 
     def _set_active_platform(self, platform):
-        """Highlights the active platform button."""
+        """Highlights the active platform button using THEME colors."""
         self.active_platform = platform
+        btn_initial = _theme_color("btn_initial", "bg_surface")
+        bg_surface = _theme_color("bg_surface", "bg_panel")
+        text_primary = _theme_color("text_primary")
+
         if platform == "chess_com":
-            self.btn_cc_user.configure(fg_color=THEME["btn_initial"],
-                                       text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")))
-            self.btn_lich_user.configure(fg_color=THEME["bg_surface"], text_color=THEME["text_primary"])
+            self.btn_cc_user.configure(
+                fg_color=btn_initial,
+                text_color=_get_dynamic_text_color(btn_initial),
+            )
+            self.btn_lich_user.configure(fg_color=bg_surface, text_color=text_primary)
         else:
-            self.btn_lich_user.configure(fg_color=THEME["btn_initial"],
-                                         text_color=_get_dynamic_text_color(THEME.get("btn_initial", "#344268")))
-            self.btn_cc_user.configure(fg_color=THEME["bg_surface"], text_color=THEME["text_primary"])
+            self.btn_lich_user.configure(
+                fg_color=btn_initial,
+                text_color=_get_dynamic_text_color(btn_initial),
+            )
+            self.btn_cc_user.configure(fg_color=bg_surface, text_color=text_primary)
+
+    def _matches_time_control(self, game):
+        """Checks whether a parsed chess.pgn.Game matches active sidebar time-control filters."""
+        if self.filters.get("All", True) or not any(
+            self.filters.get(m, False) for m in ("Blitz", "Rapid", "Standard")
+        ):
+            return True
+
+        event_str = str(game.headers.get("Event", "")).lower()
+        tc_str = str(game.headers.get("TimeControl", "")).lower()
+
+        if self.filters.get("Blitz") and ("blitz" in event_str or tc_str in {"180", "180+2", "60", "120+1"}):
+            return True
+        if self.filters.get("Rapid") and ("rapid" in event_str or tc_str in {"600", "900", "900+10", "600+5"}):
+            return True
+        if self.filters.get("Standard") and any(k in event_str for k in ("standard", "classical", "daily")):
+            return True
+
+        return False
 
     def _trigger_platform_action(self, platform, action="last"):
         """Fetches games directly via API for both platforms (last or batch), parses them, and loads mixed_analysis."""
@@ -241,76 +298,76 @@ class Sidebar(ctk.CTkFrame):
         current_user = self.cc_saved_username if platform == "chess_com" else self.lich_saved_username
 
         if not current_user:
-            set_status_message(f"No username for {platform}. Redirecting to Mixed.")
+            set_status_message(f"No username for {platform}. Redirecting to Mixed Collections.")
             state.show_workspace("mixed")
             return
 
-        # ... rest of the method ...
         top_level = self.winfo_toplevel()
         action_label = "last game" if action == "last" else "up to 100 games"
         set_status_message(f"Fetching {action_label} for {current_user} ({platform})...")
 
         games_list = []
         try:
-            import urllib.request
-            import json
-            import io
-            import chess.pgn
-
-            headers = {'User-Agent': 'ChessAnalysisApp/1.0'}
+            headers = {"User-Agent": "ChessAnalysisApp/1.0"}
 
             if platform == "chess_com":
                 archives_url = f"https://api.chess.com/pub/player/{current_user.lower()}/games/archives"
                 req = urllib.request.Request(archives_url, headers=headers)
                 with urllib.request.urlopen(req, timeout=10) as response:
-                    data = json.loads(response.read().decode('utf-8'))
+                    data = json.loads(response.read().decode("utf-8"))
                     archives = data.get("archives", [])
                     collected_games = []
 
                     if action == "last":
-                        if archives:
-                            latest_archive = archives[-1]
-                            req_games = urllib.request.Request(latest_archive, headers=headers)
+                        for archive_url in reversed(archives):
+                            req_games = urllib.request.Request(archive_url, headers=headers)
                             with urllib.request.urlopen(req_games, timeout=15) as g_res:
-                                g_data = json.loads(g_res.read().decode('utf-8'))
-                                month_games = g_data.get("games", [])
-                                if month_games:
-                                    collected_games = [month_games[-1]]
-                    else:  # batch / 100
+                                g_data = json.loads(g_res.read().decode("utf-8"))
+                                month_games = list(reversed(g_data.get("games", [])))
+                                for g in month_games:
+                                    pgn_text = g.get("pgn", "")
+                                    if pgn_text:
+                                        parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
+                                        if parsed_game and self._matches_time_control(parsed_game):
+                                            collected_games = [parsed_game]
+                                            break
+                            if collected_games:
+                                break
+                    else:
                         for archive_url in reversed(archives):
                             try:
                                 req_games = urllib.request.Request(archive_url, headers=headers)
                                 with urllib.request.urlopen(req_games, timeout=15) as g_res:
-                                    g_data = json.loads(g_res.read().decode('utf-8'))
+                                    g_data = json.loads(g_res.read().decode("utf-8"))
                                     month_games = g_data.get("games", [])
-                                    collected_games = list(reversed(month_games)) + collected_games
-                                    if len(collected_games) >= 100:
-                                        collected_games = collected_games[:100]
-                                        break
+                                    for g in reversed(month_games):
+                                        pgn_text = g.get("pgn", "")
+                                        if pgn_text:
+                                            parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
+                                            if parsed_game and self._matches_time_control(parsed_game):
+                                                collected_games.append(parsed_game)
+                                                if len(collected_games) >= 100:
+                                                    break
                             except Exception:
                                 continue
+                            if len(collected_games) >= 100:
+                                break
 
-                    for g in collected_games:
-                        pgn_text = g.get("pgn", "")
-                        if pgn_text:
-                            parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
-                            if parsed_game:
-                                games_list.append(parsed_game)
+                    games_list = collected_games[:100]
             else:
-                # Lichess fetch endpoint for both last (max=1) and batch (max=100)
                 max_games = 1 if action == "last" else 100
                 lich_url = f"https://lichess.org/api/games/user/{current_user}?max={max_games}&pgnInJson=true"
                 req = urllib.request.Request(lich_url, headers=headers)
                 with urllib.request.urlopen(req, timeout=15) as response:
                     for line in response:
-                        line_str = line.decode('utf-8').strip()
+                        line_str = line.decode("utf-8").strip()
                         if line_str:
                             try:
                                 g_data = json.loads(line_str)
                                 pgn_text = g_data.get("pgn", "")
                                 if pgn_text:
                                     parsed_game = chess.pgn.read_game(io.StringIO(pgn_text))
-                                    if parsed_game:
+                                    if parsed_game and self._matches_time_control(parsed_game):
                                         games_list.append(parsed_game)
                             except Exception:
                                 continue
@@ -331,7 +388,7 @@ class Sidebar(ctk.CTkFrame):
                 initial_games=games_list,
                 filename=source_data,
                 active_focus=games_list[0] if games_list else None,
-                active_index=0
+                active_index=0,
             )
         set_status_message(f"Loaded {len(games_list)} game(s) for {current_user}.")
 
@@ -364,7 +421,7 @@ class Sidebar(ctk.CTkFrame):
             current_text = self.txt_qeval_moves.get("1.0", "end").strip()
             if current_text == self.placeholder_text:
                 self.txt_qeval_moves.delete("1.0", "end")
-                self.txt_qeval_moves.configure(text_color=THEME["text_primary"])
+                self.txt_qeval_moves.configure(text_color=_theme_color("text_primary"))
 
             self.txt_qeval_moves.insert("insert", clipboard_text)
         except Exception:
@@ -375,13 +432,13 @@ class Sidebar(ctk.CTkFrame):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if current_text == self.placeholder_text:
             self.txt_qeval_moves.delete("1.0", "end")
-            self.txt_qeval_moves.configure(text_color=THEME["text_primary"])
+            self.txt_qeval_moves.configure(text_color=_theme_color("text_primary"))
 
     def _on_qeval_focus_out(self, event):
         current_text = self.txt_qeval_moves.get("1.0", "end").strip()
         if not current_text:
-            self.txt_qeval_moves.insert("1.0", "end")
-            self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
+            self.txt_qeval_moves.insert("1.0", self.placeholder_text)
+            self.txt_qeval_moves.configure(text_color=_theme_color("text_secondary", "text_primary"))
 
     def parse_qeval_pgn(self):
         raw_text = self.txt_qeval_moves.get("1.0", "end").strip()
@@ -420,7 +477,7 @@ class Sidebar(ctk.CTkFrame):
 
         self.txt_qeval_moves.delete("1.0", "end")
         self.txt_qeval_moves.insert("1.0", self.placeholder_text)
-        self.txt_qeval_moves.configure(text_color=THEME["text_secondary"])
+        self.txt_qeval_moves.configure(text_color=_theme_color("text_secondary", "text_primary"))
 
         state.show_workspace("analysis")
         set_status_message(f"Loaded {len(games_list)} game(s).")
@@ -431,7 +488,7 @@ class Sidebar(ctk.CTkFrame):
 def set_status_message(message, text_color=None):
     try:
         if text_color is None:
-            text_color = THEME.get("status_text", "#ddddff")
+            text_color = _theme_color("status_text", "text_secondary")
         label = getattr(state, "status", None)
         if label:
             label.configure(text=message, text_color=text_color)

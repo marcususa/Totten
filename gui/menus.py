@@ -15,6 +15,13 @@ try:
 except ImportError:
     THEME = {}
 
+# New Mixed Collections edit workspace (edit_core.py -> EditWorkspace / create_workspace)
+try:
+    from gui.mixed_collections.edit_core import EditWorkspace, create_workspace as create_edit_workspace
+except ImportError:
+    EditWorkspace = None
+    create_edit_workspace = None
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
 try:
@@ -66,12 +73,38 @@ def get_workspace_parent():
     return getattr(state, "app_root", None)
 
 
+def open_mixed_edit_workspace():
+    """Points Mixed Collections editing to gui.mixed_collections.edit_core (EditWorkspace)."""
+    mixed_state = getattr(state, "mixed_state", None)
+    if isinstance(mixed_state, dict):
+        mixed_state["workspace_mode"] = "edit"
+        if EditWorkspace is not None:
+            mixed_state["edit_workspace_cls"] = EditWorkspace
+        if create_edit_workspace is not None:
+            mixed_state["create_edit_workspace"] = create_edit_workspace
+
+    if hasattr(state, "open_edit_workspace") and callable(state.open_edit_workspace):
+        state.open_edit_workspace()
+        return
+
+    parent = get_workspace_parent()
+    if create_edit_workspace is not None and parent is not None and hasattr(state, "set_workspace"):
+        try:
+            ws = create_edit_workspace(parent)
+            state.set_workspace(ws)
+            return
+        except Exception as e:
+            print(f"[MENU] Direct EditWorkspace mount fallback failed: {e}")
+
+    state.show_workspace("mixed")
+
+
 def handle_clear_catalog():
     """
-    1. Clears backend catalog JSON/DB state.
-    2. Resets in-memory import lists & sidebar tracking.
-    3. Archives/rotates active 'personal_catalog.pgn' and resets active PGN views.
-    4. Clears treeview UI state to show 0 games.
+1. Clears backend catalog JSON/DB state.
+2. Resets in-memory import lists & sidebar tracking.
+3. Archives/rotates active 'personal_catalog.pgn' and resets active PGN views.
+4. Clears treeview UI state to show 0 games.
     """
     clear_catalog()
     reset_importer_state()
@@ -99,6 +132,7 @@ def open_theme_editor():
     """Spawns the Theme Editor pop-out window."""
     print("[MENU] Triggering Theme Editor...")
     ThemeEditorWindow()
+
 
 def show_about_dialog():
     """Displays application About information styled like the splash screen with credits, quotes, and references."""
@@ -197,7 +231,7 @@ def create_menu(app):
 
     # 2. Edit Menu
     edit_menu = tk.Menu(menubar, tearoff=0)
-    edit_menu.add_command(label="PGN & Engine", command=lambda: state.show_workspace("mixed"))
+    edit_menu.add_command(label="PGN & Engine", command=open_mixed_edit_workspace)
     edit_menu.add_separator()
     edit_menu.add_command(label="Theme Chooser", command=open_theme_chooser)
     edit_menu.add_command(label="Theme Editor", command=open_theme_editor)
@@ -206,7 +240,7 @@ def create_menu(app):
     # 3. View Menu
     view_menu = tk.Menu(menubar, tearoff=0)
     view_menu.add_command(label="Catalog", command=lambda: state.show_workspace("search_catalog"))
-    view_menu.add_command(label="Mixed Collections", command=lambda: state.show_workspace("mixed"))
+    view_menu.add_command(label="Mixed Collections", command=open_mixed_edit_workspace)
     view_menu.add_command(label="Calendar", command=lambda: state.show_workspace("calendar"))
     view_menu.add_command(label="Show / Hide Sidebar", command=toggle_sidebar)
     menubar.add_cascade(label="View", menu=view_menu)
@@ -215,7 +249,7 @@ def create_menu(app):
     tools_menu = tk.Menu(menubar, tearoff=0)
     tools_menu.add_command(label="Analysis", command=lambda: state.show_workspace("analysis"))
     tools_menu.add_command(label="Patterns", command=lambda: state.show_workspace("patterns"))
-    tools_menu.add_command(label="Engines", command=lambda: state.show_workspace("mixed"))
+    tools_menu.add_command(label="Engines", command=open_mixed_edit_workspace)
     menubar.add_cascade(label="Tools", menu=tools_menu)
 
     # 5. Help Menu
