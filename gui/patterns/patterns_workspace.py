@@ -7,6 +7,7 @@ import customtkinter as ctk
 import gui.app_state as state
 from gui.statusbar import set_status_message
 from core.constants import THEME
+from core.db_backend import get_db_path
 from gui.patterns.patterns_slider_logic import PatternsSliderLogicMixin
 from gui.patterns.patterns_loader import PatternsLoaderMixin
 
@@ -20,7 +21,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         )
         self.app_state = app_state or state
 
-        self.db_path = Path("personal_catalog.duckdb")
+        self.db_path = get_db_path()
         self.pgn_path = Path("personal_catalog.pgn")
         self.eco_dir = Path("catalog_eco")
 

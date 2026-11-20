@@ -4,7 +4,7 @@ import json
 import threading
 import chess
 import chess.pgn
-import duckdb
+from core.db_backend import USE_DUCKDB, connect_db, table_exists
 from gui.statusbar import set_status_message
 
 
@@ -12,8 +12,9 @@ class PatternsLoaderMixin:
     """Manages database connectivity, background PGN parsing, and piece-ply indexing."""
 
     def _init_db(self):
+        backend_name = "DuckDB" if USE_DUCKDB else "SQLite3"
         try:
-            con = duckdb.connect(str(self.db_path))
+            con = connect_db(self.db_path)
             con.execute("""
                 CREATE TABLE IF NOT EXISTS categorized_moves (
                     game_id VARCHAR,
@@ -28,7 +29,7 @@ class PatternsLoaderMixin:
             """)
             con.close()
         except Exception as e:
-            print(f"Error connecting to DuckDB at {self.db_path}: {e}")
+            print(f"Error connecting to {backend_name} at {self.db_path}: {e}")
 
     def check_and_load_catalog(self):
         eco_exists = self.eco_dir.exists() and any(self.eco_dir.glob("*.pgn"))
@@ -85,12 +86,9 @@ class PatternsLoaderMixin:
                             "piece_plies": piece_plies,
                         })
                         idx += 1
-            else:
-                con = duckdb.connect(str(self.db_path), read_only=True)
-                tables = con.execute("SHOW TABLES").fetchall()
-                table_names = [t[0] for t in tables]
-
-                if "catalog_headers" in table_names:
+            elif self.db_path.exists():
+                con = connect_db(self.db_path, read_only=True)
+                if table_exists(con, "catalog_headers"):
                     rows = con.execute("SELECT headers_json FROM catalog_headers").fetchall()
                     for r in rows:
                         try:
