@@ -12,6 +12,11 @@ from gui.patterns.patterns_slider_logic import PatternsSliderLogicMixin
 from gui.patterns.patterns_loader import PatternsLoaderMixin
 
 
+def _theme_text_color():
+    """Returns text_primary first, falling back to text_secondary."""
+    return THEME.get("text_primary") or THEME.get("text_secondary")
+
+
 class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMixin):
     def __init__(self, master, app_state=None, stockfish_path=None):
         super().__init__(
@@ -61,7 +66,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
         panel_bg = THEME.get("bg_panel", "#172134")
         surface_bg = THEME.get("bg_surface", "#1e293b")
         border_col = THEME.get("border_color", "#334155")
-        text_sec = THEME.get("text_secondary", "#cbd5e1")
+        text_col = _theme_text_color()
         btn_hover_col = THEME.get("btn_hover", "#2e4a8c")
         btn_initial_col = THEME.get("btn_initial", "#1e3a8a")
 
@@ -108,7 +113,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s1_box,
             text=f"Opening: {self.slider_1_val.get()}–{self.slider_2_val.get() - 1}",
             font=("Arial", 11, "bold"),
-            text_color=text_sec,
+            text_color=text_col,
         )
         self.lbl_s1.pack(anchor="w", padx=2)
         self.slider_1 = ctk.CTkSlider(
@@ -134,7 +139,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s2_box,
             text=f"Middlegame: {self.slider_2_val.get()}–{self.slider_3_val.get() - 1}",
             font=("Arial", 11, "bold"),
-            text_color=text_sec,
+            text_color=text_col,
         )
         self.lbl_s2.pack(anchor="w", padx=2)
         self.slider_2 = ctk.CTkSlider(
@@ -160,7 +165,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             s3_box,
             text=f"Endgame: {self.slider_3_val.get()}+",
             font=("Arial", 11, "bold"),
-            text_color=text_sec,
+            text_color=text_col,
         )
         self.lbl_s3.pack(anchor="w", padx=2)
         self.slider_3 = ctk.CTkSlider(
@@ -199,8 +204,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
 
         panel_bg = THEME.get("bg_panel", "#172134")
         surface_bg = THEME.get("bg_surface", "#1e293b")
-        text_sec = THEME.get("text_secondary", "#cbd5e1")
-        text_pri = THEME.get("text_primary", "#ffffff")
+        text_col = _theme_text_color()
         btn_initial = THEME.get("btn_initial", "#1e3a8a")
 
         # Show instructions only until the user selects a piece or submits a move filter
@@ -210,8 +214,8 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
             inst_lbl = ctk.CTkLabel(
                 self.cards_scroll_frame,
                 text="1. Select piece,  2. Give exact move, or click \"Submit Filter\"",
-                font=("Arial", 11, "bold"),  # Bold text as requested
-                text_color=text_sec,
+                font=("Arial", 11, "bold"),
+                text_color=text_col,
                 anchor="w",
                 height=22,
                 fg_color="transparent"
@@ -241,7 +245,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                 anchor="w",
                 fg_color=theme.get("bg", btn_initial),
                 hover_color=theme.get("border", THEME.get("btn_hover", "#2e4a8c")),
-                text_color=theme.get("fg", text_pri),
+                text_color=text_col,
                 font=("Arial", 12, "bold"),
                 height=36,
                 corner_radius=4,
@@ -266,7 +270,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                         anchor="w",
                         fg_color=surface_bg,
                         hover_color=THEME.get("btn_hover", "#2e4a8c"),
-                        text_color=text_sec,
+                        text_color=text_col,
                         font=("Arial", 11),
                         height=28,
                         command=lambda game_item=g: self.send_tier_games_to_analysis(game_item),
@@ -280,7 +284,7 @@ class PatternsWorkspace(ctk.CTkFrame, PatternsSliderLogicMixin, PatternsLoaderMi
                         anchor="w",
                         fg_color="transparent",
                         hover_color=THEME.get("btn_hover", "#2e4a8c"),
-                        text_color=THEME.get("text_muted", "#94a3b8"),
+                        text_color=text_col,
                         font=("Arial", 10),
                         height=24,
                         command=lambda tk=t_key: self.send_tier_to_analysis(tk),
