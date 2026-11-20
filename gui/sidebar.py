@@ -73,6 +73,7 @@ class Sidebar(ctk.CTkFrame):
         btn_hover = _theme_color("btn_hover", "btn_initial")
         text_primary = _theme_color("text_primary")
         text_secondary = _theme_color("text_secondary", "text_primary")
+        btn_text_color = _theme_color("text_primary", "text_secondary")
 
         # --- STATUS DISPLAY ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -126,7 +127,7 @@ class Sidebar(ctk.CTkFrame):
                 anchor="w",
                 fg_color="transparent",
                 hover_color=btn_hover,
-                text_color=text_primary,
+                text_color=btn_text_color,
                 font=ctk.CTkFont(size=11),
                 command=lambda wk=workspace_key: state.show_workspace(wk),
             )
@@ -166,7 +167,7 @@ class Sidebar(ctk.CTkFrame):
             font=ctk.CTkFont(size=10),
             fg_color=btn_initial,
             hover_color=btn_hover,
-            text_color=_get_dynamic_text_color(btn_initial),
+            text_color=btn_text_color,
             command=self.handle_qeval_send_analysis,
         )
         self.btn_qeval_analysis.pack(fill="x", padx=4, pady=(0, 4))
@@ -185,7 +186,7 @@ class Sidebar(ctk.CTkFrame):
             font=ctk.CTkFont(size=9, weight="bold"),
             fg_color=btn_initial,
             hover_color=btn_hover,
-            text_color=_get_dynamic_text_color(btn_initial),
+            text_color=btn_text_color,
             command=lambda: self._trigger_platform_action("chess_com", action="last"),
         )
         self.btn_cc_user.pack(fill="x", pady=(0, 4))
@@ -200,7 +201,7 @@ class Sidebar(ctk.CTkFrame):
             font=ctk.CTkFont(size=9, weight="bold"),
             fg_color=btn_initial,
             hover_color=btn_hover,
-            text_color=_get_dynamic_text_color(btn_initial),
+            text_color=btn_text_color,
             command=lambda: self._trigger_platform_action("lichess", action="last"),
         )
         self.btn_lich_user.pack(fill="x", pady=(0, 6))
@@ -237,7 +238,7 @@ class Sidebar(ctk.CTkFrame):
             font=ctk.CTkFont(size=9, weight="bold"),
             fg_color=btn_initial,
             hover_color=btn_hover,
-            text_color=_get_dynamic_text_color(btn_initial),
+            text_color=btn_text_color,
             command=lambda: self._trigger_platform_action(self.active_platform, action="batch"),
         ).pack(fill="x", pady=(4, 0))
 
@@ -258,20 +259,20 @@ class Sidebar(ctk.CTkFrame):
         self.active_platform = platform
         btn_initial = _theme_color("btn_initial", "bg_surface")
         bg_surface = _theme_color("bg_surface", "bg_panel")
-        text_primary = _theme_color("text_primary")
+        btn_text_color = _theme_color("text_primary", "text_secondary")
 
         if platform == "chess_com":
             self.btn_cc_user.configure(
                 fg_color=btn_initial,
-                text_color=_get_dynamic_text_color(btn_initial),
+                text_color=btn_text_color,
             )
-            self.btn_lich_user.configure(fg_color=bg_surface, text_color=text_primary)
+            self.btn_lich_user.configure(fg_color=bg_surface, text_color=btn_text_color)
         else:
             self.btn_lich_user.configure(
                 fg_color=btn_initial,
-                text_color=_get_dynamic_text_color(btn_initial),
+                text_color=btn_text_color,
             )
-            self.btn_cc_user.configure(fg_color=bg_surface, text_color=text_primary)
+            self.btn_cc_user.configure(fg_color=bg_surface, text_color=btn_text_color)
 
     def _matches_time_control(self, game):
         """Checks whether a parsed chess.pgn.Game matches active sidebar time-control filters."""
