@@ -33,7 +33,7 @@ class CatalogNavigationMixin:
     def on_prev_move(self, event=None):
         self._ensure_valid_game()
         if hasattr(self, "board_node") and self.board_node and hasattr(self.board_node,
-                                                                       "parent") and self.board_node.parent:
+                                                                      "parent") and self.board_node.parent:
             self.board_node = self.board_node.parent
             self.current_node = self.board_node
             if hasattr(self, "board_widget") and self.board_widget:
@@ -44,7 +44,7 @@ class CatalogNavigationMixin:
     def on_next_move(self, event=None):
         self._ensure_valid_game()
         if hasattr(self, "board_node") and self.board_node and hasattr(self.board_node,
-                                                                       "variations") and self.board_node.variations:
+                                                                      "variations") and self.board_node.variations:
             self.board_node = self.board_node.variation(0)
             self.current_node = self.board_node
             if hasattr(self, "board_widget") and self.board_widget:
@@ -90,12 +90,13 @@ class CatalogNavigationMixin:
                 self.board_widget.flip_board()
             elif hasattr(self, "invert"):
                 self.board_widget.invert()
-            elif hasattr(self.board_widget, "toggle_flip"):
+            elif hasattr(self, "toggle_flip"):
                 self.board_widget.toggle_flip()
 
     def trigger_engine_mode(self, mode):
         self.active_engine_mode = mode
         self._selected_mode_button = mode
+        self._last_tracked_node = None
 
         mode_buttons = {
             "review": ("btn_review", "btn_review_mode"),

@@ -1,17 +1,176 @@
 import customtkinter as ctk
 from tkinter import ttk
+import chess
+import chess.pgn
 from gui.chess_board import ChessBoardWidget
 from core.constants import THEME, LAYOUT
 
 
 class CatalogInitMixin:
-    """Mixin class to handle the UI initialization and layout for CatalogAnalysis and MixedAnalysis."""
+    """Mixin class to handle the UI initialization, PGN rendering, and move tracking for CatalogAnalysis."""
+
+    def _get_analysis_text_widget(self):
+        if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
+            return None
+        box = self.analysis_textbox
+        return getattr(box, "_textbox", getattr(box, "textbox", box))
+
+    def _render_game_pgn_tree(self, game_obj):
+        """Renders mainline moves, comments, and variations into analysis_textbox with click-to-jump tags."""
+        target_box = self._get_analysis_text_widget()
+        if not target_box:
+            return
+
+        if not hasattr(self, "_node_text_ranges"):
+            self._node_text_ranges = {}
+        self._node_text_ranges.clear()
+
+        if hasattr(game_obj, "root") and callable(game_obj.root):
+            root = game_obj.root()
+        else:
+            root = game_obj
+
+        try:
+            target_box.configure(state="normal")
+        except Exception:
+            pass
+
+        target_box.delete("1.0", "end")
+
+        if not root:
+            try:
+                target_box.configure(state="disabled")
+            except Exception:
+                pass
+            return
+
+        # Root comment if present
+        if getattr(root, "comment", ""):
+            comment_str = root.comment.strip()
+            if comment_str:
+                target_box.insert("end", f"{{{comment_str}}} ", ("comment_tag",))
+
+        def walk_node(node, is_variation=False):
+            if not node.variations:
+                return
+
+            # Main variation is index 0; side variations are indices 1..N-1
+            main_child = node.variation(0)
+            self._insert_move_node(node, main_child, is_variation=is_variation)
+
+            for alt_child in node.variations[1:]:
+                target_box.insert("end", " (", ("variation_tag",))
+                self._insert_alt_line(node, alt_child)
+                target_box.insert("end", ") ", ("variation_tag",))
+
+            walk_node(main_child, is_variation=is_variation)
+
+        def _insert_alt_line(parent_node, alt_node):
+            self._insert_move_node(parent_node, alt_node, is_variation=True)
+            curr = alt_node
+            while curr.variations:
+                nxt = curr.variation(0)
+                self._insert_move_node(curr, nxt, is_variation=True)
+                for sub_alt in curr.variations[1:]:
+                    target_box.insert("end", " (", ("variation_tag",))
+                    _insert_alt_line(curr, sub_alt)
+                    target_box.insert("end", ") ", ("variation_tag",))
+                curr = nxt
+
+        walk_node(root, is_variation=False)
+
+        try:
+            target_box.configure(state="disabled")
+        except Exception:
+            pass
+
+        self.update_active_move_highlight()
+
+    def _insert_move_node(self, parent_node, child_node, is_variation=False):
+        target_box = self._get_analysis_text_widget()
+        if not target_box or not child_node or not getattr(child_node, "move", None):
+            return
+
+        board_before = parent_node.board()
+        move_num = board_before.fullmove_number
+        is_white = (board_before.turn == chess.WHITE)
+        san = board_before.san(child_node.move)
+
+        if is_white:
+            prefix = f"{move_num}. {san}"
+        elif is_variation:
+            prefix = f"{move_num}... {san}"
+        else:
+            prefix = f"{san}"
+
+        node_tag = f"node_{id(child_node)}"
+        style_tag = "variation_tag" if is_variation else "move_tag"
+
+        start_idx = target_box.index("end-1c")
+        target_box.insert("end", f"{prefix} ", (style_tag, node_tag))
+        end_idx = target_box.index("end-1c")
+
+        if not hasattr(self, "_node_text_ranges"):
+            self._node_text_ranges = {}
+        self._node_text_ranges[id(child_node)] = (start_idx, end_idx)
+
+        target_box.tag_bind(
+            node_tag,
+            "<Button-1>",
+            lambda event, n=child_node: self._on_analysis_move_click(n)
+        )
+
+        comment_str = (getattr(child_node, "comment", "") or "").strip()
+        if comment_str:
+            target_box.insert("end", f"{{{comment_str}}} ", ("comment_tag",))
+
+    def _on_analysis_move_click(self, node):
+        if not node:
+            return
+        self.board_node = node
+        self.current_node = node
+        if hasattr(self, "board_widget") and self.board_widget:
+            try:
+                self.board_widget.set_position_fen(node.board().fen())
+            except Exception:
+                pass
+        self.update_active_move_highlight()
+
+    def update_active_move_highlight(self, event=None):
+        """Highlights the active move node in analysis_textbox using the active_tracker tag."""
+        target_box = self._get_analysis_text_widget()
+        if not target_box:
+            return
+
+        active_node = (
+                getattr(self, "board_node", None)
+                or getattr(self, "current_node", None)
+        )
+
+        try:
+            target_box.configure(state="normal")
+            target_box.tag_remove("active_tracker", "1.0", "end")
+
+            if active_node is not None:
+                node_suffix = f"_{id(active_node)}"
+                exact_node_tag = f"node_{id(active_node)}"
+                for tag in target_box.tag_names():
+                    if tag == exact_node_tag or tag.endswith(node_suffix):
+                        ranges = target_box.tag_ranges(tag)
+                        if ranges:
+                            target_box.tag_add("active_tracker", ranges[0], ranges[1])
+                            target_box.see(ranges[0])
+                            break
+        finally:
+            try:
+                target_box.configure(state="disabled")
+            except Exception:
+                pass
 
     def _safe_load_game(self, game_node, category_source=None):
         if category_source and category_source != "catalog":
             return
 
-        # Ensure game_node is a proper chess node/game object and not an index
         if isinstance(game_node, int):
             import gui.app_state as state
             active_games = state.catalog_state.get("active_games", [])
@@ -21,26 +180,21 @@ class CatalogInitMixin:
         if hasattr(game_node, "root") and callable(game_node.root):
             game_node = game_node.root()
 
-        # If the analysis textbox already contains text, do not wipe it out
-        if hasattr(self, "analysis_textbox") and self.analysis_textbox:
-            current_text = self.analysis_textbox.get("1.0", "end").strip()
-            if current_text and current_text != "[No game selected...]" and not current_text.startswith("[No"):
-                return
+        self.current_game = game_node
+        self.active_game = game_node
+        self.root_game_node = game_node
+        self.current_node = game_node
+        self.board_node = game_node
 
-        self.load_game(game_node, category_source=category_source)
         import gui.app_state as state
         if hasattr(state, "catalog_state") and isinstance(state.catalog_state, dict):
             state.catalog_state["active_focus"] = game_node
 
-        self.current_node = game_node
         if hasattr(self, "_update_active_boards") and hasattr(self.current_node, "board"):
             self.current_board = self.current_node.board()
             self._update_active_boards(self.current_board)
 
-        if hasattr(self, "analysis_data") and self.analysis_data:
-            self.render_catalog_analysis_moves(self.analysis_data)
-        elif hasattr(self, "_last_catalog_analysis_data") and self._last_catalog_analysis_data:
-            self.render_catalog_analysis_moves(self._last_catalog_analysis_data)
+        self._render_game_pgn_tree(game_node)
 
     def toggle_pgn_data_panel(self):
         if self.pgn_data_panel.winfo_ismapped():
@@ -102,24 +256,28 @@ class CatalogInitMixin:
 
     def _init_analysis_tags(self):
         """Configures CustomTkinter/Tkinter text box tags using central THEME colors and vertical spacing."""
-        if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
+        target_box = self._get_analysis_text_widget()
+        if not target_box:
             return
 
-        box = self.analysis_textbox
-        target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
+        primary = THEME.get("text_primary", "#ffffff")
+        secondary = THEME.get("text_secondary", "#94a3b8")
+        accent = THEME.get("btn_hover", primary)
 
-        # Dynamic theme colors
-        primary = THEME["text_primary"]
-        secondary = THEME.get("text_secondary", primary)
-        accent = THEME["btn_hover"]
-
-        target_box.tag_config("red", foreground=THEME.get("eval_red", primary), spacing3=6)
-        target_box.tag_config("orange", foreground=THEME.get("eval_orange", primary), spacing3=6)
-        target_box.tag_config("green", foreground=THEME.get("eval_green", primary), spacing3=6)
+        target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), spacing3=6)
+        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), spacing3=6)
+        target_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"), spacing3=6)
         target_box.tag_config("light_blue", foreground=THEME.get("eval_default", secondary), spacing3=6)
-        ...
-        target_box.tag_config("active_tracker", background=THEME.get("active_tracker_bg", accent),
-                              foreground=THEME.get("active_tracker_fg", primary))
+        target_box.tag_config("default", foreground=primary, spacing3=6)
+        target_box.tag_config("comment_tag", foreground=secondary, spacing3=6)
+        target_box.tag_config("variation_tag", foreground=secondary, spacing3=6)
+        target_box.tag_config("header_tag", foreground=secondary, spacing3=6)
+        target_box.tag_config("move_tag", foreground=primary, spacing3=6)
+        target_box.tag_config(
+            "active_tracker",
+            background=THEME.get("active_tracker_bg", accent),
+            foreground=THEME.get("active_tracker_fg", "#ffffff")
+        )
 
     def render_pv_lines(self, pv_data):
         """Renders up to 4 Multi-PV engine lines into self.pv_textbox."""
@@ -142,37 +300,16 @@ class CatalogInitMixin:
                 target_box.insert("end", text)
 
     def render_catalog_analysis_moves(self, analysis_data):
-        """Bridges catalog analysis data into self.analysis_rows and uses _sync_analysis_selection to prevent wiping on click."""
-        if not hasattr(self, "analysis_textbox"):
-            return
-
-        self.analysis_data = analysis_data
-        self._last_catalog_analysis_data = analysis_data
-
-        if not hasattr(self, "analysis_rows"):
-            self.analysis_rows = {}
-
-        for m_num in sorted(analysis_data.keys()):
-            entry = analysis_data[m_num]
-
-            w_txt = entry.get("white_text", entry.get("white", ""))
-            b_txt = entry.get("black_text", entry.get("black", ""))
-            w_tag = entry.get("white_tag", "default")
-            b_tag = entry.get("black_tag", "default")
-            w_node = entry.get("white_node")
-            b_node = entry.get("black_node")
-
-            self.analysis_rows[m_num] = {
-                "white": w_txt,
-                "black": b_txt,
-                "white_tag": w_tag,
-                "black_tag": b_tag,
-                "white_node": w_node,
-                "black_node": b_node
-            }
-
-        if hasattr(self, "_sync_analysis_selection"):
-            self._sync_analysis_selection()
+        """Renders the PGN tree with moves, comments, and variations, then syncs the tracker."""
+        game_obj = (
+            getattr(self, "current_game", None)
+            or getattr(self, "active_game", None)
+            or getattr(self, "root_game_node", None)
+        )
+        if game_obj:
+            self._render_game_pgn_tree(game_obj)
+        else:
+            self.update_active_move_highlight()
 
     def _update_analysis_buttons_state(self):
         """Updates the visual selection state of all engine and mode buttons."""
@@ -228,6 +365,7 @@ class CatalogInitMixin:
 
         if hasattr(state, "catalog_state") and state.catalog_state.get("active_focus"):
             self.current_node = state.catalog_state["active_focus"]
+            self.board_node = self.current_node
             if hasattr(self, "_update_active_boards"):
                 self._update_active_boards(self.current_node.board())
 
@@ -584,7 +722,6 @@ class CatalogInitMixin:
         self.pgn_data_text._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0)
         self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.pgn_data_text.insert("end", "[No game selected. Click a game to load its details...]\n")
-        self.pgn_data_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
         def _bind_keys(event=None):
             top = self.winfo_toplevel()
@@ -595,6 +732,5 @@ class CatalogInitMixin:
             top.bind_all("<Up>", self._handle_up)
             top.bind_all("<Down>", self._handle_down)
 
-        self.bind("<Map>", _bind_keys)
+        self.bind("<Map>", _bind_keys) #if self.bind("", _bind_keys), fix: self.bind("<Map>", _bind_keys)
         self.after(100, _bind_keys)
-

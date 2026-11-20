@@ -34,8 +34,9 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         self.active_game = None
         self.root_game_node = None
         self.current_node = None
+        self._last_tracked_node = None
         self.active_engine_mode = state.catalog_state.get("active_engine_mode") if hasattr(state,
-                                                                                           "catalog_state") else None
+                                                                                            "catalog_state") else None
         self.analysis_rows = {}
         self._current_analysis_worker = None
 
@@ -74,6 +75,9 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
         if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
             game = self.preview_lookup[item_id]
             if game:
+                self.current_game = game
+                self.active_game = game
+                self._last_tracked_node = None
                 self.load_game(game)
 
     def _inject_stop_analysis_button(self):
@@ -101,7 +105,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             if hasattr(self, '_current_analysis_worker') and self._current_analysis_worker:
                 self._current_analysis_worker.cancel = True
                 self._current_analysis_worker = None
-            print("[ENGINE WORKER] Analysis stopped by user.")
+                print("[ENGINE WORKER] Analysis stopped by user.")
         except Exception as e:
             print(f"[STOP ANALYSIS ERROR] {e}")
 
@@ -140,7 +144,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
             if callable(callback):
                 callback(event)
-                return "break"
+            return "break"
         except Exception as e:
             print(f"[SHORTCUT EXECUTION ERROR] {e}")
 
@@ -201,6 +205,9 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
 
         target_game = focused_game if focused_game else games_list[0]
         if hasattr(self, "load_game"):
+            self.current_game = target_game
+            self.active_game = target_game
+            self._last_tracked_node = None
             self.load_game(target_game)
 
     def pop_out_board(self, *args, **kwargs):
@@ -306,6 +313,9 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                 self.pgn_tree.see(item_id)
 
         if target:
+            self.current_game = target
+            self.active_game = target
+            self._last_tracked_node = None
             self.load_game_from_state(target)
 
         self.after(50, self.focus_set)
@@ -332,7 +342,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
             if hasattr(state, "active_category_source"):
                 state.active_category_source = eco_games
 
-        self.populate_catalog_tree(eco_games, active_game=target_game)
+            self.populate_catalog_tree(eco_games, active_game=target_game)
 
     def load_game_hardwired(self, game_node, category_source=None):
         if isinstance(category_source, list):
