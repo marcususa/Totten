@@ -1,5 +1,7 @@
 import io
+import os
 import platform
+import shutil
 import sys
 import traceback
 from pathlib import Path
@@ -8,37 +10,101 @@ import chess.engine
 import chess.pgn
 
 
+IGNORED_SUFFIXES = {".nnue", ".txt", ".md", ".json", ".log", ".bin", ".pdb", ".py"}
+
+
 class ChessEngine:
-    def __init__(self):
-        base_dir = Path(__file__).resolve().parent.parent / "engines"
-        system = platform.system()
+    def __init__(self, current_engine="Stockfish"):
+        self.app_root = Path(__file__).resolve().parent.parent
+        self.engines_dir = self.app_root / "engines"
+        self.engines_dir.mkdir(parents=True, exist_ok=True)
+        self.current_engine = current_engine or "Stockfish"
+        self.engine_path = self._resolve_engine_path(self.current_engine)
 
-        if system == "Windows":
-            possible_paths = [
-                base_dir / "stockfish-windows-x86-64-sse41-popcnt.exe",
-                base_dir / "stockfish-windows-x86-64-avx2.exe",
-                base_dir / "stockfish.exe",
-            ]
-        elif system == "Linux":
-            possible_paths = [
-                base_dir / "stockfish",
-                base_dir / "stockfish-ubuntu-x86-64",
-                base_dir / "stockfish-ubuntu-x86-64-bmi2",
-            ]
-        else:
-            possible_paths = [
-                base_dir / "stockfish",
-                base_dir / "stockfish.exe",
-            ]
+    def _is_engine_executable(self, path: Path) -> bool:
+        if not path.is_file():
+            return False
+        if path.suffix.lower() in IGNORED_SUFFIXES:
+            return False
+        if platform.system() == "Windows":
+            return path.suffix.lower() == ".exe"
+        # On POSIX/Linux/macOS, accept executable files (or binaries without non-binary suffixes)
+        return os.access(path, os.X_OK) or path.suffix == ""
 
-        self.engine_path = None
-        for p in possible_paths:
-            if p.exists():
-                self.engine_path = p
-                break
+    def _find_engine_in_folder(self, name_query: str):
+        if not name_query:
+            return None
+        needle = str(name_query).strip().lower()
+        if not needle:
+            return None
 
-        if not self.engine_path:
-            self.engine_path = possible_paths[0]
+        if not self.engines_dir.exists():
+            return None
+
+        matches = [
+            p for p in self.engines_dir.iterdir()
+            if self._is_engine_executable(p) and needle in p.name.lower()
+        ]
+        if not matches:
+            return None
+
+        # Prefer newest modified file if multiple match
+        matches.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return matches[0]
+
+    def _resolve_engine_path(self, engine_name: str) -> Path:
+        """
+        Case-insensitive engine lookup with 'If no X use Stockfish' fallback.
+        """
+        cleaned = (engine_name or "").strip()
+
+        # 1. If a non-Stockfish engine is requested, look for it first (case-insensitive)
+        if cleaned and cleaned.lower() != "stockfish":
+            custom_match = self._find_engine_in_folder(cleaned)
+            if custom_match is not None:
+                return custom_match
+
+        # 2. Default or fallback to Stockfish (case-insensitive)
+        stockfish_match = self._find_engine_in_folder("stockfish")
+        if stockfish_match is not None:
+            return stockfish_match
+
+        # 3. Last-resort fallback path in engines/ if no matching binary is present yet
+        if platform.system() == "Windows":
+            return self.engines_dir / "stockfish.exe"
+        return self.engines_dir / "stockfish"
+
+    def set_current_engine(self, engine_name: str) -> Path:
+        """Updates current_engine (case-insensitive) and refreshes engine_path."""
+        self.current_engine = (engine_name or "Stockfish").strip() or "Stockfish"
+        self.engine_path = self._resolve_engine_path(self.current_engine)
+        return self.engine_path
+
+    def add_engine_file(self, source_file_path: str, select_engine: bool = False) -> Path:
+        """
+        Copies an external engine file into the app's engines/ folder for USB portability
+        and returns the destination Path inside engines/.
+        """
+        src = Path(source_file_path)
+        if not src.exists() or not src.is_file():
+            raise FileNotFoundError(f"Engine file not found: {source_file_path}")
+
+        self.engines_dir.mkdir(parents=True, exist_ok=True)
+        dest = self.engines_dir / src.name
+
+        if src.resolve() != dest.resolve():
+            if dest.exists():
+                counter = 1
+                while dest.exists():
+                    dest = self.engines_dir / f"{src.stem}_{counter}{src.suffix}"
+                    counter += 1
+            shutil.copy2(src, dest)
+
+        if select_engine:
+            self.current_engine = dest.stem
+            self.engine_path = dest
+
+        return dest
 
     def verify_health(self):
         """Verifies the discovered binary can complete a basic UCI handshake."""
