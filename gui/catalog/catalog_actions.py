@@ -2,7 +2,7 @@ import io
 import threading
 import json
 import chess.pgn
-import duckdb
+from core.db_backend import USE_DUCKDB, connect_db, table_exists
 import gui.app_state as state
 from gui.statusbar import set_status_message
 
@@ -134,15 +134,15 @@ class CatalogActionsMixin:
             self._is_loading = False
 
     def load_catalog_summary_from_duckdb(self):
+        backend_name = "DuckDB" if USE_DUCKDB else "SQLite3"
         if not self.db_path.exists():
-            print("[DUCKDB ERROR] Database file path does not exist:", self.db_path)
+            print(f"[{backend_name} ERROR] Database file path does not exist:", self.db_path)
             return
 
         try:
-            con = duckdb.connect(str(self.db_path), read_only=True)
-            tables = [t[0] for t in con.execute("SHOW TABLES").fetchall()]
-            if "catalog_headers" not in tables:
-                print("[DUCKDB ERROR] 'catalog_headers' table not found in base tables:", tables)
+            con = connect_db(self.db_path, read_only=True)
+            if not table_exists(con, "catalog_headers"):
+                print(f"[{backend_name} ERROR] 'catalog_headers' table not found in database.")
                 con.close()
                 return
 
@@ -154,7 +154,7 @@ class CatalogActionsMixin:
                 try:
                     query_str = self.entry_filter.get().strip()
                 except Exception as ex:
-                    print(f"[DEBUG DuckDB LOAD] Error reading entry_filter: {ex}")
+                    print(f"[DEBUG {backend_name} LOAD] Error reading entry_filter: {ex}")
 
             required, excluded, optional = self._parse_search_query(query_str)
             search_terms = required + optional
@@ -250,10 +250,10 @@ class CatalogActionsMixin:
             self.aggregated_games_data = list(grouped_map.values())
 
         except Exception as e:
-            print(f"[DuckDB Summary Error] {e}")
+            print(f"[{backend_name} Summary Error] {e}")
 
     def fetch_group_instances_lazily(self, group_key):
-        """Strictly queries DuckDB for ALL games matching this exact ECO, Opening, and Variation subset."""
+        """Strictly queries the active database for ALL games matching this exact ECO, Opening, and Variation subset."""
         if group_key in self.lazy_loaded_instances:
             cached = self.lazy_loaded_instances[group_key]
             if cached:
@@ -261,10 +261,11 @@ class CatalogActionsMixin:
 
         eco, opening, variation = group_key
         instances = []
+        backend_name = "DuckDB" if USE_DUCKDB else "SQLite3"
 
         if self.db_path.exists():
             try:
-                con = duckdb.connect(str(self.db_path), read_only=True)
+                con = connect_db(self.db_path, read_only=True)
                 rows = con.execute("""
                     SELECT game_index, white, black, headers_json, pgn_text 
                     FROM catalog_headers 
@@ -292,7 +293,7 @@ class CatalogActionsMixin:
                         "pgn_text": pgn_text
                     })
             except Exception as e:
-                print(f"[DuckDB Subset Query Error]: {e}")
+                print(f"[{backend_name} Subset Query Error]: {e}")
 
         if instances:
             self.lazy_loaded_instances[group_key] = instances
@@ -322,7 +323,7 @@ class CatalogActionsMixin:
         if not item_data or not game_data:
             return
 
-        # 1. Strictly query DuckDB for all games matching this exact ECO, Opening, and Variation
+        # 1. Strictly query database for all games matching this exact ECO, Opening, and Variation
         group_key = (item_data.get("eco"), item_data.get("opening"), item_data.get("variation"))
         instances = self.fetch_group_instances_lazily(group_key)
         if not instances:

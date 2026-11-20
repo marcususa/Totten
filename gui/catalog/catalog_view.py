@@ -6,11 +6,11 @@ import customtkinter as ctk
 import chess
 import chess.pgn
 import json
-import duckdb
 
 import gui.app_state as state
 from gui.statusbar import set_status_message
 from core.constants import THEME
+from core.db_backend import get_db_path
 from .catalog_loader import CatalogLoaderMixin
 from .catalog_search import CatalogSearchMixin
 from .catalog_ui_layout import CatalogUIMixin
@@ -37,7 +37,7 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
 
         self.json_path = self.root_dir / "personal_catalog.json"
         self.pgn_path = self.root_dir / "personal_catalog.pgn"
-        self.db_path = self.root_dir / "personal_catalog.duckdb"
+        self.db_path = get_db_path(self.root_dir)
         self._load_preferences()
 
         self.catalog = {}
@@ -132,3 +132,4 @@ class SearchCatalogWorkspace(ctk.CTkFrame, CatalogLoaderMixin, CatalogSearchMixi
                 except Exception:
                     continue
         return False
+

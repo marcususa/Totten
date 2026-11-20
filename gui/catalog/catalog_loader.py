@@ -1,54 +1,50 @@
 import json
 import threading
 import chess.pgn
-import duckdb
+from core.db_backend import USE_DUCKDB, connect_db, table_exists
 from gui.sidebar import set_status_message, start_progress, update_progress, stop_progress
 
 
 class CatalogLoaderMixin:
     def check_and_load_catalog(self, is_startup=True):
         """
-        Loads catalog data directly from DuckDB.
-        On startup, fetches a fast random sample of 500 games from DuckDB.
+        Loads catalog data directly from the active database backend (DuckDB or SQLite3).
+        On startup, fetches a fast random sample of 500 games.
         """
         is_startup = True if not isinstance(is_startup, bool) else is_startup
+        backend_name = "DuckDB" if USE_DUCKDB else "SQLite3"
 
         if self.db_path.exists():
             try:
-                conn = duckdb.connect(str(self.db_path), read_only=True)
+                conn = connect_db(self.db_path, read_only=True)
 
-                # Robust DuckDB native table check
-                table_check = conn.execute(
-                    "SELECT table_name FROM information_schema.tables WHERE table_name = 'catalog_headers'"
-                ).fetchone()
-
-                if not table_check:
+                if not table_exists(conn, "catalog_headers"):
                     conn.close()
-                    print("[Catalog Loader] Table 'catalog_headers' not found in DuckDB.")
+                    print(f"[Catalog Loader] Table 'catalog_headers' not found in {backend_name}.")
                     self.aggregated_games_data = []
                     self._safe_refresh_view()
                     set_status_message("Catalog is empty. Import a PGN to begin.")
                     return
 
                 if is_startup:
-                    print("[Catalog Loader] Fetching 500 random games from DuckDB...")
+                    print(f"[Catalog Loader] Fetching 500 random games from {backend_name}...")
                     query = """
-                        SELECT eco, opening, variation, white, black, headers_json 
-                        FROM catalog_headers 
-                        ORDER BY RANDOM() 
+                        SELECT eco, opening, variation, white, black, headers_json
+                        FROM catalog_headers
+                        ORDER BY RANDOM()
                         LIMIT 500;
                     """
                 else:
-                    print("[Catalog Loader] Fetching full catalog from DuckDB...")
+                    print(f"[Catalog Loader] Fetching full catalog from {backend_name}...")
                     query = """
-                        SELECT eco, opening, variation, white, black, headers_json 
+                        SELECT eco, opening, variation, white, black, headers_json
                         FROM catalog_headers;
                     """
 
                 rows = conn.execute(query.strip()).fetchall()
                 conn.close()
 
-                print(f"[Catalog Loader] Successfully retrieved {len(rows)} records from DuckDB.")
+                print(f"[Catalog Loader] Successfully retrieved {len(rows)} records from {backend_name}.")
 
                 aggregated = {}
                 for eco, opening, variation, white, black, headers_json in rows:
@@ -89,9 +85,9 @@ class CatalogLoaderMixin:
                 return
 
             except Exception as e:
-                print(f"[Catalog Loader Error] Failed to query DuckDB: {e}")
+                print(f"[Catalog Loader Error] Failed to query {backend_name}: {e}")
 
-        print("[Catalog Loader] DuckDB file not found. Initializing empty view.")
+        print(f"[Catalog Loader] {backend_name} file not found. Initializing empty view.")
         self.aggregated_games_data = []
         self._safe_refresh_view()
         set_status_message("Catalog database not found. Import a PGN.")
