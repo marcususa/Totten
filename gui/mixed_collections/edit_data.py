@@ -36,36 +36,45 @@ class EditDataMixin:
             lbl.configure(text=symbol)
 
     def _toggle_lich_filter(self, mode):
-        self.lich_filters[mode] = not self.lich_filters[mode]
-        for m, lbl in self.lich_box_labels.items():
-            symbol = '■' if self.lich_filters[m] else '□'
-            lbl.configure(text=symbol)
+        current = self.lich_filters.get(mode, False)
+        self.lich_filters[mode] = not current
 
     def _quick_fetch_cc_last(self):
         if self.cc_saved_username:
             print(f"[DEBUG CHESS.COM] Fetching last game for quick button: {self.cc_saved_username}")
-            threading.Thread(target=self._worker_fetch_chess_com_batch,
-                             args=(self.cc_saved_username, {"B": True, "R": True, "S": True, "ALL": True}, 1),
-                             daemon=True).start()
+            threading.Thread(
+                target=self._worker_fetch_chess_com_batch,
+                args=(self.cc_saved_username, {"B": True, "R": True, "S": True, "ALL": True}, 1),
+                daemon=True
+            ).start()
 
     def _batch_cc_download(self):
         if self.cc_saved_username:
             print(f"[DEBUG CHESS.COM] Batch download (last 100) for {self.cc_saved_username} with filters: {self.cc_filters}")
-            threading.Thread(target=self._worker_fetch_chess_com_batch,
-                             args=(self.cc_saved_username, self.cc_filters, 100), daemon=True).start()
+            threading.Thread(
+                target=self._worker_fetch_chess_com_batch,
+                args=(self.cc_saved_username, self.cc_filters, 100),
+                daemon=True
+            ).start()
 
     def _quick_fetch_lich_last(self):
         if self.lich_saved_username:
             print(f"[DEBUG LICHESS] Fetching last game for quick button: {self.lich_saved_username}")
-            threading.Thread(target=self._worker_fetch_lichess_batch,
-                             args=(self.lich_saved_username, {"B": True, "R": True, "S": True, "ALL": True}, 1),
-                             daemon=True).start()
+            all_filters = {"Blitz": True, "Rapid": True, "Standard": True, "All": True}
+            threading.Thread(
+                target=self._worker_fetch_lichess_batch,
+                args=(self.lich_saved_username, all_filters, 1),
+                daemon=True
+            ).start()
 
     def _batch_lich_download(self):
         if self.lich_saved_username:
             print(f"[DEBUG LICHESS] Batch download (last 100) for {self.lich_saved_username} with filters: {self.lich_filters}")
-            threading.Thread(target=self._worker_fetch_lichess_batch,
-                             args=(self.lich_saved_username, self.lich_filters, 100), daemon=True).start()
+            threading.Thread(
+                target=self._worker_fetch_lichess_batch,
+                args=(self.lich_saved_username, dict(self.lich_filters), 100),
+                daemon=True
+            ).start()
 
     def _update_tree_with_games(self, fetched_games):
         for item in self.col_tree.get_children():
@@ -131,14 +140,22 @@ class EditDataMixin:
                                 continue
 
                         parsed.append(game_obj)
-                    self.after(0, lambda: self._update_tree_with_games(parsed))
+
+                    final_games = list(parsed)
+                    self.after(0, lambda games=final_games: self._update_tree_with_games(games))
         except Exception as e:
             print(f"[DEBUG CHESS.COM ERROR] {e}")
 
     def _worker_fetch_lichess_batch(self, username, filters, max_count):
         try:
-            url = f"https://lichess.org/api/games/user/{username.lower()}?max={max_count * 2}"
-            headers = {"Accept": "application/x-ndjson", "User-Agent": "ChessAppTool/1.0"}
+            url = (
+                f"https://lichess.org/api/games/user/{username.lower()}"
+                f"?max={max_count * 2}&pgnInJson=true&moves=true"
+            )
+            headers = {
+                "Accept": "application/x-ndjson",
+                "User-Agent": "ChessAppTool/1.0"
+            }
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=15) as resp:
                 parsed = []
@@ -146,32 +163,51 @@ class EditDataMixin:
                     if len(parsed) >= max_count:
                         break
                     decoded = line.decode("utf-8").strip()
-                    if decoded:
-                        g = json.loads(decoded)
-                        speed = g.get("speed", "").lower()
+                    if not decoded:
+                        continue
 
-                        if not filters.get("ALL", True):
-                            match_mode = False
-                            if filters.get("B") and speed in ("blitz", "bullet"):
-                                match_mode = True
-                            if filters.get("R") and speed == "rapid":
-                                match_mode = True
-                            if filters.get("S") and speed in ("classical", "correspondence"):
-                                match_mode = True
-                            if not match_mode:
-                                continue
+                    g = json.loads(decoded)
+                    speed = g.get("speed", "").lower()
 
+                    if not filters.get("All", False):
+                        match_mode = False
+                        if filters.get("Blitz") and speed in ("blitz", "bullet"):
+                            match_mode = True
+                        if filters.get("Rapid") and speed == "rapid":
+                            match_mode = True
+                        if filters.get("Standard") and speed in ("classical", "correspondence"):
+                            match_mode = True
+                        if not match_mode:
+                            continue
+
+                    pgn_text = g.get("pgn", "")
+                    game_obj = chess.pgn.read_game(io.StringIO(pgn_text)) if pgn_text else None
+                    if game_obj is None:
                         game_obj = chess.pgn.Game()
                         w_name = g.get("players", {}).get("white", {}).get("user", {}).get("name", "Unknown")
                         b_name = g.get("players", {}).get("black", {}).get("user", {}).get("name", "Unknown")
                         winner = g.get("winner")
                         res = "1-0" if winner == "white" else ("0-1" if winner == "black" else "1/2-1/2")
-
                         game_obj.headers["White"] = w_name
                         game_obj.headers["Black"] = b_name
                         game_obj.headers["Result"] = res
 
-                        parsed.append(game_obj)
-                self.after(0, lambda: self._update_tree_with_games(parsed))
+                        moves_str = g.get("moves", "")
+                        if moves_str:
+                            board = game_obj.board()
+                            node = game_obj
+                            for uci_move in moves_str.split():
+                                try:
+                                    move = chess.Move.from_uci(uci_move)
+                                    if move in board.legal_moves:
+                                        board.push(move)
+                                        node = node.add_variation(move)
+                                except Exception:
+                                    break
+
+                    parsed.append(game_obj)
+
+                final_games = list(parsed)
+                self.after(0, lambda games=final_games: self._update_tree_with_games(games))
         except Exception as e:
             print(f"[DEBUG LICHESS ERROR] {e}")

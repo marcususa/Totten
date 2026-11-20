@@ -15,11 +15,21 @@ from gui.mixed_collections.edit_navigation import EditNavigationMixin
 from gui.mixed_collections.edit_engine import EditEngineMixin
 from gui.mixed_collections.edit_constants import load_categories_config
 
-from .edit_layout import EditLayoutMixin
+from .edit_theme import EditThemeMixin
+from .edit_left import EditLeftMixin
+from .edit_right import EditRightMixin
 from .edit_data import EditDataMixin
 
 
-class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin, EditLayoutMixin, EditDataMixin):
+class EditWorkspace(
+    EditThemeMixin,
+    EditLeftMixin,
+    EditRightMixin,
+    EditNavigationMixin,
+    EditEngineMixin,
+    EditDataMixin,
+    ctk.CTkFrame,
+):
 
     CONFIG_FILE = "chess_accounts.json"
 
@@ -38,6 +48,17 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin, EditLayo
         saved_accounts = self._load_saved_accounts()
         self.cc_saved_username = saved_accounts.get("chess_com", None)
         self.lich_saved_username = saved_accounts.get("lichess", None)
+
+        # Default current_engine to "Stockfish" (case-insensitive handling in ChessEngine)
+        mixed_state = getattr(state, "mixed_state", None)
+        state_engine = mixed_state.get("current_engine") if isinstance(mixed_state, dict) else None
+        self.current_engine = (
+            state_engine
+            or saved_accounts.get("current_engine")
+            or "Stockfish"
+        )
+        if isinstance(mixed_state, dict):
+            mixed_state["current_engine"] = self.current_engine
 
         # Filter box selection states (tracking filled square status for B, R, S, ALL)
         self.cc_filters = {"B": False, "R": False, "S": False, "ALL": True}
@@ -73,15 +94,24 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin, EditLayo
         state.mixed_state["active_focus"] = None
         state.mixed_state["current_filename"] = None
 
+    def _build_ui(self):
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=3)
+        self.grid_columnconfigure(1, weight=2)
+        self._build_left_column()
+        self._build_right_column()
+
     def _load_saved_accounts(self):
-        """Loads saved usernames from the local JSON config file."""
+        """Loads saved usernames and engine setting from the local JSON config file."""
         if os.path.exists(self.CONFIG_FILE):
             try:
                 with open(self.CONFIG_FILE, "r") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
             except Exception as e:
                 print(f"[DEBUG] Error loading accounts config: {e}")
-        return {"chess_com": None, "lichess": None}
+        return {"chess_com": None, "lichess": None, "current_engine": "Stockfish"}
 
     def save_account_to_disk(self, platform, username):
         """Saves a platform username to the local JSON config file."""
@@ -92,6 +122,20 @@ class EditWorkspace(ctk.CTkFrame, EditNavigationMixin, EditEngineMixin, EditLayo
                 json.dump(accounts, f, indent=4)
         except Exception as e:
             print(f"[DEBUG] Error saving accounts config: {e}")
+
+    def save_engine_to_disk(self, engine_name):
+        """Saves current_engine to disk and state."""
+        cleaned = (engine_name or "").strip() or "Stockfish"
+        self.current_engine = cleaned
+        if hasattr(state, "mixed_state") and isinstance(state.mixed_state, dict):
+            state.mixed_state["current_engine"] = cleaned
+        accounts = self._load_saved_accounts()
+        accounts["current_engine"] = cleaned
+        try:
+            with open(self.CONFIG_FILE, "w") as f:
+                json.dump(accounts, f, indent=4)
+        except Exception as e:
+            print(f"[DEBUG] Error saving engine config: {e}")
 
     def refresh_view(self):
         self._refresh_treeview()

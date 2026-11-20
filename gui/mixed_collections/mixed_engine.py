@@ -1,14 +1,23 @@
 import threading
 import chess
+import gui.app_state as state
 from core.chess_engine import ChessEngine
 from core.constants import THEME
 from ..engine_mixins.engine_review_mixin import EngineReviewMixin
 from ..engine_mixins.engine_candidate_mixin import EngineCandidateMixin
 from ..engine_mixins.engine_standard_mixin import EngineStandardMixin
 
-
 class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
     """Manages background analysis workers, raw engine evaluation, and mode routing."""
+
+    def _get_current_engine_name(self) -> str:
+        if getattr(self, "current_engine", None):
+            return self.current_engine
+        app_state = globals().get("state")
+        mixed = getattr(app_state, "mixed_state", None) if app_state is not None else None
+        if isinstance(mixed, dict):
+            return mixed.get("current_engine") or "Stockfish"
+        return "Stockfish"
 
     def toggle_engine_action(self):
         """Controls the independent Engine button for raw live evaluation on the left, with real-time thread state sync."""
@@ -65,7 +74,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
             def run(self):
                 print("[RAW ENGINE WORKER] Starting thread analysis...")
                 try:
-                    engine = ChessEngine()
+                    engine = ChessEngine(current_engine=self.outer._get_current_engine_name())
 
                     def callback(res):
                         if self.cancel:
@@ -261,7 +270,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
 
                 try:
                     print(f"[ENGINE WORKER] Starting analysis for mode: {self.analysis_mode}")
-                    engine_worker = ChessEngine()
+                    engine_worker = ChessEngine(current_engine=self.outer._get_current_engine_name())
                     engine_worker.analyze_game(self.game_obj, mode=self.analysis_mode, callback=stream_callback)
                 except Exception as e:
                     print(f"[ENGINE WORKER CRASH] Mode {self.analysis_mode} failed: {e}")
@@ -270,13 +279,18 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
         self._current_analysis_worker.start()
 
     def _sync_analysis_selection(self):
-        """Renders the analysis panel completely like a continuous book."""
+        """Renders moves, candidate annotations, and active_tracker horizontally in analysis_textbox."""
         if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
             return
 
         box = self.analysis_textbox
         box.configure(fg_color=THEME["bg_surface"])
         target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
+
+        active_node = (
+                getattr(self, "board_node", None)
+                or getattr(self, "current_node", None)
+        )
 
         try:
             target_box.configure(state="normal")
@@ -287,60 +301,84 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                 "orange": THEME["eval_orange"],
                 "green": THEME["eval_green"],
                 "light_blue": THEME["eval_light_blue"],
-                "default": THEME["eval_default"]
+                "default": THEME["eval_default"],
             }
 
             for tag_name, color in eval_tag_colors.items():
                 target_box.tag_config(tag_name, foreground=color)
 
-            target_box.tag_config("active_tracker", background=THEME["active_tracker_bg"], foreground=THEME["active_tracker_fg"])
+            target_box.tag_config(
+                "comment_tag",
+                foreground=THEME.get("text_secondary", THEME["eval_default"]),
+            )
+            target_box.tag_config(
+                "active_tracker",
+                background=THEME["active_tracker_bg"],
+                foreground=THEME["active_tracker_fg"],
+            )
 
-            sorted_moves = sorted(self.analysis_rows.keys())
-            for move_num in sorted_moves:
-                row = self.analysis_rows[move_num]
+            rows = getattr(self, "analysis_rows", {}) or {}
+            for move_num in sorted(rows.keys()):
+                row = rows[move_num]
                 target_box.insert("end", f"{move_num}. ")
 
                 w_text = row.get("white", "")
                 w_tag = row.get("white_tag", "default")
                 w_node = row.get("white_node")
+                w_alts = row.get("white_alts", "")
 
                 if w_text:
                     w_tag_name = f"w_{move_num}_{id(w_node)}" if w_node else f"w_{move_num}"
-                    is_active_white = (
-                            (hasattr(self, "current_node") and self.current_node == w_node) or
-                            (hasattr(self, "board_node") and self.board_node == w_node)
-                    )
-                    applied_tag = "active_tracker" if is_active_white else (
-                        w_tag if w_tag in eval_tag_colors else "default")
-
-                    target_box.insert("end", f"{w_text} ", (applied_tag, w_tag_name))
+                    base_w_tag = w_tag if w_tag in eval_tag_colors else "default"
+                    is_active_w = active_node is not None and w_node is not None and active_node == w_node
+                    tags = [base_w_tag, w_tag_name]
+                    if is_active_w:
+                        tags.append("active_tracker")
+                    target_box.insert("end", f"{w_text} ", tuple(tags))
                     if w_node:
                         target_box.tag_bind(w_tag_name, "<Button-1>", lambda e, n=w_node: self.jump_to_node(n))
                 else:
                     target_box.insert("end", "... ")
 
+                if w_alts:
+                    target_box.insert("end", f"{w_alts} ", ("comment_tag",))
+
                 b_text = row.get("black", "")
                 b_tag = row.get("black_tag", "default")
                 b_node = row.get("black_node")
+                b_alts = row.get("black_alts", "")
 
                 if b_text:
                     b_tag_name = f"b_{move_num}_{id(b_node)}" if b_node else f"b_{move_num}"
-                    is_active_black = (
-                            (hasattr(self, "current_node") and self.current_node == b_node) or
-                            (hasattr(self, "board_node") and self.board_node == b_node)
-                    )
-                    applied_tag = "active_tracker" if is_active_black else (
-                        b_tag if b_tag in eval_tag_colors else "default")
-
-                    target_box.insert("end", f"{b_text} ", (applied_tag, b_tag_name))
+                    base_b_tag = b_tag if b_tag in eval_tag_colors else "default"
+                    is_active_b = active_node is not None and b_node is not None and active_node == b_node
+                    tags = [base_b_tag, b_tag_name]
+                    if is_active_b:
+                        tags.append("active_tracker")
+                    target_box.insert("end", f"{b_text} ", tuple(tags))
                     if b_node:
                         target_box.tag_bind(b_tag_name, "<Button-1>", lambda e, n=b_node: self.jump_to_node(n))
 
+                if b_alts:
+                    target_box.insert("end", f"{b_alts} ", ("comment_tag",))
+
                 target_box.insert("end", "    ")
 
-            target_box.configure(state="disabled")
-        except Exception as e:
-            print(f"[SYNC ANALYSIS ERROR] {e}")
+            if active_node is not None:
+                suffix = f"_{id(active_node)}"
+                exact = f"node_{id(active_node)}"
+                for tag in target_box.tag_names():
+                    if tag == exact or tag.endswith(suffix):
+                        ranges = target_box.tag_ranges(tag)
+                        if ranges:
+                            target_box.tag_add("active_tracker", ranges[0], ranges[1])
+                            target_box.see(ranges[0])
+                            break
+        finally:
+            try:
+                target_box.configure(state="disabled")
+            except Exception:
+                pass
 
     def trigger_engine_mode(self, mode):
         """Routes engine mode changes, updates button/frame highlights, and delegates to the mixin handlers."""
