@@ -33,21 +33,25 @@ except ImportError:
         def clear_catalog():
             """Direct fallback implementation to guarantee catalog clearing if module import fails."""
             print("[MENU] Executing direct root catalog cleanup fallback...")
+            from core.db_backend import USE_DUCKDB, get_db_path
 
             targets = [
+                get_db_path(ROOT_DIR),
                 ROOT_DIR / "personal_catalog.duckdb",
+                ROOT_DIR / "personal_catalog.sqlite3",
                 ROOT_DIR / "personal_catalog.json",
                 ROOT_DIR / "personal_catalog.pgn"
             ]
 
-            try:
-                import duckdb
-                duckdb.sql("CLOSE DATABASE").fetchall()
-            except Exception:
+            if USE_DUCKDB:
                 try:
-                    duckdb.default_connection.close()
+                    import duckdb
+                    duckdb.sql("CLOSE DATABASE").fetchall()
                 except Exception:
-                    pass
+                    try:
+                        duckdb.default_connection.close()
+                    except Exception:
+                        pass
 
             for file_path in targets:
                 if file_path.exists():
