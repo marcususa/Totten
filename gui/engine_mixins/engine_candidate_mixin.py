@@ -136,6 +136,18 @@ class EngineCandidateMixin:
     def trigger_engine_mode(self, mode_name):
         self.active_engine_mode = mode_name
 
+        if getattr(self, "_engine_running", False) and hasattr(self, "stop_raw_engine_analysis"):
+            try:
+                self.stop_raw_engine_analysis()
+            except Exception:
+                pass
+        self._engine_running = False
+        if hasattr(self, "update_engine_display"):
+            try:
+                self.update_engine_display("")
+            except Exception:
+                pass
+
         if hasattr(self, "btn_candidates") and self.btn_candidates:
             try:
                 self.btn_candidates.configure(fg_color=THEME.get("btn_hover", ""))
@@ -173,9 +185,9 @@ class EngineCandidateMixin:
                     print(f"[UI DEBUG] Could not display {c_name}: {e}")
                     sys.stdout.flush()
 
-        if not shown and hasattr(self, "analysis_textbox") and self.analysis_textbox:
+        if not shown and hasattr(self, "pv_textbox") and self.pv_textbox:
             try:
-                parent = getattr(self.analysis_textbox, "master", None)
+                parent = getattr(self.pv_textbox, "master", None)
                 if parent:
                     try:
                         p_manager = parent.winfo_manager()
@@ -186,10 +198,10 @@ class EngineCandidateMixin:
                     else:
                         parent.pack(fill="both", expand=True)
                     shown = True
-                    print("[UI DEBUG] Displayed analysis_textbox master widget.")
+                    print("[UI DEBUG] Displayed pv_textbox master widget.")
                     sys.stdout.flush()
             except Exception as e:
-                print(f"[UI DEBUG] Could not display analysis_textbox parent: {e}")
+                print(f"[UI DEBUG] Could not display pv_textbox parent: {e}")
                 sys.stdout.flush()
 
         selected_game = getattr(self, "current_game", None) or getattr(self, "active_game", None)
@@ -317,7 +329,7 @@ class EngineCandidateMixin:
             self._candidate_lock = threading.Lock()
 
         with self._candidate_lock:
-            if hasattr(self, '_current_candidate_worker') and self._current_candidate_worker:
+            if hasattr(self, "_current_candidate_worker") and self._current_candidate_worker:
                 if self._current_candidate_worker.is_alive():
                     self._current_candidate_worker.cancel = True
                     try:
@@ -345,7 +357,7 @@ class EngineCandidateMixin:
                         return
 
                     try:
-                        move_num = res['move_num']
+                        move_num = res["move_num"]
                         print(
                             f"[STREAM CALLBACK] Received move_num={move_num}, is_white={res.get('is_white')}, eval_diff={res.get('eval_diff')}")
                         sys.stdout.flush()
@@ -353,14 +365,14 @@ class EngineCandidateMixin:
                         if not (self.start_m <= move_num <= self.end_m):
                             return
 
-                        is_white = res['is_white']
-                        played_san = res['played_san']
-                        tag = res.get('tag', 'default')
-                        recs = res.get('recs', [])
-                        top_alt_pv = res.get('top_alt_pv', [])
-                        node_obj = res.get('node')
+                        is_white = res["is_white"]
+                        played_san = res["played_san"]
+                        tag = res.get("tag", "default")
+                        recs = res.get("recs", [])
+                        top_alt_pv = res.get("top_alt_pv", [])
+                        node_obj = res.get("node")
 
-                        eval_diff = res.get('eval_diff', res.get('diff', res.get('score_diff', 0.0)))
+                        eval_diff = res.get("eval_diff", res.get("diff", res.get("score_diff", 0.0)))
                         if abs(eval_diff) > 10:
                             eval_diff = eval_diff / 100.0
                         if eval_diff > 0:
@@ -479,29 +491,19 @@ class EngineCandidateMixin:
         self._sync_candidate_selection()
 
     def _sync_candidate_selection(self):
-        """Redraws the candidate analysis textbox flowing continuously like a book from left to right."""
-        if not hasattr(self, "analysis_textbox") or not self.analysis_textbox:
-            print("[SYNC WARNING] analysis_textbox attribute missing!")
+        """Renders candidate moves into the left-column pv_textbox while keeping right-column moves intact."""
+        if getattr(self, "_engine_running", False) and hasattr(self, "stop_raw_engine_analysis"):
+            try:
+                self.stop_raw_engine_analysis()
+            except Exception:
+                pass
+        self._engine_running = False
+
+        box = getattr(self, "pv_textbox", None) or getattr(self, "_cached_analysis_box", None)
+        if not box:
+            print("[SYNC WARNING] pv_textbox attribute missing!")
             sys.stdout.flush()
             return
-
-        box = self.analysis_textbox
-
-        try:
-            if not box.winfo_ismapped():
-                manager = ""
-                try:
-                    manager = box.master.winfo_manager()
-                except Exception:
-                    pass
-
-                if manager == "grid":
-                    box.grid(sticky="nsew")
-                else:
-                    box.pack(fill="both", expand=True)
-        except Exception as e:
-            print(f"[SYNC LAYOUT WARNING] Could not auto-map analysis_textbox: {e}")
-            sys.stdout.flush()
 
         try:
             box.configure(fg_color=THEME.get("bg_surface", ""))
@@ -512,13 +514,12 @@ class EngineCandidateMixin:
 
         try:
             target_box.configure(state="normal")
-            self._init_analysis_tags()
             target_box.delete("1.0", "end")
 
             if not hasattr(self, "candidate_rows") or not self.candidate_rows:
-                target_box.insert("end", "[No candidate moves available]\n", "default")
+                target_box.insert("end", "[No candidate moves available]\n")
                 target_box.configure(state="disabled")
-                print("[SYNC] Inserted fallback: No candidate moves available")
+                print("[SYNC] Inserted fallback: No candidate moves available into pv_textbox")
                 sys.stdout.flush()
                 return
 
@@ -529,45 +530,35 @@ class EngineCandidateMixin:
 
                 w_move = entry.get("white_move", "")
                 w_alts = entry.get("white_alts", "")
-                w_tag = entry.get("white_tag", "default")
                 w_node = entry.get("white_node")
 
                 b_move = entry.get("black_move", "")
                 b_alts = entry.get("black_alts", "")
-                b_tag = entry.get("black_tag", "default")
                 b_node = entry.get("black_node")
 
                 if w_move:
-                    is_active_w = (hasattr(self, "current_node") and self.current_node == w_node)
-                    tag_w = "active_tracker" if is_active_w else w_tag
                     w_tag_name = f"cw_{m_num}_{id(w_node)}" if w_node else f"cw_{m_num}"
-
-                    target_box.insert("end", f"{w_move} ", (tag_w, w_tag_name))
+                    target_box.insert("end", f"{w_move} ", (w_tag_name,))
                     inserted_chars += len(w_move) + 1
-
                     if w_node:
                         target_box.tag_bind(w_tag_name, "<Button-1>", lambda e, n=w_node: self.jump_to_node(n))
                     if w_alts:
-                        target_box.insert("end", f"{w_alts} ", "comment_tag")
+                        target_box.insert("end", f"{w_alts} ")
                         inserted_chars += len(w_alts) + 1
 
                 if b_move:
-                    is_active_b = (hasattr(self, "current_node") and self.current_node == b_node)
-                    tag_b = "active_tracker" if is_active_b else b_tag
                     b_tag_name = f"cb_{m_num}_{id(b_node)}" if b_node else f"cb_{m_num}"
-
-                    target_box.insert("end", f"{b_move} ", (tag_b, b_tag_name))
+                    target_box.insert("end", f"{b_move} ", (b_tag_name,))
                     inserted_chars += len(b_move) + 1
-
                     if b_node:
                         target_box.tag_bind(b_tag_name, "<Button-1>", lambda e, n=b_node: self.jump_to_node(n))
                     if b_alts:
-                        target_box.insert("end", f"{b_alts} ", "comment_tag")
+                        target_box.insert("end", f"{b_alts} ")
                         inserted_chars += len(b_alts) + 1
 
             target_box.configure(state="disabled")
             print(
-                f"[SYNC SUCCESS] Rendered {len(sorted_moves)} rows ({inserted_chars} chars) into analysis_textbox. (Mapped: {box.winfo_ismapped()})")
+                f"[SYNC SUCCESS] Rendered {len(sorted_moves)} rows ({inserted_chars} chars) into pv_textbox.")
             sys.stdout.flush()
 
         except Exception as e:
@@ -593,8 +584,8 @@ class EngineCandidateMixin:
         self._active_chunk_start = 1
         self._active_chunk_end = 0
 
-        if hasattr(self, "analysis_textbox") and self.analysis_textbox:
-            box = self.analysis_textbox
+        box = getattr(self, "pv_textbox", None) or getattr(self, "_cached_analysis_box", None)
+        if box:
             target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
             try:
                 target_box.configure(state="normal")
