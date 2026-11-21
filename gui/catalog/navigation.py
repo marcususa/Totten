@@ -125,6 +125,10 @@ class CatalogNavigationMixin:
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
         elif mode == "candidates":
+            if getattr(self, "_engine_running", False) and hasattr(self, "stop_raw_engine_analysis"):
+                self.stop_raw_engine_analysis()
+            if hasattr(self, "update_engine_display"):
+                self.update_engine_display("")
             EngineCandidateMixin.trigger_engine_mode(self, "candidates")
         elif mode == "standard":
             EngineStandardMixin.trigger_engine_mode(self, "standard")

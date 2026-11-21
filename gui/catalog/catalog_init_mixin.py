@@ -734,3 +734,10 @@ class CatalogInitMixin:
 
         self.bind("<Map>", _bind_keys) #if self.bind("", _bind_keys), fix: self.bind("<Map>", _bind_keys)
         self.after(100, _bind_keys)
+
+        # ****DON'T DELETE - DON'T DELETE****
+        # IF: self.bind("", _bind_keys) it is an AI chat glitch
+        # REPLACE WITH: self.bind("<Map>", _bind_keys)
+        # Then make sure it ends with: self.after(100, _bind_keys)
+        # ****DON'T DELETE - DON'T DELETE****
+
