@@ -4,10 +4,21 @@ from pathlib import Path
 from PIL import Image, ImageTk, ImageDraw
 import customtkinter as ctk
 import chess
-from core.constants import THEME
+from core.constants import THEME, DEFAULT_BOARD_FILE
 import gui.app_state as state
 
 PIECE_PATH = "assets/pieces/"
+DEFAULT_BOARD_BG_PATH = DEFAULT_BOARD_FILE
+
+BOARD_SPACING = {
+    "outer_padx": 0,
+    "outer_pady": 0,
+    "canvas_padx": (2, 0),
+    "canvas_pady": 0,
+    "control_gap_main": 6,
+    "control_gap_popout": 4,
+    "popout_top_pad": 5,
+}
 
 ROOT_DIR = Path(__file__).resolve().parent
 while ROOT_DIR != ROOT_DIR.parent:
@@ -79,7 +90,13 @@ class ChessBoardWidget(ctk.CTkFrame):
         board_pixel_size = self.square_size * 8
 
         self.control_panel = ctk.CTkFrame(self, fg_color="transparent", width=panel_width, corner_radius=0)
-        self.control_panel.grid(row=0, column=0, sticky="ns", padx=0, pady=0)
+        self.control_panel.grid(
+            row=0,
+            column=0,
+            sticky="ns",
+            padx=BOARD_SPACING["outer_padx"],
+            pady=BOARD_SPACING["outer_pady"],
+        )
         self.control_panel.grid_propagate(False)
 
         # Inner button container centered vertically
@@ -95,6 +112,7 @@ class ChessBoardWidget(ctk.CTkFrame):
             # Pop-out layout: Compact buttons with symbols and analysis toggle 'A'
             button_width = panel_width - 4
             button_height = 35
+            gap = BOARD_SPACING["control_gap_popout"]
 
             self.flip_button = ctk.CTkButton(
                 self.buttons_container, text="↻",
@@ -102,7 +120,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
                 command=self.toggle_flip
             )
-            self.flip_button.pack(side="top", pady=(0, 4), anchor="center")
+            self.flip_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.popout_button = ctk.CTkButton(
                 self.buttons_container, text=chr(9704),
@@ -110,7 +128,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14),
                 command=self.toggle_popout
             )
-            self.popout_button.pack(side="top", pady=(0, 4), anchor="center")
+            self.popout_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.analysis_button = ctk.CTkButton(
                 self.buttons_container, text="A",
@@ -118,7 +136,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14, "bold"),
                 command=self.toggle_analysis
             )
-            self.analysis_button.pack(side="top", pady=(0, 4), anchor="center")
+            self.analysis_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.prev_button = ctk.CTkButton(
                 self.buttons_container, text="◀",
@@ -126,7 +144,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 12),
                 command=self._on_left_arrow
             )
-            self.prev_button.pack(side="top", pady=(0, 4), anchor="center")
+            self.prev_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.next_button = ctk.CTkButton(
                 self.buttons_container, text="▶",
@@ -140,6 +158,7 @@ class ChessBoardWidget(ctk.CTkFrame):
             # Main app layout: Full descriptive buttons
             button_width = panel_width - 8
             button_height = 32
+            gap = BOARD_SPACING["control_gap_main"]
 
             self.flip_button = ctk.CTkButton(
                 self.buttons_container, text="↻ Flip",
@@ -147,7 +166,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 14, "bold"),
                 command=self.toggle_flip
             )
-            self.flip_button.pack(side="top", pady=(0, 6), anchor="center")
+            self.flip_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.popout_button = ctk.CTkButton(
                 self.buttons_container, text="Pop Out",
@@ -155,7 +174,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 13, "bold"),
                 command=self.toggle_popout
             )
-            self.popout_button.pack(side="top", pady=(0, 6), anchor="center")
+            self.popout_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.prev_button = ctk.CTkButton(
                 self.buttons_container, text="◀ Prev",
@@ -163,7 +182,7 @@ class ChessBoardWidget(ctk.CTkFrame):
                 hover_color=btn_hover, text_color=text_color, font=("Arial", 13, "bold"),
                 command=self._on_left_arrow
             )
-            self.prev_button.pack(side="top", pady=(0, 6), anchor="center")
+            self.prev_button.pack(side="top", pady=(0, gap), anchor="center")
 
             self.next_button = ctk.CTkButton(
                 self.buttons_container, text="Next ▶",
@@ -180,7 +199,13 @@ class ChessBoardWidget(ctk.CTkFrame):
             bg=THEME.get("bg_panel", "#0f172a"),
             highlightthickness=0
         )
-        self.canvas.grid(row=0, column=1, sticky="nsew", padx=(2, 0), pady=0)
+        self.canvas.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=BOARD_SPACING["canvas_padx"],
+            pady=BOARD_SPACING["canvas_pady"],
+        )
 
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag_motion)
@@ -444,13 +469,16 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         board_pixel_size = self.square_size * 8
 
-        # Check if board_background image exists in project root
+        # Check if board_background image exists in project root, otherwise default to wood.png
         bg_img_file = None
         for ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"]:
             candidate = ROOT_DIR / f"board_background{ext}"
             if candidate.exists():
                 bg_img_file = candidate
                 break
+
+        if bg_img_file is None and DEFAULT_BOARD_BG_PATH and Path(DEFAULT_BOARD_BG_PATH).exists():
+            bg_img_file = Path(DEFAULT_BOARD_BG_PATH)
 
         base_pil_img = None
         if bg_img_file:
@@ -591,7 +619,7 @@ class ChessBoardWidget(ctk.CTkFrame):
 
         self.popout_board = ChessBoardWidget(self.popout_window, square_size=self.square_size, is_popout=True)
         self.popout_board.master_widget = self
-        self.popout_board.grid(row=0, column=0, sticky="nsew", padx=0, pady=(5, 0))
+        self.popout_board.grid(row=0, column=0, sticky="nsew", padx=0, pady=(BOARD_SPACING["popout_top_pad"], 0))
         self.popout_board.set_board(self.board)
 
         def on_window_resize(event):
