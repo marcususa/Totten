@@ -8,6 +8,7 @@ from pgn.importer import import_pgn, import_fen, reset_importer_state
 from gui.sidebar import toggle_sidebar
 from gui.theme_chooser import ThemeChooserWindow
 from gui.theme_editor_layout import ThemeEditorWindow
+from gui.theme_boards import ThemeBoardsWindow
 
 # Import your core constants for centralized theming
 try:
@@ -138,6 +139,12 @@ def open_theme_editor():
     ThemeEditorWindow()
 
 
+def open_theme_boards():
+    """Spawns the Theme Boards pop-out window."""
+    print("[MENU] Triggering Theme Boards...")
+    ThemeBoardsWindow()
+
+
 def show_about_dialog():
     """Displays application About information styled like the splash screen with credits, quotes, and references."""
     top = ctk.CTkToplevel()
@@ -239,6 +246,7 @@ def create_menu(app):
     edit_menu.add_separator()
     edit_menu.add_command(label="Theme Chooser", command=open_theme_chooser)
     edit_menu.add_command(label="Theme Editor", command=open_theme_editor)
+    edit_menu.add_command(label="Theme Boards", command=open_theme_boards)
     menubar.add_cascade(label="Edit", menu=edit_menu)
 
     # 3. View Menu
