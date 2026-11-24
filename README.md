@@ -1,8 +1,10 @@
 "Mel, let's steal some apples" - Lionel Hampton (A Song is Born)
 
-The goal is to build a catalog instead of a library for chess games. You can import .pgn files, and the program will catalog games by frequency based on the ECO, opening, and variation. The Mixed Collections feature allows you to create "playlists" of games you can analyze. Engine options and a patterns feature will analyze select games.
+Totten is a chess program that catalogs imported games. It catalogs these games based on the ECO, opening, and variation. The Mixed Collections feature allows you to create "playlists" of games you can analyze. Engine options and patterns features analyze and evaluate selected games.
 
 Future development will include the exploration of relationships between chess patterns and music theory.
+
+To do: os.execv to UI refresh in stages, patterns evaluation, catalog search themes with UI refresh update, catalog and mixed collection engine analysis updates with UI refresh update, mixed collections default games, sidebar, and third column updates along with UI refresh update, patterns selection theme with UI refresh update
 
 If interested or you have any questions, you can reach out to me at the following email address.
 
