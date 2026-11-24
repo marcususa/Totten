@@ -1,4 +1,4 @@
- {
+{
         "Red": {
             "Light": {
                 "bg_panel": "#fef2f2",
@@ -33,11 +33,11 @@
                 "bg_panel": "#591010",
                 "bg_surface": "#7f1d1d",
                 "text_primary": "#ffffff",
-                "text_secondary": "#aa4e58",
+                "text_secondary": "#c36973",
                 "status_text": "#ddddff",
-                "border_color": "#ef4444",
+                "border_color": "#791f1f",
                 "divider": "#ef4444",
-                "border_ring": "#ef4444",
+                "border_ring": "#6c1b1b",
                 "progress_bg": "#7f1d1d",
                 "progress_fill": "#ffffff",
                 "btn_initial": "#951f1f",
@@ -119,12 +119,12 @@
                 "dark_square": "#d99b6c"
             },
             "Medium": {
-                "bg_panel": "#5c200b",
+                "bg_panel": "#5c280a",
                 "bg_surface": "#7c2d12",
                 "text_primary": "#ffffff",
                 "text_secondary": "#ffedd5",
                 "status_text": "#ddddff",
-                "border_color": "#f97316",
+                "border_color": "#b3520e",
                 "divider": "#f97316",
                 "border_ring": "#f97316",
                 "progress_bg": "#7c2d12",
@@ -144,12 +144,12 @@
                 "eval_light_blue_bg": "#1f3852",
                 "eval_default": "#fdba74",
                 "pattern_yellow": "#ffd700",
-                "light_square": "#a85324",
-                "dark_square": "#5c200b"
+                "light_square": "#d17e51",
+                "dark_square": "#a54c1d"
             },
             "Dark": {
                 "bg_panel": "#431407",
-                "bg_surface": "#7c2d12",
+                "bg_surface": "#60230e",
                 "text_primary": "#ffffff",
                 "text_secondary": "#ca9c79",
                 "status_text": "#ddddff",
@@ -161,7 +161,7 @@
                 "btn_initial": "#9a3412",
                 "btn_hover": "#b53d12",
                 "btn_active": "#9a3412",
-                "active_tracker_bg": "#521900",
+                "active_tracker_bg": "#934300",
                 "active_tracker_fg": "#ffffff",
                 "eval_red": "#de3d35",
                 "eval_red_bg": "#4a1f1f",
@@ -273,7 +273,7 @@
                 "text_primary": "#0f172a",
                 "text_secondary": "#334155",
                 "status_text": "#1e293b",
-                "border_color": "#38bdf8",
+                "border_color": "#5c8597",
                 "divider": "#38bdf8",
                 "border_ring": "#38bdf8",
                 "progress_bg": "#e0f2fe",
@@ -294,7 +294,7 @@
                 "eval_default": "#334155",
                 "pattern_yellow": "#ffd700",
                 "light_square": "#e1f3fe",
-                "dark_square": "#8dcbf8"
+                "dark_square": "#4d7897"
             },
             "Medium": {
                 "bg_panel": "#142865",
@@ -327,7 +327,7 @@
             },
             "Dark": {
                 "bg_panel": "#131e37",
-                "bg_surface": "#1a2049",
+                "bg_surface": "#1d2455",
                 "text_primary": "#ffffff",
                 "text_secondary": "#94a3b8",
                 "status_text": "#ddddff",
@@ -336,9 +336,9 @@
                 "border_ring": "#1e3a8a",
                 "progress_bg": "#1e1b4b",
                 "progress_fill": "#ffffff",
-                "btn_initial": "#1e3a8a",
+                "btn_initial": "#223877",
                 "btn_hover": "#284eba",
-                "btn_active": "#1e3a8a",
+                "btn_active": "#1f3c90",
                 "active_tracker_bg": "#1e3a8a",
                 "active_tracker_fg": "#ffffff",
                 "eval_red": "#de3d35",
@@ -351,8 +351,8 @@
                 "eval_light_blue_bg": "#1f3852",
                 "eval_default": "#94a3b8",
                 "pattern_yellow": "#ffd700",
-                "light_square": "#365297",
-                "dark_square": "#233873"
+                "light_square": "#5672b7",
+                "dark_square": "#304379"
             }
         },
         "Purple": {
@@ -446,7 +446,7 @@
         },
         "Brown": {
             "Light": {
-                "bg_panel": "#fdf8f6",
+                "bg_panel": "#f7ede2",
                 "bg_surface": "#f7ede2",
                 "text_primary": "#0f172a",
                 "text_secondary": "#334155",
@@ -561,7 +561,7 @@
                 "eval_default": "#334155",
                 "pattern_yellow": "#ffd700",
                 "light_square": "#e2e8f0",
-                "dark_square": "#94a3b8"
+                "dark_square": "#7b828c"
             },
             "Medium": {
                 "bg_panel": "#1b1c1e",
@@ -771,19 +771,19 @@
                 "dark_square": "#59300c"
             },
             "Dark": {
-                "bg_panel": "#422006",
-                "bg_surface": "#4e2b0c",
+                "bg_panel": "#291300",
+                "bg_surface": "#190001",
                 "text_primary": "#ffffff",
                 "text_secondary": "#87695c",
                 "status_text": "#856759",
-                "border_color": "#854d0e",
+                "border_color": "#5e401e",
                 "divider": "#854d0e",
-                "border_ring": "#854d0e",
+                "border_ring": "#472907",
                 "progress_bg": "#713f12",
                 "progress_fill": "#ffffff",
-                "btn_initial": "#854d0e",
-                "btn_hover": "#a76930",
-                "btn_active": "#854d0e",
+                "btn_initial": "#60370a",
+                "btn_hover": "#7c4e23",
+                "btn_active": "#653a0a",
                 "active_tracker_bg": "#713f12",
                 "active_tracker_fg": "#ffffff",
                 "eval_red": "#de3d35",
@@ -797,7 +797,7 @@
                 "eval_default": "#855b52",
                 "pattern_yellow": "#eab308",
                 "light_square": "#7a3e08",
-                "dark_square": "#471f05"
+                "dark_square": "#57280a"
             }
         }
     }
