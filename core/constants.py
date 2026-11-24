@@ -9,6 +9,8 @@ while ROOT_DIR != ROOT_DIR.parent:
 
 USER_THEMES_FILE = ROOT_DIR / "user_themes.json"
 DEFAULTS_FILE = ROOT_DIR / "theme_defaults.json"
+BOARDS_DIR = ROOT_DIR / "assets" / "boards"
+DEFAULT_BOARD_FILE = BOARDS_DIR / "wood.png"
 
 DEFAULT_THEME = {
     "bg_panel": "#591010",
@@ -39,6 +41,10 @@ DEFAULT_THEME = {
     "light_square": "#993333",
     "dark_square": "#591010"
 }
+
+
+def get_default_board_path() -> Path | None:
+    return DEFAULT_BOARD_FILE if DEFAULT_BOARD_FILE.exists() else None
 
 
 def load_theme():
