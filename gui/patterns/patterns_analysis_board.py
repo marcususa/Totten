@@ -10,6 +10,16 @@ from core.constants import THEME
 class PatternsAnalysisBoardMixin:
     """Encapsulates board traversal, FEN rendering, move list highlighting, and global shortcuts."""
 
+    def reset_pattern_details_lock(self):
+        """Unlocks Game Details and restores its header when leaving pattern study lock."""
+        self._pattern_details_locked = False
+        if hasattr(self, "lbl_pgn_data_title") and self.lbl_pgn_data_title:
+            try:
+                if not self.lbl_pgn_data_title.winfo_ismapped():
+                    self.lbl_pgn_data_title.pack(side="left")
+            except Exception:
+                pass
+
     def load_game_hardwired(self, game_node, category_source=None):
         resolved = self._resolve_game_obj(game_node)
         if isinstance(category_source, list):
@@ -67,7 +77,11 @@ class PatternsAnalysisBoardMixin:
             except Exception:
                 pass
 
-        if hasattr(self, "pgn_data_text") and self.pgn_data_text:
+        if (
+            hasattr(self, "pgn_data_text")
+            and self.pgn_data_text
+            and not getattr(self, "_pattern_details_locked", False)
+        ):
             try:
                 exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True, columns=None)
                 pgn_text_export = resolved.accept(exporter)
@@ -86,8 +100,8 @@ class PatternsAnalysisBoardMixin:
                 text_primary = THEME.get("text_primary")
                 self.moves_textbox.configure(state="normal", fg_color=surface_bg)
 
-                bg_active = "#ff0000"
-                fg_active = "#ffffff"
+                bg_active = THEME.get("active_tracker_bg")
+                fg_active = THEME.get("active_tracker_fg")
 
                 internal_text = getattr(self.moves_textbox, "_textbox", self.moves_textbox)
                 internal_text.tag_config("active_move", background=bg_active, foreground=fg_active)
@@ -154,8 +168,8 @@ class PatternsAnalysisBoardMixin:
                 except Exception:
                     pass
 
-            bg_active = "#ff0000"
-            fg_active = "#ffffff"
+            bg_active = THEME.get("active_tracker_bg")
+            fg_active = THEME.get("active_tracker_fg")
 
             if current_box:
                 try:
@@ -163,7 +177,7 @@ class PatternsAnalysisBoardMixin:
                     inner_analysis = getattr(current_box, "_textbox", current_box)
 
                     inner_analysis.tag_config("active_move", background=bg_active, foreground=fg_active,
-                                              underline=False)
+                                            underline=False)
                     inner_analysis.tag_remove("active_move", "1.0", "end")
 
                     active_node = getattr(self, "board_node", None) or getattr(self, "current_node", None)
@@ -173,7 +187,7 @@ class PatternsAnalysisBoardMixin:
                         if ranges:
                             inner_analysis.tag_add("active_move", ranges[0], ranges[1])
                             inner_analysis.tag_raise("active_move")
-                            current_box.see(ranges[0])
+                        current_box.see(ranges[0])
 
                     current_box.configure(state="disabled")
                 except Exception as e:
@@ -195,7 +209,7 @@ class PatternsAnalysisBoardMixin:
                         if ranges:
                             internal_text.tag_add("active_move", ranges[0], ranges[1])
                             internal_text.tag_raise("active_move")
-                            self.moves_textbox.see(ranges[0])
+                        self.moves_textbox.see(ranges[0])
 
                     self.moves_textbox.configure(state="disabled")
                 except Exception as e:
@@ -251,7 +265,7 @@ class PatternsAnalysisBoardMixin:
         if hasattr(self, "preview_lookup") and item_id in self.preview_lookup:
             game = self.preview_lookup[item_id]
 
-            if hasattr(self, "pgn_data_text"):
+            if hasattr(self, "pgn_data_text") and not getattr(self, "_pattern_details_locked", False):
                 self.pgn_data_text.delete("1.0", "end")
 
             if hasattr(self, "on_hardwired_tree_select"):
