@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from core.constants import THEME, LAYOUT
 
-from .patterns_actions import PatternsInitMixin, mark_move_good, mark_move_bad
+from .patterns_actions import PatternsInitMixin
 from .patterns_search import PatternsSearchMixin
 from .patterns_analysis_layout import PatternsAnalysisLayoutMixin
 from .patterns_analysis_navigation import PatternsAnalysisNavigationMixin

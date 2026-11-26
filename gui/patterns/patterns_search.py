@@ -13,7 +13,6 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 from cairosvg import svg2png
 import gui.app_state as state
-from core.patterns_db import get_patterns
 from core.constants import THEME, LAYOUT
 
 

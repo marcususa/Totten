@@ -182,11 +182,10 @@ class PatternsAnalysisLayoutMixin:
         self.right_analysis_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.right_analysis_panel.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
 
-        # 4-Row Configuration (Row 1 protected with minsize=32):
+        # 3-Row Configuration:
         self.right_analysis_panel.rowconfigure(0, weight=1)
-        self.right_analysis_panel.rowconfigure(1, weight=0, minsize=32)
-        self.right_analysis_panel.rowconfigure(2, weight=3)
-        self.right_analysis_panel.rowconfigure(3, weight=1)
+        self.right_analysis_panel.rowconfigure(1, weight=3)
+        self.right_analysis_panel.rowconfigure(2, weight=1)
         self.right_analysis_panel.columnconfigure(0, weight=1)
 
         # --- Row 0: Top Catalog Panel ---
@@ -265,71 +264,7 @@ class PatternsAnalysisLayoutMixin:
         self.pgn_tree.configure(yscrollcommand=self.pgn_scrollbar.set)
         self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
-        # --- Row 1: Thin Evaluation Bar Panel (Good, Bad, IDK) ---
-        self.eval_bar_frame = ctk.CTkFrame(
-            self.right_analysis_panel,
-            fg_color=THEME["bg_panel"],
-            corner_radius=6,
-            border_width=1,
-            border_color=THEME.get("border_color", THEME["bg_surface"]),
-            height=32
-        )
-        self.eval_bar_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 8))
-        self.eval_bar_frame.grid_propagate(False)
-
-        self.eval_bar_frame.grid_rowconfigure(0, weight=1)
-        self.eval_bar_frame.grid_columnconfigure((0, 1, 2), weight=1)
-
-        eval_btn_height = 20
-        eval_btn_corner = 6
-        eval_btn_font = ctk.CTkFont(size=11)
-        eval_btn_hover = THEME["btn_hover"]
-        eval_btn_initial = THEME["btn_initial"]
-        eval_text_color = THEME["text_primary"]
-
-        self.btn_eval_good = ctk.CTkButton(
-            self.eval_bar_frame,
-            text="Good",
-            height=eval_btn_height,
-            corner_radius=eval_btn_corner,
-            border_width=0,
-            fg_color=eval_btn_initial,
-            hover_color=eval_btn_hover,
-            text_color=eval_text_color,
-            font=eval_btn_font,
-            command=self._eval_good_action
-        )
-        self.btn_eval_good.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
-
-        self.btn_eval_bad = ctk.CTkButton(
-            self.eval_bar_frame,
-            text="Bad",
-            height=eval_btn_height,
-            corner_radius=eval_btn_corner,
-            border_width=0,
-            fg_color=eval_btn_initial,
-            hover_color=eval_btn_hover,
-            text_color=eval_text_color,
-            font=eval_btn_font,
-            command=self._eval_bad_action
-        )
-        self.btn_eval_bad.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
-
-        self.btn_eval_idk = ctk.CTkButton(
-            self.eval_bar_frame,
-            text="IDK",
-            height=eval_btn_height,
-            corner_radius=eval_btn_corner,
-            border_width=0,
-            fg_color=eval_btn_initial,
-            hover_color=eval_btn_hover,
-            text_color=eval_text_color,
-            font=eval_btn_font,
-            command=self._eval_idk_action
-        )
-        self.btn_eval_idk.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
-
-        # --- Row 2: Analysis Panel ---
+        # --- Row 1: Analysis Panel ---
         self.analysis_container_frame = ctk.CTkFrame(
             self.right_analysis_panel,
             fg_color=THEME["bg_panel"],
@@ -337,7 +272,7 @@ class PatternsAnalysisLayoutMixin:
             border_width=1,
             border_color=THEME.get("border_color", THEME["bg_surface"])
         )
-        self.analysis_container_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=(0, 8))
+        self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         self.lbl_analysis_title = ctk.CTkLabel(
             self.analysis_container_frame,
@@ -362,7 +297,7 @@ class PatternsAnalysisLayoutMixin:
         self.analysis_textbox._textbox.configure(font=("Arial", 11), highlightthickness=0, takefocus=0, wrap="word")
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
-        # --- Row 3: Game Details Panel ---
+        # --- Row 2: Game Details Panel ---
         self.pgn_data_panel = ctk.CTkFrame(
             self.right_analysis_panel,
             fg_color=THEME["bg_panel"],
@@ -370,7 +305,7 @@ class PatternsAnalysisLayoutMixin:
             border_width=1,
             border_color=THEME.get("border_color", THEME["bg_surface"])
         )
-        self.pgn_data_panel.grid(row=3, column=0, sticky="nsew", padx=0, pady=0)
+        self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
         self.pgn_data_header = ctk.CTkFrame(self.pgn_data_panel, fg_color="transparent")
         self.pgn_data_header.pack(fill="x", padx=10, pady=(6, 2))
