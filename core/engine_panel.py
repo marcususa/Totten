@@ -6,9 +6,10 @@ import chess
 import chess.engine
 from core.chess_engine import ChessEngine
 from core.constants import THEME
-from ..engine_mixins.engine_review_mixin import EngineReviewMixin
-from ..engine_mixins.engine_candidate_mixin import EngineCandidateMixin
-from ..engine_mixins.engine_standard_mixin import EngineStandardMixin
+
+from gui.engine_mixins.engine_review_mixin import EngineReviewMixin
+from gui.engine_mixins.engine_candidate_mixin import EngineCandidateMixin
+from gui.engine_mixins.engine_standard_mixin import EngineStandardMixin
 
 
 class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
@@ -28,7 +29,7 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
         """Clears out the left-column PV text display box."""
         self.update_engine_display("[No active position to evaluate.]\n")
 
-    def update_engine_display(self, text):
+    def update_engine_display(self, text, structured_lines=None):
         """STRICTLY controls the left-column engine panel textbox for raw PV lines only."""
         target_box = None
         for attr_name in ("pv_textbox", "raw_engine_textbox", "engine_textbox", "left_textbox", "_cached_analysis_box"):
@@ -39,7 +40,7 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
 
         if target_box:
             try:
-                target_box.configure(fg_color=THEME["bg_surface"])
+                target_box.configure(fg_color=THEME["bg_surface"], text_color=THEME["text_primary"])
                 inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
 
                 try:
@@ -49,7 +50,37 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
 
                 inner_box.configure(state="normal")
                 inner_box.delete("1.0", "end")
-                inner_box.insert("end", text)
+                if text:
+                    inner_box.insert("end", text)
+                if structured_lines:
+                    for line_info in structured_lines:
+                        idx = line_info.get("pv_index", 1)
+                        depth = line_info.get("depth", 0)
+                        eval_str = line_info.get("eval", "+0.00")
+                        moves = line_info.get("moves_san", [])
+                        board_state = line_info.get("board_state")
+
+                        numbered_pv = []
+                        if board_state is not None and moves:
+                            temp_board = board_state.copy()
+                            for m_idx, san_move in enumerate(moves):
+                                if temp_board.turn == chess.WHITE:
+                                    numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
+                                else:
+                                    if m_idx == 0:
+                                        numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
+                                    else:
+                                        numbered_pv.append(san_move)
+                                try:
+                                    mv = temp_board.parse_san(san_move)
+                                    temp_board.push(mv)
+                                except Exception:
+                                    break
+                        else:
+                            numbered_pv = list(moves)
+
+                        moves_str = " ".join(numbered_pv) if numbered_pv else "(none)"
+                        inner_box.insert("end", f"{idx}. {depth} | Eval: {eval_str} {moves_str}\n\n")
                 inner_box.configure(state="disabled")
             except Exception as e:
                 print(f"[ENGINE DISPLAY ERROR] {e}")
@@ -146,24 +177,27 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
                 print("[RAW ENGINE WORKER] Starting thread analysis (MultiPV=5) for left panel...")
                 engine = None
                 try:
-                    engine_path = "stockfish"
+                    engine_client = ChessEngine()
+                    engine_path = str(engine_client.engine_path) if getattr(engine_client, "engine_path", None) else "stockfish"
                     exe_filename = "stockfish.exe" if platform.system() == "Windows" else "stockfish"
 
-                    for folder_name in ("engine", "engines"):
-                        folder_path = Path(folder_name)
-                        if folder_path.exists() and folder_path.is_dir():
-                            candidate = folder_path / exe_filename
-                            if candidate.exists():
-                                engine_path = str(candidate.resolve())
-                                break
-                            for file_path in folder_path.iterdir():
-                                if file_path.is_file():
-                                    if platform.system() == "Windows" and file_path.suffix.lower() == ".exe":
-                                        engine_path = str(file_path.resolve())
-                                        break
-                                    elif platform.system() != "Windows":
-                                        engine_path = str(file_path.resolve())
-                                        break
+                    if not Path(engine_path).exists():
+                        engine_path = "stockfish"
+                        for folder_name in ("engine", "engines"):
+                            folder_path = Path(folder_name)
+                            if folder_path.exists() and folder_path.is_dir():
+                                candidate = folder_path / exe_filename
+                                if candidate.exists():
+                                    engine_path = str(candidate.resolve())
+                                    break
+                                for file_path in folder_path.iterdir():
+                                    if file_path.is_file():
+                                        if platform.system() == "Windows" and file_path.suffix.lower() == ".exe":
+                                            engine_path = str(file_path.resolve())
+                                            break
+                                        elif platform.system() != "Windows":
+                                            engine_path = str(file_path.resolve())
+                                            break
 
                     engine = chess.engine.SimpleEngine.popen_uci(engine_path)
                     limit = chess.engine.Limit(depth=30)
@@ -197,31 +231,31 @@ class CatalogEngineMixin(EngineReviewMixin, EngineCandidateMixin, EngineStandard
                                     "pv": pv
                                 }
 
-                                formatted_lines = []
-                                for idx in sorted(latest_lines.keys()):
-                                    line_data = latest_lines[idx]
-                                    d = line_data["depth"]
-                                    e = line_data["eval"]
-                                    moves = line_data["pv"]
+                            formatted_lines = []
+                            for idx in sorted(latest_lines.keys()):
+                                line_data = latest_lines[idx]
+                                d = line_data["depth"]
+                                e = line_data["eval"]
+                                moves = line_data["pv"]
 
-                                    temp_board = self.board_state.copy()
-                                    numbered_pv = []
-                                    for move in moves:
-                                        san_move = temp_board.san(move)
-                                        if temp_board.turn == chess.WHITE:
-                                            numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
+                                temp_board = self.board_state.copy()
+                                numbered_pv = []
+                                for move in moves:
+                                    san_move = temp_board.san(move)
+                                    if temp_board.turn == chess.WHITE:
+                                        numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
+                                    else:
+                                        if len(numbered_pv) == 0:
+                                            numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
                                         else:
-                                            if len(numbered_pv) == 0:
-                                                numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
-                                            else:
-                                                numbered_pv.append(san_move)
-                                        temp_board.push(move)
+                                            numbered_pv.append(san_move)
+                                    temp_board.push(move)
 
-                                    moves_str = " ".join(numbered_pv)
-                                    formatted_lines.append(f"{idx}. Depth {d}  Eval: {e}  {moves_str}")
+                                moves_str = " ".join(numbered_pv)
+                                formatted_lines.append(f"{idx}. {d} | Eval: {e} {moves_str}")
 
-                                display_text = "\n\n".join(formatted_lines) + "\n"
-                                self.outer.after(0, lambda dt=display_text: self.outer.update_engine_display(dt))
+                            display_text = "\n\n".join(formatted_lines) + "\n"
+                            self.outer.after(0, lambda dt=display_text: self.outer.update_engine_display(dt))
 
                             if current_depth >= 30 and self.pausing_to_depth_30:
                                 break

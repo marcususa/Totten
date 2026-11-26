@@ -154,6 +154,7 @@ class AnalysisPanelMixin:
         inner_box.tag_config("default", foreground=primary)
         inner_box.tag_config("comment_tag", foreground=secondary)
         inner_box.tag_config("variation_tag", foreground=secondary)
+        eval_font = ("Arial", 11, "bold")
         inner_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"))
         inner_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"))
         inner_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"))
