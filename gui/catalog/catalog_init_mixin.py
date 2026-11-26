@@ -135,6 +135,8 @@ class CatalogInitMixin:
             except Exception:
                 pass
         self.update_active_move_highlight()
+        if hasattr(self, "notify_live_engine_position_changed"):
+            self.notify_live_engine_position_changed()
 
     def update_active_move_highlight(self, event=None):
         """Highlights the active move node in analysis_textbox using the active_tracker tag."""
@@ -143,8 +145,8 @@ class CatalogInitMixin:
             return
 
         active_node = (
-                getattr(self, "board_node", None)
-                or getattr(self, "current_node", None)
+            getattr(self, "board_node", None)
+            or getattr(self, "current_node", None)
         )
 
         try:
@@ -160,7 +162,7 @@ class CatalogInitMixin:
                         if ranges:
                             target_box.tag_add("active_tracker", ranges[0], ranges[1])
                             target_box.see(ranges[0])
-                            break
+                        break
         finally:
             try:
                 target_box.configure(state="disabled")
@@ -220,7 +222,7 @@ class CatalogInitMixin:
     def _handle_keypress(self, event=None):
         if event and event.keysym in ("f", "F"):
             self.on_flip_board()
-            return "break"
+        return "break"
 
     def _handle_left(self, event=None):
         if hasattr(self, "on_prev_move") and callable(self.on_prev_move):
@@ -255,7 +257,7 @@ class CatalogInitMixin:
         return "break"
 
     def _init_analysis_tags(self):
-        """Configures CustomTkinter/Tkinter text box tags using central THEME colors and vertical spacing."""
+        """Configures CustomTkinter/Tkinter text box tags using central THEME colors, bold evals, and vertical spacing."""
         target_box = self._get_analysis_text_widget()
         if not target_box:
             return
@@ -263,12 +265,13 @@ class CatalogInitMixin:
         primary = THEME.get("text_primary", "#ffffff")
         secondary = THEME.get("text_secondary", "#94a3b8")
         accent = THEME.get("btn_hover", primary)
+        eval_font = ("Arial", 11, "bold")
 
-        target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), spacing3=6)
-        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), spacing3=6)
-        target_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"), spacing3=6)
-        target_box.tag_config("light_blue", foreground=THEME.get("eval_default", secondary), spacing3=6)
-        target_box.tag_config("default", foreground=primary, spacing3=6)
+        target_box.tag_config("red", foreground=THEME.get("eval_red", "#de3d35"), font=eval_font, spacing3=6)
+        target_box.tag_config("orange", foreground=THEME.get("eval_orange", "#FFA500"), font=eval_font, spacing3=6)
+        target_box.tag_config("green", foreground=THEME.get("eval_green", "#1fa73b"), font=eval_font, spacing3=6)
+        target_box.tag_config("light_blue", foreground=THEME.get("eval_light_blue", "#31a0ef"), font=eval_font, spacing3=6)
+        target_box.tag_config("default", foreground=primary, font=eval_font, spacing3=6)
         target_box.tag_config("comment_tag", foreground=secondary, spacing3=6)
         target_box.tag_config("variation_tag", foreground=secondary, spacing3=6)
         target_box.tag_config("header_tag", foreground=secondary, spacing3=6)
@@ -276,7 +279,7 @@ class CatalogInitMixin:
         target_box.tag_config(
             "active_tracker",
             background=THEME.get("active_tracker_bg", accent),
-            foreground=THEME.get("active_tracker_fg", "#ffffff")
+            foreground=THEME.get("active_tracker_fg", "#ffffff"),
         )
 
     def render_pv_lines(self, pv_data):
@@ -379,14 +382,18 @@ class CatalogInitMixin:
         self.left_pane_container = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.left_pane_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=0)
 
-        self.left_board_panel = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"], corner_radius=8,
-                                             border_width=1,
-                                             border_color=THEME.get("border_ring", THEME["bg_surface"]))
+        self.left_board_panel = ctk.CTkFrame(
+            self.left_pane_container, fg_color=THEME["bg_panel"], corner_radius=8,
+            border_width=1,
+            border_color=THEME.get("border_ring", THEME["bg_surface"])
+        )
         self.left_board_panel.pack(side="top", anchor="w", fill="none", expand=False, padx=0, pady=(0, 5))
 
-        self.board_holder = ctk.CTkFrame(self.left_board_panel, fg_color=THEME["bg_surface"],
-                                         width=LAYOUT["board_width"], height=LAYOUT["board_height"],
-                                         corner_radius=0)
+        self.board_holder = ctk.CTkFrame(
+            self.left_board_panel, fg_color=THEME["bg_surface"],
+            width=LAYOUT["board_width"], height=LAYOUT["board_height"],
+            corner_radius=0
+        )
         self.board_holder.pack(side="top", anchor="w", padx=10, pady=10)
         self.board_holder.pack_propagate(False)
 
@@ -402,10 +409,12 @@ class CatalogInitMixin:
         if hasattr(self, "on_last_move"):
             self.board_widget.on_jump_end = self.on_last_move
 
-        self.engine_results_container_frame = ctk.CTkFrame(self.left_pane_container, fg_color=THEME["bg_panel"],
-                                                           corner_radius=8,
-                                                           border_width=1,
-                                                           border_color=THEME.get("border_ring", THEME["bg_surface"]))
+        self.engine_results_container_frame = ctk.CTkFrame(
+            self.left_pane_container, fg_color=THEME["bg_panel"],
+            corner_radius=8,
+            border_width=1,
+            border_color=THEME.get("border_ring", THEME["bg_surface"])
+        )
         self.engine_results_container_frame.pack(side="top", fill="both", expand=True, padx=0, pady=0)
 
         self.engine_results_header_frame = ctk.CTkFrame(self.engine_results_container_frame, fg_color="transparent")
@@ -507,10 +516,54 @@ class CatalogInitMixin:
 
             create_compact_mode_button("Engine", is_action=True)
             create_compact_mode_button("Review", mode_key="review")
-            create_compact_mode_button("Candidates", mode_key="candidates")
             create_compact_mode_button("Standard", mode_key="standard")
 
+            divider_lbl = ctk.CTkLabel(
+                self.row_analysis_btns,
+                text="|",
+                width=8,
+                height=btn_height,
+                text_color=THEME.get("text_secondary", text_color),
+                font=btn_font,
+            )
+            divider_lbl.pack(side="left", padx=2, pady=0)
+
+            create_compact_mode_button("Candidates", mode_key="candidates")
+
         init_buttons_ui()
+
+        self.chunk_btn_frame = ctk.CTkFrame(self.engine_results_header_frame, fg_color="transparent")
+        self.chunk_btn_frame.pack(side="left", padx=(8, 0))
+
+        chunk_btn_height = 20
+        chunk_btn_corner = 6
+        chunk_btn_font = ctk.CTkFont(size=10, weight="bold")
+        chunk_btn_hover = THEME["btn_hover"]
+        chunk_btn_initial = THEME["btn_initial"]
+        chunk_text_color = THEME["text_primary"]
+        chunk_border_color = THEME.get("border_ring", THEME["bg_surface"])
+
+        def create_chunk_mode_button(text, command_func):
+            frm = ctk.CTkFrame(
+                self.chunk_btn_frame, fg_color="transparent", corner_radius=chunk_btn_corner,
+                border_width=1, border_color=chunk_border_color
+            )
+            frm.pack(side="left", padx=2, pady=0)
+
+            btn = ctk.CTkButton(
+                frm, text=text, width=36, height=chunk_btn_height, corner_radius=chunk_btn_corner,
+                border_width=0, fg_color=chunk_btn_initial,
+                hover_color=chunk_btn_hover, text_color=chunk_text_color, font=chunk_btn_font,
+                command=command_func
+            )
+            btn.bind("<Enter>", lambda e, b=btn, f=frm: b.configure(fg_color=chunk_btn_hover))
+            btn.bind("<Leave>", lambda e, b=btn, f=frm: b.configure(fg_color=chunk_btn_initial))
+            btn.pack(fill="both", expand=True)
+            return btn
+
+        self.btn_plus_10 = create_chunk_mode_button("+10", lambda: self.load_candidate_extension(10))
+        self.btn_plus_20 = create_chunk_mode_button("+20", lambda: self.load_candidate_extension(20))
+        self.btn_plus_30 = create_chunk_mode_button("+30", lambda: self.load_candidate_extension(30))
 
         self.pv_inner_wrapper = ctk.CTkFrame(self.engine_results_container_frame, fg_color="transparent")
         self.pv_inner_wrapper.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -537,9 +590,11 @@ class CatalogInitMixin:
         self.right_analysis_panel.rowconfigure(2, weight=1)
         self.right_analysis_panel.columnconfigure(0, weight=1)
 
-        self.top_catalog_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
-                                              border_width=1,
-                                              border_color=THEME.get("border_ring", THEME["bg_surface"]))
+        self.top_catalog_panel = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
+            border_width=1,
+            border_color=THEME.get("border_ring", THEME["bg_surface"])
+        )
         self.top_catalog_panel.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         style = ttk.Style()
@@ -625,10 +680,12 @@ class CatalogInitMixin:
 
         self.pgn_tree.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
-        self.analysis_container_frame = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"],
-                                                     corner_radius=8,
-                                                     border_width=1,
-                                                     border_color=THEME.get("border_ring", THEME["bg_surface"]))
+        self.analysis_container_frame = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color=THEME["bg_panel"],
+            corner_radius=8,
+            border_width=1,
+            border_color=THEME.get("border_ring", THEME["bg_surface"])
+        )
         self.analysis_container_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=(0, 8))
 
         self.analysis_header_frame = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
@@ -639,39 +696,6 @@ class CatalogInitMixin:
             text_color=THEME.get("text_secondary", THEME["text_primary"])
         )
         self.lbl_analysis_title.pack(side="left", anchor="w")
-
-        self.chunk_btn_frame = ctk.CTkFrame(self.analysis_header_frame, fg_color="transparent")
-        self.chunk_btn_frame.pack(side="left", padx=(10, 0))
-
-        btn_height = 20
-        btn_corner = 6
-        btn_font = ctk.CTkFont(size=10, weight="bold")
-        btn_hover = THEME["btn_hover"]
-        btn_initial = THEME["btn_initial"]
-        text_color = THEME["text_primary"]
-        border_color = THEME.get("border_ring", THEME["bg_surface"])
-
-        def create_chunk_mode_button(text, command_func):
-            frm = ctk.CTkFrame(
-                self.chunk_btn_frame, fg_color="transparent", corner_radius=btn_corner,
-                border_width=1, border_color=border_color
-            )
-            frm.pack(side="left", padx=2, pady=0)
-
-            btn = ctk.CTkButton(
-                frm, text=text, width=36, height=btn_height, corner_radius=btn_corner,
-                border_width=0, fg_color=btn_initial,
-                hover_color=btn_hover, text_color=text_color, font=btn_font,
-                command=command_func
-            )
-            btn.bind("<Enter>", lambda e, b=btn, f=frm: b.configure(fg_color=btn_hover))
-            btn.bind("<Leave>", lambda e, b=btn, f=frm: b.configure(fg_color=btn_initial))
-            btn.pack(fill="both", expand=True)
-            return btn
-
-        self.btn_plus_10 = create_chunk_mode_button("+10", lambda: self.load_candidate_extension(10))
-        self.btn_plus_20 = create_chunk_mode_button("+20", lambda: self.load_candidate_extension(20))
-        self.btn_plus_30 = create_chunk_mode_button("+30", lambda: self.load_candidate_extension(30))
 
         self.analysis_wrapper = ctk.CTkFrame(self.analysis_container_frame, fg_color="transparent")
         self.analysis_wrapper.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -689,8 +713,10 @@ class CatalogInitMixin:
         self._init_analysis_tags()
         self.analysis_textbox.pack(fill="both", expand=True, padx=0, pady=0)
 
-        self.pgn_data_panel = ctk.CTkFrame(self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
-                                           border_width=1, border_color=THEME.get("border_ring", THEME["bg_surface"]))
+        self.pgn_data_panel = ctk.CTkFrame(
+            self.right_analysis_panel, fg_color=THEME["bg_panel"], corner_radius=8,
+            border_width=1, border_color=THEME.get("border_ring", THEME["bg_surface"])
+        )
         self.pgn_data_panel.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
 
         self.pgn_data_header = ctk.CTkFrame(self.pgn_data_panel, fg_color="transparent")
