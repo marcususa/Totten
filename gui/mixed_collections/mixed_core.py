@@ -104,10 +104,10 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
             self.board_widget.on_jump_start = self.on_first_move
             self.board_widget.on_jump_end = self.on_last_move
 
-            # Instantly grab focus back to the workspace when clicking the board
-            self.board_widget.bind("<Button-1>", lambda e: self.focus_set())
-            for child in self.board_widget.winfo_children():
-                child.bind("<Button-1>", lambda e: self.focus_set())
+        # Instantly grab focus back to the workspace when clicking the board
+        self.board_widget.bind("<Button-1>", lambda e: self.focus_set())
+        for child in self.board_widget.winfo_children():
+            child.bind("<Button-1>", lambda e: self.focus_set())
 
         self.after(100, self.focus_set)
 
@@ -157,20 +157,6 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
 
         if self.active_engine_mode:
             self.trigger_engine_mode(self.active_engine_mode)
-
-    def update_engine_display(self, text):
-        """Strictly controls the left-column pv_textbox for raw engine outputs."""
-        target_box = getattr(self, "pv_textbox", None)
-        if target_box:
-            try:
-                target_box.configure(fg_color=THEME["bg_surface"])
-                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-                inner_box.configure(state="normal")
-                inner_box.delete("1.0", "end")
-                inner_box.insert("end", text)
-                inner_box.configure(state="disabled")
-            except Exception as e:
-                print(f"[ENGINE DISPLAY ERROR] {e}")
 
     def write_analysis(self, text):
         self.update_engine_display(text)
@@ -308,7 +294,7 @@ class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, Mix
             if hasattr(state, "active_category_source"):
                 state.active_category_source = eco_games
 
-        self.populate_catalog_tree(eco_games, active_game=target_game)
+            self.populate_catalog_tree(eco_games, active_game=target_game)
 
     def load_game_hardwired(self, game_node, category_source=None):
         if isinstance(category_source, list):

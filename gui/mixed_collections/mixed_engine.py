@@ -1,14 +1,19 @@
 import threading
 import chess
 import gui.app_state as state
-from core.chess_engine import ChessEngine
+from core.chess_engine import ChessEngine, classify_move_evaluation
 from core.constants import THEME
 from ..engine_mixins.engine_review_mixin import EngineReviewMixin
 from ..engine_mixins.engine_candidate_mixin import EngineCandidateMixin
 from ..engine_mixins.engine_standard_mixin import EngineStandardMixin
 
+
 class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandardMixin):
-    """Manages background analysis workers, raw engine evaluation, and mode routing."""
+    """
+    Manages background analysis workers, live raw engine evaluation,
+    visual PV formatting, and mode routing for Mixed Collections.
+    All engine evaluations and metadata remain strictly in memory for the session.
+    """
 
     def _get_current_engine_name(self) -> str:
         if getattr(self, "current_engine", None):
@@ -19,41 +24,224 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
             return mixed.get("current_engine") or "Stockfish"
         return "Stockfish"
 
+    def _get_live_engine_textbox(self):
+        for attr_name in ("pv_textbox", "raw_engine_textbox", "engine_textbox", "_cached_analysis_box"):
+            box = getattr(self, attr_name, None)
+            if box:
+                return box
+        return None
+
+    def _ensure_pv_tags(self, inner_box):
+        primary_color = THEME.get("text_primary", "#ffffff")
+        secondary_color = THEME.get("text_secondary", primary_color)
+        inner_box.tag_config(
+            "pv_header",
+            foreground=primary_color,
+            font=("Arial", 11, "bold"),
+            spacing1=4,
+            spacing3=1,
+        )
+        inner_box.tag_config(
+            "pv_eval_pos",
+            foreground=primary_color,
+            font=("Arial", 11, "bold"),
+        )
+        inner_box.tag_config(
+            "pv_eval_neg",
+            foreground=primary_color,
+            font=("Arial", 11, "bold"),
+        )
+        inner_box.tag_config(
+            "pv_eval_even",
+            foreground=primary_color,
+            font=("Arial", 11, "bold"),
+        )
+        inner_box.tag_config(
+            "pv_moves",
+            foreground=secondary_color,
+            font=("Arial", 11),
+            spacing1=0,
+            spacing3=6,
+        )
+        inner_box.tag_config(
+            "pv_status",
+            foreground=secondary_color,
+            font=("Arial", 11),
+        )
+
+    def _eval_tag_for_string(self, eval_str: str) -> str:
+        text = str(eval_str or "").strip()
+        if text.startswith("+"):
+            try:
+                val = float(text)
+                if val >= 0.35:
+                    return "pv_eval_pos"
+                if val <= -0.35:
+                    return "pv_eval_neg"
+                return "pv_eval_even"
+            except ValueError:
+                return "pv_eval_pos"
+        if text.startswith("-"):
+            return "pv_eval_neg"
+        return "pv_eval_even"
+
+    def update_engine_display(self, text, structured_lines=None):
+        """
+        Renders live PV output into the left-column engine panel with clean visual
+        separation between lines (eval + depth header, then numbered moves) and
+        zero time/millisecond metrics. Left-panel evaluations use the primary theme color
+        while colored evaluations remain reserved for the right-side Analysis panel.
+        """
+        target_box = self._get_live_engine_textbox()
+        if not target_box:
+            return
+
+        try:
+            primary_color = THEME.get("text_primary", "#ffffff")
+            target_box.configure(fg_color=THEME["bg_surface"], text_color=primary_color)
+            inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
+            inner_box.configure(state="normal", fg=primary_color)
+            self._ensure_pv_tags(inner_box)
+            for tag_name in ("red", "orange", "green", "light_blue", "default"):
+                inner_box.tag_config(tag_name, foreground=primary_color)
+            inner_box.delete("1.0", "end")
+            if text:
+                inner_box.insert("end", text, ("pv_status",))
+
+            if structured_lines:
+                for line_info in structured_lines:
+                    idx = line_info.get("pv_index", 1)
+                    depth = line_info.get("depth", 0)
+                    eval_str = line_info.get("eval", "+0.00")
+                    moves = line_info.get("moves_san", [])
+                    board_state = line_info.get("board_state")
+
+                    numbered_pv = []
+                    if board_state is not None and moves:
+                        temp_board = board_state.copy()
+                        for m_idx, san_move in enumerate(moves):
+                            if temp_board.turn == chess.WHITE:
+                                numbered_pv.append(f"{temp_board.fullmove_number}. {san_move}")
+                            else:
+                                if m_idx == 0:
+                                    numbered_pv.append(f"{temp_board.fullmove_number}... {san_move}")
+                                else:
+                                    numbered_pv.append(san_move)
+                            try:
+                                mv = temp_board.parse_san(san_move)
+                                temp_board.push(mv)
+                            except Exception:
+                                break
+                    else:
+                        numbered_pv = list(moves)
+
+                    moves_str = " ".join(numbered_pv) if numbered_pv else "(none)"
+                    eval_tag = self._eval_tag_for_string(eval_str)
+
+                    inner_box.insert("end", f"#{idx} ", ("pv_header",))
+                    inner_box.insert("end", f"{eval_str}", (eval_tag,))
+                    inner_box.insert("end", f" | Depth {depth}\n", ("pv_header",))
+                    inner_box.insert("end", f"  {moves_str}\n", ("pv_moves",))
+
+            inner_box.configure(state="disabled")
+        except Exception as e:
+            print(f"[ENGINE DISPLAY ERROR] {e}")
+
+    def _resolve_current_board(self):
+        if not hasattr(self, "current_node") or self.current_node is None or isinstance(self.current_node, int):
+            game_obj = getattr(self, "current_game", None) or getattr(self, "active_game", None)
+            lists_to_check = ("game_list", "filtered_games", "current_games", "games")
+            if not game_obj:
+                for lst_name in lists_to_check:
+                    lst = getattr(self, lst_name, None)
+                    if lst:
+                        idx = self.current_node if isinstance(self.current_node, int) else 0
+                        if 0 <= idx < len(lst):
+                            game_obj = lst[idx]
+                            break
+
+            if game_obj:
+                if hasattr(game_obj, "root") and callable(game_obj.root):
+                    self.current_node = game_obj.root()
+                elif hasattr(game_obj, "board") and callable(game_obj.board):
+                    self.current_node = game_obj
+                elif isinstance(game_obj, dict) and "game" in game_obj:
+                    g = game_obj["game"]
+                    self.current_node = g.root() if hasattr(g, "root") and callable(g.root) else g
+
+        if not hasattr(self, "current_node") or self.current_node is None or isinstance(self.current_node, int):
+            return None
+
+        if hasattr(self.current_node, "board") and callable(self.current_node.board):
+            return self.current_node.board()
+        if isinstance(self.current_node, chess.Board):
+            return self.current_node.copy()
+        return None
+
+    def notify_live_engine_position_changed(self):
+        """
+        Called whenever the board position changes while live raw engine analysis is active.
+        Debounces rapid navigation clicks so the engine shifts gears cleanly without stuttering.
+        """
+        if not getattr(self, "_engine_running", False):
+            return
+
+        self._raw_engine_gen = getattr(self, "_raw_engine_gen", 0) + 1
+        pending_after = getattr(self, "_raw_engine_debounce_id", None)
+        if pending_after and hasattr(self, "after_cancel"):
+            try:
+                self.after_cancel(pending_after)
+            except Exception:
+                pass
+
+        prev_worker = getattr(self, "_current_raw_engine_worker", None)
+        if prev_worker:
+            prev_worker.cancel = True
+            if getattr(prev_worker, "engine_client", None):
+                try:
+                    prev_worker.engine_client.stop_active_engine()
+                except Exception:
+                    pass
+
+        if hasattr(self, "after"):
+            self._raw_engine_debounce_id = self.after(90, self.start_raw_engine_analysis)
+        else:
+            self.start_raw_engine_analysis()
+
     def toggle_engine_action(self):
         """Controls the independent Engine button for raw live evaluation on the left, with real-time thread state sync."""
         is_running = getattr(self, "_engine_running", False)
         worker = getattr(self, "_current_raw_engine_worker", None)
 
-        if is_running and (worker is None or not worker.is_alive()):
+        if is_running and (worker is None or not worker.is_alive()) and not getattr(self, "_raw_engine_debounce_id", None):
             is_running = False
             self._engine_running = False
 
-        print(f"[DEBUG] Mixed Engine button clicked! Synced _engine_running state: {is_running}")
-
         if is_running:
-            print("[DEBUG] Stopping raw engine analysis...")
             self.stop_raw_engine_analysis()
         else:
-            print("[DEBUG] Starting raw engine analysis...")
             self.start_raw_engine_analysis()
 
     def start_raw_engine_analysis(self):
         """Runs a lightweight background worker for raw engine lines targeting only pv_textbox."""
-        if not hasattr(self, "current_node") or not self.current_node:
-            print("[RAW ENGINE] Error: No current_node found.")
-            self.update_engine_display("[No active position to evaluate.]\n")
+        self._raw_engine_debounce_id = None
+        board_obj = self._resolve_current_board()
+        if board_obj is None:
+            self.update_engine_display("No active position to evaluate.\n")
             return
 
-        try:
-            board_obj = self.current_node.board()
-        except Exception as e:
-            print(f"[RAW ENGINE] Error getting board from node: {e}")
-            return
+        self._raw_engine_gen = getattr(self, "_raw_engine_gen", 0) + 1
+        current_gen = self._raw_engine_gen
 
-        if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
-            self._current_raw_engine_worker.cancel = True
+        prev_worker = getattr(self, "_current_raw_engine_worker", None)
+        if prev_worker:
+            prev_worker.cancel = True
+            if getattr(prev_worker, "engine_client", None):
+                try:
+                    prev_worker.engine_client.stop_active_engine()
+                except Exception:
+                    pass
 
-        # Set running state and update button appearance immediately
         self._engine_running = True
         for btn_name in ("btn_engine_action", "btn_engines"):
             btn = getattr(self, btn_name, None)
@@ -64,86 +252,97 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                     pass
 
         class RawEngineWorker(threading.Thread):
-            def __init__(self, board_state, outer):
+            def __init__(self, board_state, outer, gen_token):
                 super().__init__()
                 self.board_state = board_state
                 self.outer = outer
+                self.generation = gen_token
+                self.expected_generation = gen_token
                 self.cancel = False
+                self.pausing_to_depth_30 = False
                 self.daemon = True
+                self.engine_client = None
 
             def run(self):
-                print("[RAW ENGINE WORKER] Starting thread analysis...")
                 try:
                     engine = ChessEngine(current_engine=self.outer._get_current_engine_name())
+                    self.engine_client = engine
 
                     def callback(res):
-                        if self.cancel:
+                        if self.cancel or self.generation != getattr(self.outer, "_raw_engine_gen", self.generation):
                             return
-                        print(f"[RAW ENGINE WORKER] Received result callback: {res}")
-                        current_depth = res.get('depth', 25)
-                        raw_eval = res.get('eval', 0.0)
 
-                        if isinstance(raw_eval, str) and "M" in raw_eval:
-                            eval_str = raw_eval
+                        raw_lines = res.get("lines", [])
+                        structured = []
+                        if raw_lines:
+                            for entry in raw_lines:
+                                item = dict(entry)
+                                item["board_state"] = self.board_state
+                                structured.append(item)
                         else:
-                            eval_str = f"{float(raw_eval):+.2f}"
-
-                        pv_lines = res.get('pv_lines', [])
-                        if isinstance(pv_lines, list) and pv_lines:
-                            formatted_lines = []
+                            current_depth = res.get("depth", 0)
+                            raw_eval = res.get("eval", 0.0)
+                            eval_str = raw_eval if isinstance(raw_eval, str) else f"{float(raw_eval):+.2f}"
+                            pv_lines = res.get("pv_lines", [])
                             for idx, line in enumerate(pv_lines, start=1):
-                                temp_board = self.board_state.copy()
-                                move_tokens = line.strip().split()
-                                numbered_pv = []
+                                structured.append({
+                                    "pv_index": idx,
+                                    "depth": current_depth,
+                                    "eval": eval_str,
+                                    "moves_san": line.strip().split() if line else [],
+                                    "board_state": self.board_state,
+                                })
 
-                                for move_str in move_tokens:
-                                    try:
-                                        move = temp_board.parse_san(move_str)
-                                        if temp_board.turn == chess.WHITE:
-                                            numbered_pv.append(f"{temp_board.fullmove_number}. {move_str}")
-                                        else:
-                                            if len(numbered_pv) == 0:
-                                                numbered_pv.append(f"{temp_board.fullmove_number}... {move_str}")
-                                            else:
-                                                numbered_pv.append(move_str)
-                                        temp_board.push(move)
-                                    except Exception:
-                                        numbered_pv.append(move_str)
-
-                                moves_str = " ".join(numbered_pv)
-                                formatted_lines.append(f"{idx}. {current_depth} | Eval: {eval_str} {moves_str}")
-
-                            display_text = "\n\n".join(formatted_lines) + "\n"
-                        else:
-                            display_text = f"1. {current_depth} | Eval: {eval_str} | PV: (none)\n"
-
-                        self.outer.after(0, lambda: self.outer.update_engine_display(display_text))
-
-                        # Automatically reset the engine button/state when it finishes depth 25
-                        try:
-                            if int(current_depth) >= 25:
-                                print("[ENGINE] Reached max depth 25. Resetting engine state.")
-                                self.outer.after(0, self.outer.stop_raw_engine_analysis)
-                        except Exception as ex:
-                            print(f"[ENGINE DEBUG] Depth check error: {ex}")
+                        self.outer.after(
+                            0,
+                            lambda sl=structured, g=self.generation: self._apply_ui_update(g, sl),
+                        )
 
                     engine.analyze_position(
                         self.board_state,
-                        depths=(10, 15, 20, 25),
+                        depths=(1, 5, 10, 15, 20, 25),
                         multipv=5,
                         callback=callback,
-                        worker_ref=self
+                        worker_ref=self,
+                        max_depth=30,
                     )
                 except Exception as e:
-                    print(f"[RAW ENGINE WORKER CRASH] {e}")
+                    if not self.cancel:
+                        print(f"[RAW ENGINE WORKER CRASH] {e}")
+                finally:
+                    if self.generation == getattr(self.outer, "_raw_engine_gen", self.generation) and not self.cancel:
+                        self.outer.after(0, self.outer.stop_raw_engine_analysis)
 
-        self._current_raw_engine_worker = RawEngineWorker(board_obj, self)
-        self._current_raw_engine_worker.start()
+            def _apply_ui_update(self, gen_token, structured):
+                if self.cancel or gen_token != getattr(self.outer, "_raw_engine_gen", gen_token):
+                    return
+                if not getattr(self.outer, "_engine_running", False):
+                    return
+                self.outer.update_engine_display("", structured_lines=structured)
+
+        worker = RawEngineWorker(board_obj, self, current_gen)
+        self._current_raw_engine_worker = worker
+        worker.start()
 
     def stop_raw_engine_analysis(self):
-        if hasattr(self, '_current_raw_engine_worker') and self._current_raw_engine_worker:
-            self._current_raw_engine_worker.cancel = True
-            self._current_raw_engine_worker = None
+        self._raw_engine_gen = getattr(self, "_raw_engine_gen", 0) + 1
+        pending_after = getattr(self, "_raw_engine_debounce_id", None)
+        if pending_after and hasattr(self, "after_cancel"):
+            try:
+                self.after_cancel(pending_after)
+            except Exception:
+                pass
+        self._raw_engine_debounce_id = None
+
+        worker = getattr(self, "_current_raw_engine_worker", None)
+        if worker:
+            worker.cancel = True
+            if getattr(worker, "engine_client", None):
+                try:
+                    worker.engine_client.stop_active_engine()
+                except Exception:
+                    pass
+        self._current_raw_engine_worker = None
 
         self._engine_running = False
         for btn_name in ("btn_engine_action", "btn_engines"):
@@ -154,28 +353,20 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                 except Exception:
                     pass
 
-    def update_engine_display(self, text):
-        """Strictly controls the left-column pv_textbox for raw engine outputs without touching the right analysis column."""
-        target_box = getattr(self, "pv_textbox", None)
-        if target_box:
-            try:
-                target_box.configure(fg_color=THEME["bg_surface"])
-                inner_box = getattr(target_box, "_textbox", getattr(target_box, "textbox", target_box))
-                inner_box.configure(state="normal")
-                inner_box.delete("1.0", "end")
-                inner_box.insert("end", text)
-                inner_box.configure(state="disabled")
-            except Exception as e:
-                print(f"[ENGINE DISPLAY ERROR] {e}")
-
     def start_game_review(self, target_game):
         self._run_analysis_worker(target_game, mode="review")
 
     def _run_analysis_worker(self, target_game, mode="review"):
         self.analysis_rows = {}
 
-        if hasattr(self, '_current_analysis_worker') and self._current_analysis_worker:
-            self._current_analysis_worker.cancel = True
+        prev_worker = getattr(self, "_current_analysis_worker", None)
+        if prev_worker:
+            prev_worker.cancel = True
+            if getattr(prev_worker, "engine_client", None):
+                try:
+                    prev_worker.engine_client.stop_active_engine()
+                except Exception:
+                    pass
 
         class WorkerThread(threading.Thread):
             def __init__(self, game_obj, outer, analysis_mode):
@@ -185,6 +376,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                 self.analysis_mode = analysis_mode
                 self.cancel = False
                 self.daemon = True
+                self.engine_client = None
                 self.white_streak = 0
                 self.black_streak = 0
                 self.last_eval = 0.0
@@ -195,63 +387,45 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                         return
 
                     try:
-                        move_num = res['move_num']
-                        is_white = res['is_white']
-                        curr_eval = res.get('eval_after', 0.0)
-                        played_san = res['played_san']
+                        move_num = res["move_num"]
+                        is_white = res["is_white"]
+                        curr_eval = res.get("eval_after", 0.0)
+                        played_san = res["played_san"]
+                        board_before_mv = res.get("board")
 
                         steps = move_num * 2 - 1 if is_white else move_num * 2
                         curr_n = self.game_obj
+                        parent_n = self.game_obj
                         for _ in range(steps):
                             if curr_n.variations:
+                                parent_n = curr_n
                                 curr_n = curr_n.variation(0)
 
-                        if move_num < 8:
+                        b_before = board_before_mv if board_before_mv is None else parent_n.board()
+                        mv_obj = curr_n.move if getattr(curr_n, "move", None) else None
+
+                        tag_to_apply, self.white_streak, self.black_streak, _ = classify_move_evaluation(
+                            move_num=move_num,
+                            is_white=is_white,
+                            eval_before=self.last_eval,
+                            eval_after=curr_eval,
+                            white_streak=self.white_streak,
+                            black_streak=self.black_streak,
+                            board_before=b_before,
+                            move=mv_obj,
+                        )
+                        self.last_eval = curr_eval
+
+                        if move_num < 8 or tag_to_apply == "default":
                             move_display = played_san
-                            tag_to_apply = "default"
-                            self.last_eval = curr_eval
                         else:
-                            if is_white:
-                                loss = self.last_eval - curr_eval
-                            else:
-                                loss = curr_eval - self.last_eval
-
-                            self.last_eval = curr_eval
-
-                            tag_to_apply = "default"
-                            eval_str = ""
-
-                            if loss >= 2.6:
-                                tag_to_apply = "red"
-                                eval_str = f" {{{curr_eval:+.2f}}}"
-                                self.white_streak = 0
-                                self.black_streak = 0
-                            elif 1.0 <= loss <= 2.5:
-                                tag_to_apply = "orange"
-                                eval_str = f" {{{curr_eval:+.2f}}}"
-                                self.white_streak = 0
-                                self.black_streak = 0
-                            elif 0.3 <= loss < 1.0:
-                                if is_white:
-                                    if self.black_streak > 0:
-                                        self.black_streak -= 1
-                                    else:
-                                        self.white_streak += 1
-                                    tag_to_apply = "green" if self.white_streak >= 3 else "light_blue"
-                                else:
-                                    if self.white_streak > 0:
-                                        self.white_streak -= 1
-                                    else:
-                                        self.black_streak += 1
-                                    tag_to_apply = "green" if self.black_streak >= 3 else "light_blue"
-
-                            move_display = f"{played_san}{eval_str}"
+                            move_display = f"{played_san} {{{curr_eval:+.2f}}}"
 
                         if move_num not in self.outer.analysis_rows:
                             self.outer.analysis_rows[move_num] = {
                                 "white": "", "black": "",
                                 "white_tag": "default", "black_tag": "default",
-                                "white_node": None, "black_node": None
+                                "white_node": None, "black_node": None,
                             }
 
                         if is_white:
@@ -264,16 +438,21 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                             self.outer.analysis_rows[move_num]["black_node"] = curr_n
 
                         self.outer.after(0, self.outer._sync_analysis_selection)
-
                     except Exception as ex:
                         print(f"[STREAM CALLBACK ERROR] {ex}")
 
                 try:
-                    print(f"[ENGINE WORKER] Starting analysis for mode: {self.analysis_mode}")
                     engine_worker = ChessEngine(current_engine=self.outer._get_current_engine_name())
-                    engine_worker.analyze_game(self.game_obj, mode=self.analysis_mode, callback=stream_callback)
+                    self.engine_client = engine_worker
+                    engine_worker.analyze_game(
+                        self.game_obj,
+                        mode=self.analysis_mode,
+                        callback=stream_callback,
+                        worker_ref=self,
+                    )
                 except Exception as e:
-                    print(f"[ENGINE WORKER CRASH] Mode {self.analysis_mode} failed: {e}")
+                    if not self.cancel:
+                        print(f"[ENGINE WORKER CRASH] Mode {self.analysis_mode} failed: {e}")
 
         self._current_analysis_worker = WorkerThread(target_game, self, mode)
         self._current_analysis_worker.start()
@@ -288,8 +467,8 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
         target_box = getattr(box, "_textbox", getattr(box, "textbox", box))
 
         active_node = (
-                getattr(self, "board_node", None)
-                or getattr(self, "current_node", None)
+            getattr(self, "board_node", None)
+            or getattr(self, "current_node", None)
         )
 
         try:
@@ -362,7 +541,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                 if b_alts:
                     target_box.insert("end", f"{b_alts} ", ("comment_tag",))
 
-                target_box.insert("end", "    ")
+                target_box.insert("end", " ")
 
             if active_node is not None:
                 suffix = f"_{id(active_node)}"
@@ -373,7 +552,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                         if ranges:
                             target_box.tag_add("active_tracker", ranges[0], ranges[1])
                             target_box.see(ranges[0])
-                            break
+                        break
         finally:
             try:
                 target_box.configure(state="disabled")
@@ -388,7 +567,7 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
         mode_buttons = {
             "review": ("btn_review", "btn_review_mode"),
             "candidates": ("btn_candidates", "btn_candidate_moves"),
-            "standard": ("btn_standard", "btn_standard_mode", "btn_engines")
+            "standard": ("btn_standard", "btn_standard_mode", "btn_engines"),
         }
 
         for m, btn_names in mode_buttons.items():
@@ -405,25 +584,24 @@ class MixedAnalysisEngine(EngineReviewMixin, EngineCandidateMixin, EngineStandar
                     except Exception:
                         pass
 
-        if hasattr(self, "frame_review") and self.frame_review:
-            try:
-                self.frame_review.configure(border_width=0 if mode == "review" else 1)
-            except Exception:
-                pass
-        if hasattr(self, "frame_candidates") and self.frame_candidates:
-            try:
-                self.frame_candidates.configure(border_width=0 if mode == "candidates" else 1)
-            except Exception:
-                pass
-        if hasattr(self, "frame_standard") and self.frame_standard:
-            try:
-                self.frame_standard.configure(border_width=0 if mode == "standard" else 1)
-            except Exception:
-                pass
+        for frame_attr, m_key in (
+            ("frame_review", "review"),
+            ("frame_candidates", "candidates"),
+            ("frame_standard", "standard"),
+        ):
+            frm = getattr(self, frame_attr, None)
+            if frm:
+                try:
+                    frm.configure(border_width=0 if mode == m_key else 1)
+                except Exception:
+                    pass
 
         if mode == "review":
             EngineReviewMixin.trigger_engine_mode(self, "review")
         elif mode == "candidates":
+            if getattr(self, "_engine_running", False) and hasattr(self, "stop_raw_engine_analysis"):
+                self.stop_raw_engine_analysis()
+                self.update_engine_display("")
             EngineCandidateMixin.trigger_engine_mode(self, "candidates")
         elif mode == "standard":
             EngineStandardMixin.trigger_engine_mode(self, "standard")
