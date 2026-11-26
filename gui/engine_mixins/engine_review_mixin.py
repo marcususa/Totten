@@ -174,42 +174,52 @@ class EngineReviewMixin:
                 self.analysis_mode = analysis_mode
                 self.cancel = False
                 self.daemon = True
+                self.engine_client = None
                 self.last_eval = 0.0
+                self.white_streak = 0
+                self.black_streak = 0
 
             def run(self):
                 def stream_callback(res):
                     if self.cancel:
                         return
                     try:
-                        move_num = res['move_num']
-                        is_white = res['is_white']
-                        curr_eval = res.get('eval_after', 0.0)
-                        played_san = res['played_san']
+                        move_num = res["move_num"]
+                        is_white = res["is_white"]
+                        curr_eval = res.get("eval_after", 0.0)
+                        played_san = res["played_san"]
 
                         steps = move_num * 2 - 1 if is_white else move_num * 2
                         curr_n = self.game_obj
+                        parent_n = self.game_obj
                         for _ in range(steps):
                             if curr_n.variations:
+                                parent_n = curr_n
                                 curr_n = curr_n.variation(0)
 
-                        move_display = played_san
-                        tag_to_apply = "default"
+                        from core.chess_engine import classify_move_evaluation
+                        tag_to_apply, self.white_streak, self.black_streak, _ = classify_move_evaluation(
+                            move_num=move_num,
+                            is_white=is_white,
+                            eval_before=self.last_eval,
+                            eval_after=curr_eval,
+                            white_streak=self.white_streak,
+                            black_streak=self.black_streak,
+                            board_before=parent_n.board(),
+                            move=getattr(curr_n, "move", None),
+                        )
+                        self.last_eval = curr_eval
 
-                        if move_num >= 8:
-                            loss = (self.last_eval - curr_eval) if is_white else (curr_eval - self.last_eval)
-                            self.last_eval = curr_eval
-                            if loss >= 2.6:
-                                tag_to_apply = "red"
-                                move_display = f"{played_san} {{{curr_eval:+.2f}}}"
-                            elif 1.0 <= loss <= 2.5:
-                                tag_to_apply = "orange"
-                                move_display = f"{played_san} {{{curr_eval:+.2f}}}"
+                        if move_num < 8 or tag_to_apply == "default":
+                            move_display = played_san
+                        else:
+                            move_display = f"{played_san} {{{curr_eval:+.2f}}}"
 
                         if move_num not in self.outer.analysis_rows:
                             self.outer.analysis_rows[move_num] = {
                                 "white": "", "black": "",
                                 "white_tag": "default", "black_tag": "default",
-                                "white_node": None, "black_node": None
+                                "white_node": None, "black_node": None,
                             }
 
                         if is_white:
@@ -227,13 +237,20 @@ class EngineReviewMixin:
 
                 try:
                     engine_worker = ChessEngine()
-                    engine_worker.analyze_game(self.game_obj, mode=self.analysis_mode, callback=stream_callback)
+                    self.engine_client = engine_worker
+                    engine_worker.analyze_game(
+                        self.game_obj,
+                        mode=self.analysis_mode,
+                        callback=stream_callback,
+                        worker_ref=self,
+                    )
                     if not self.cancel and self.analysis_mode == "review":
                         if not hasattr(self.outer, "analysis_cache"):
                             self.outer.analysis_cache = {}
                         self.outer.analysis_cache[id(self.game_obj)] = self.outer.analysis_rows
                 except Exception as e:
-                    print(f"[ENGINE WORKER CRASH] {e}")
+                    if not self.cancel:
+                        print(f"[ENGINE WORKER CRASH] {e}")
 
         self._current_analysis_worker = WorkerThread(target_game, self, mode)
         self._current_analysis_worker.start()

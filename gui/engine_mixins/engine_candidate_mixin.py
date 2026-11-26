@@ -7,6 +7,7 @@ from core.constants import THEME
 from core.db_backend import USE_DUCKDB, connect_db
 
 
+
 class CommentDBManager:
     """Embedded database manager handling DuckDB or SQLite3 storage for candidate comments."""
 
@@ -214,11 +215,27 @@ class EngineCandidateMixin:
 
     def trigger_engine_chunk(self, chunk_size):
         """Handles chunk buttons (+10, +20, +30) continuing from the last evaluated chunk end."""
-        if hasattr(self, "btn_candidates") and self.btn_candidates:
+        self.active_engine_mode = "candidates"
+        self._selected_mode_button = "candidates"
+
+        if hasattr(self, "_update_analysis_buttons_state") and callable(self._update_analysis_buttons_state):
             try:
-                self.btn_candidates.configure(fg_color=THEME.get("btn_hover", ""))
+                self._update_analysis_buttons_state()
             except Exception:
                 pass
+        else:
+            for btn_name in ("btn_candidates", "btn_candidate_moves"):
+                btn = getattr(self, btn_name, None)
+                if btn is not None:
+                    try:
+                        btn.configure(fg_color=THEME.get("btn_hover", ""))
+                    except Exception:
+                        pass
+            if hasattr(self, "frame_candidates") and self.frame_candidates:
+                try:
+                    self.frame_candidates.configure(border_width=0)
+                except Exception:
+                    pass
 
         start_move = getattr(self, "_active_chunk_end", 0) + 1
         if start_move <= 1 or not hasattr(self, "candidate_rows") or not self.candidate_rows:
