@@ -6,12 +6,24 @@ import gui.app_state as state
 
 from core.constants import THEME
 from core.analysis_panel import AnalysisPanelMixin
-from gui.catalog.catalog_init_mixin import CatalogInitMixin
+from gui.catalog.analysis_layout import AnalysisLayoutMixin
+from gui.catalog.analysis_pgn import AnalysisPgnMixin
+from gui.catalog.analysis_data import AnalysisDataMixin
+from gui.catalog.analysis_search import AnalysisSearchMixin
 from gui.mixed_collections.mixed_navigation import MixedAnalysisNavigation
 from gui.mixed_collections.mixed_engine import MixedAnalysisEngine
 
 
-class MixedAnalysis(ctk.CTkFrame, CatalogInitMixin, MixedAnalysisNavigation, MixedAnalysisEngine, AnalysisPanelMixin):
+class MixedAnalysis(
+    ctk.CTkFrame,
+    AnalysisLayoutMixin,
+    AnalysisPgnMixin,
+    AnalysisDataMixin,
+    AnalysisSearchMixin,
+    MixedAnalysisNavigation,
+    MixedAnalysisEngine,
+    AnalysisPanelMixin,
+):
     """
     Dedicated self-contained workspace controller for Mixed Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
