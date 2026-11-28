@@ -7,12 +7,24 @@ import gui.app_state as state
 
 from core.analysis_panel import AnalysisPanelMixin
 from core.constants import THEME
-from .catalog_init_mixin import CatalogInitMixin
+from .analysis_pgn import AnalysisPgnMixin
+from .analysis_layout import AnalysisLayoutMixin
+from .analysis_data import AnalysisDataMixin
+from .analysis_search import AnalysisSearchMixin
 from .engine import CatalogEngineMixin
 from .navigation import CatalogNavigationMixin
 
 
-class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, CatalogEngineMixin, AnalysisPanelMixin):
+class CatalogAnalysis(
+    ctk.CTkFrame,
+    AnalysisLayoutMixin,
+    AnalysisPgnMixin,
+    AnalysisDataMixin,
+    AnalysisSearchMixin,
+    CatalogNavigationMixin,
+    CatalogEngineMixin,
+    AnalysisPanelMixin,
+):
     """
     Dedicated self-contained workspace controller for Catalog Analysis.
     Absorbs the complete layout grid, tree view navigation, board management, PGN state handling, and engine analysis modes.
@@ -254,7 +266,7 @@ class CatalogAnalysis(ctk.CTkFrame, CatalogInitMixin, CatalogNavigationMixin, Ca
                             f.seek(byte_offset)
                         except Exception:
                             f.seek(0)
-                            byte_offset = 0
+                        byte_offset = 0
 
                     while len(source_games) < chunk_size:
                         pos = f.tell()
